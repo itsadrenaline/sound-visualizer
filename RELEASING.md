@@ -39,6 +39,8 @@ It checks types, runs the tests, builds, signs every binary with the hardened ru
 3. Write what changed (or press **Generate release notes**), then **Publish release**.
 4. Watch it under **Actions**. In about 10 minutes the release has the `.dmg`, the `.zip`, the check results and install notes.
 
+**What's new**: put the notes for a version in `release-notes/v<version>.md` (e.g. `release-notes/v1.4.0.md`) before releasing. The workflow puts them at the top of the release page, above the changelog link and the install steps it adds.
+
 **Actions ▸ Release the Mac app ▸ Run workflow** does the same without drafting a release: it makes one named after the version in `package.json` if there isn't one yet.
 
 To have GitHub sign and notarize it too, add these under **Settings ▸ Secrets and variables ▸ Actions** (the workflow uses them only when they're there):

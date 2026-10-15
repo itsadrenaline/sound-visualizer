@@ -99,3 +99,15 @@ jobs:
           fi
           notes="$(printf '%s\n\n## How to install\n\n1. Download **%s** below (works on Apple Silicon and Intel Macs, macOS 12 or newer).\n2. Open it and drag **Sound Visualizer** into **Applications**.\n3. %b\n\n4. When it asks to find devices on your local network, click **Allow** (that is how SoundSwitch reaches it).\n' "$body" "$(cd dist && ls *.dmg | head -1)" "$first")"
           gh release edit "$tag" --notes "$notes"
+
+      - name: Add what's new to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # release-notes/<tag>.md, written with each version, goes at the top of the release page.
+          tag="${{ steps.release.outputs.tag }}"
+          file="release-notes/$tag.md"
+          [ -f "$file" ] || exit 0
+          body="$(gh release view "$tag" --json body -q .body)"
+          case "$body" in *"## What's new"*) exit 0 ;; esac
+          gh release edit "$tag" --notes "$(printf '%s\n\n%s\n' "$(cat "$file")" "$body")"
