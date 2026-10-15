@@ -47,6 +47,9 @@ export function fnFromText(text: string, context: { afterProgram?: boolean } = {
     [/pan.*fine|pan.*16.?bit|pan\s*\(?lsb/, 'pan'],
     [/tilt.*fine|tilt.*16.?bit|tilt\s*\(?lsb/, 'tilt'],
     [/(pan|tilt|p\/t|x\/y|xy|motor|vector).*speed|speed.*(pan|tilt|p\/t|motor)/, 'panTiltSpeed'],
+    [/(pan|tilt|p\/t|movement|position).*(macro|effect|program|pattern|shape)|auto.?move/, 'positionFx'],
+    [/(endless|continuous|infinite|360).*pan|pan.*(endless|continuous|infinite|rotation)/, 'panRotation'],
+    [/(endless|continuous|infinite|360).*tilt|tilt.*(endless|continuous|infinite|rotation)/, 'tiltRotation'],
     [/\bpan\b|horizontal|^x\b|x-?axis/, 'pan'],
     [/\btilt\b|vertical|^y\b|y-?axis/, 'tilt'],
     [/gobo.*(rot|spin|turn)/, 'goboRotation'],
@@ -57,6 +60,14 @@ export function fnFromText(text: string, context: { afterProgram?: boolean } = {
     [/focus/, 'focus'],
     [/iris/, 'iris'],
     [/frost/, 'frost'],
+    [/blade|framing|beam shaper|\bshaper\b/, 'beamShaper'],
+    [/animation/, 'animation'],
+    [/bubble|snow|spark|co2|confetti|flame|pyro/, 'specialFx'],
+    [/dimm\w*\s*(curve|mode|speed|response)/, 'dimmerMode'],
+    [/\bhue\b/, 'hue'],
+    [/saturation/, 'saturation'],
+    [/indigo/, 'indigo'],
+    [/colou?r\s*(chase|fade|effects?)/, 'colorFx'],
     [/laser/, 'laser'],
     [/sound|sensitiv|\bmic\b|audio/, 'sound'],
     [/strob|shutter|flash/, 'shutter'],
@@ -336,6 +347,13 @@ export function parseChart(text: string, kindHint?: FixtureKind, name?: string, 
       partFor.set(`${c}|c`, p.id)
     }
   }
+  // An LED ring around the lens (moving heads, PARs): channels named "ring red", "aura effect"…
+  const ringNamed = /\bring\b|halo|aura|backlight/i
+  const ringPart: PartDef | null = all.some((i) => i.cell === null && ringNamed.test(i.raw.name)) ? { id: newKey('p'), name: 'LED ring', role: 'halo' } : null
+  if (ringPart) {
+    parts.push(ringPart)
+    notes.push('Found channels for an LED ring around the lens: they drive the ring part.')
+  }
 
   const channelDefs: ChannelDef[] = []
   for (let n = 1; n <= top; n++) {
@@ -344,7 +362,7 @@ export function parseChart(text: string, kindHint?: FixtureKind, name?: string, 
       channelDefs.push({ id: newKey('c'), name: `Channel ${n}`, fn: 'other', part: null, ranges: [], confidence: 'missing', note: 'Not in the manual text given.' })
       continue
     }
-    const part = i.cell !== null ? partFor.get(`${i.cell}|${whites.includes(i.fn) ? 'w' : 'c'}`) ?? null : null
+    const part = i.cell !== null ? partFor.get(`${i.cell}|${whites.includes(i.fn) ? 'w' : 'c'}`) ?? null : ringPart && ringNamed.test(i.raw.name) ? ringPart.id : null
     const ranges = i.raw.ranges.length === 1 && i.raw.ranges[0].lo === 0 && i.raw.ranges[0].hi === 255 && FN[i.fn].style === 'level' ? [] : i.raw.ranges.map((r, k) => rangeFromRow(i.fn, r, k))
     const isFilled = filled.includes(i)
     const label = i.raw.name.replace(/\s{2,}/g, ' ').trim()

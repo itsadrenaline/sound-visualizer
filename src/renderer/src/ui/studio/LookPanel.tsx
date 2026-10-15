@@ -49,7 +49,7 @@ export function LookPanel({ def }: { def: FixtureDef }) {
         ))}
       </div>
 
-      <label className="field">
+      <label className="field" title="The body drawn on the twin and in your show. The kind above picks one; change it if the light looks different.">
         <span className="label">Shape</span>
         <select value={look.shape} onChange={(e) => setLook({ shape: e.target.value as LookKind })}>
           {SHAPES.map(([v, label]) => (
@@ -63,7 +63,7 @@ export function LookPanel({ def }: { def: FixtureDef }) {
       <div className="panel-sub">Size (mm)</div>
       <div className="row-3">
         {(['Width', 'Height', 'Depth'] as const).map((label, i) => (
-          <label key={label} className="field small">
+          <label key={label} className="field small" title={`${label} of the housing in millimetres, from the manual's specifications`}>
             <span className="label">{label}</span>
             <input type="number" min={5} max={4000} value={mm(look.size[i])} onChange={(e) => setSize(i, Number(e.target.value))} />
           </label>
@@ -89,7 +89,7 @@ export function LookPanel({ def }: { def: FixtureDef }) {
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
         </label>
-        <label className="field small">
+        <label className="field small" title="How the cells sit on the face: in a row (bars), a column (tubes), a grid (panels), a ring…">
           <span className="label">Laid out</span>
           <select value={look.layout?.kind ?? ''} onChange={(e) => setLook({ layout: e.target.value ? { kind: e.target.value as CellLayout['kind'], cols: look.layout?.cols } : undefined })}>
             <option value="">Automatic</option>
@@ -102,7 +102,7 @@ export function LookPanel({ def }: { def: FixtureDef }) {
         </label>
       </div>
       {look.layout?.kind === 'grid' && (
-        <label className="field small">
+        <label className="field small" title="How many cells in each row of the grid">
           <span className="label">Across</span>
           <input type="number" min={1} max={64} value={look.layout.cols ?? Math.ceil(Math.sqrt(cells))} onChange={(e) => setLook({ layout: { kind: 'grid', cols: Math.max(1, Number(e.target.value)) } })} />
         </label>
@@ -110,7 +110,7 @@ export function LookPanel({ def }: { def: FixtureDef }) {
 
       <div className="panel-sub">Housing and beam</div>
       <div className="row-2">
-        <label className="field small">
+        <label className="field small" title="The colour of the housing">
           <span className="label">Colour</span>
           <select value={look.bodyColor ?? ''} onChange={(e) => setLook({ bodyColor: e.target.value || undefined })}>
             <option value="">Black</option>
@@ -119,7 +119,7 @@ export function LookPanel({ def }: { def: FixtureDef }) {
             <option value="#5a3a22">Wood / retro</option>
           </select>
         </label>
-        <label className="field small">
+        <label className="field small" title="How bright it is compared with a typical 100 W LED spot: more for blinders and beams, less for small pars">
           <span className="label">Brightness</span>
           <input type="range" min={0.1} max={2.5} step={0.05} value={look.output} onChange={(e) => setLook({ output: Number(e.target.value) })} />
         </label>
@@ -136,11 +136,11 @@ export function LookPanel({ def }: { def: FixtureDef }) {
       </div>
       {moving && (
         <div className="row-2">
-          <label className="field small">
+          <label className="field small" title="How far the head turns from one end of pan to the other (often 540°)">
             <span className="label">Pan range °</span>
             <input type="number" min={90} max={720} value={look.pan ?? 540} onChange={(e) => setLook({ pan: Number(e.target.value) })} />
           </label>
-          <label className="field small">
+          <label className="field small" title="How far the head tips from one end of tilt to the other (often 270°)">
             <span className="label">Tilt range °</span>
             <input type="number" min={45} max={360} value={look.tilt ?? 270} onChange={(e) => setLook({ tilt: Number(e.target.value) })} />
           </label>

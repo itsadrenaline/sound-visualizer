@@ -6,9 +6,11 @@
  * fold into one row ("Cells 1-16 · Red Green Blue"), so a 100-channel bar stays short.
  */
 import { useMemo, useState } from 'react'
-import { CONFIDENCE, FN, FN_GROUPS, channelLabel, type ChannelDef, type ChannelFn, type FixtureDef } from '../../model/fixtureDef'
+import { CONFIDENCE, FN, channelLabel, type ChannelDef, type FixtureDef } from '../../model/fixtureDef'
 import { restValue } from '../../model/fixtureTests'
 import { addChannels, deleteChannels, editChannels, moveChannels, repeatForCells, useStudio } from '../../state/studio'
+import { addRing, type RingColours } from '../../model/fixtureStarts'
+import { FnPicker } from './FnPicker'
 
 type Row = { kind: 'channel'; index: number; ch: ChannelDef } | { kind: 'group'; key: string; label: string; indexes: number[] }
 
@@ -98,34 +100,32 @@ export function ChannelList({ def }: { def: FixtureDef }) {
   const sel = channels.filter((c) => selected.includes(c.id))
   const [adding, setAdding] = useState(false)
   const [repeat, setRepeat] = useState<number | null>(null)
+  const ringAdd = (colours: RingColours, effects: boolean) => {
+    let added: string[] = []
+    st().edit((d) => {
+      const r = addRing(d, modeIndex, colours, effects)
+      added = r.added
+      return r.def
+    })
+    st().select(added)
+  }
   return (
     <div className="ch-list" data-tour="studio-channels">
       <div className="ch-tools">
         <div className="ch-add">
-          <button className="mini" onClick={() => setAdding(!adding)} title="Add a channel after the selected one (or at the end)">
-            + Channel
+          <button className="mini" onClick={() => setAdding(!adding)} title="Add a channel after the picked one (or at the end), or a part such as an LED ring around the lens">
+            + Add
           </button>
           {adding && (
-            <select
-              autoFocus
-              size={10}
-              className="fn-pick"
-              onChange={(e) => {
-                addChannels([e.target.value as ChannelFn], sel[0]?.part ?? null, sel.at(-1)?.id)
-                setAdding(false)
-              }}
-              onBlur={() => setAdding(false)}
-            >
-              {FN_GROUPS.map((g) => (
-                <optgroup key={g} label={g}>
-                  {(Object.keys(FN) as ChannelFn[]).filter((f) => FN[f].group === g).map((f) => (
-                    <option key={f} value={f}>
-                      {FN[f].label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <FnPicker
+              onPick={(fn) => addChannels([fn], sel[0]?.part ?? null, sel.at(-1)?.id)}
+              onClose={() => setAdding(false)}
+              extra={[
+                { label: 'LED ring (RGB)', explain: 'A ring of LEDs around the lens (moving heads, some PARs): adds Ring red, green and blue at the end, as a part of its own.', run: () => ringAdd('RGB', false) },
+                { label: 'LED ring (RGBW)', explain: 'A ring with red, green, blue and white: adds four channels at the end.', run: () => ringAdd('RGBW', false) },
+                { label: 'LED ring with effects', explain: 'RGB ring plus its own effects channel (chases, fades) and effect speed.', run: () => ringAdd('RGB', true) }
+              ]}
+            />
           )}
         </div>
         <button className="mini" disabled={!sel.length} onClick={() => moveChannels(selected, -1)} title="Move the selected channels up one">
@@ -136,7 +136,7 @@ export function ChannelList({ def }: { def: FixtureDef }) {
         </button>
         {repeat === null ? (
           <button className="mini" disabled={!sel.length} onClick={() => setRepeat(8)} title="Make the selected channels cell 1, and repeat them for the other cells (e.g. Red, Green, Blue × 8)">
-            Repeat for cells…
+            Repeat…
           </button>
         ) : (
           <span className="inline-ask">
@@ -159,7 +159,7 @@ export function ChannelList({ def }: { def: FixtureDef }) {
         </button>
       </div>
       <div className="ch-rows" onMouseLeave={() => st().setPreview(null)}>
-        {!channels.length && <p className="hint">No channels yet. Add them with + Channel, paste the manual's chart from the start screen, or pick a type.</p>}
+        {!channels.length && <p className="hint">No channels yet. Add them with + Add, paste the manual's chart from the start screen, or pick a type.</p>}
         {rows.map((r) => {
           if (r.kind === 'group') {
             const ids = r.indexes.map((k) => channels[k].id)

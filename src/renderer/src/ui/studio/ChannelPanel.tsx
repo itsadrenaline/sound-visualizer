@@ -10,6 +10,7 @@ import type { ProgramPattern } from '../../model/heads'
 import { tidyRanges } from '../../model/fixtureChecks'
 import { editChannels, setChannelFn, useStudio } from '../../state/studio'
 import { ValueBar } from './ValueBar'
+import { FnButton } from './FnPicker'
 
 const PATTERNS: ProgramPattern[] = ['chase', 'fade', 'jump', 'rainbow', 'strobe', 'pulse', 'static', 'none']
 
@@ -94,12 +95,12 @@ function OneChannel({ def, ch, index }: { def: FixtureDef; ch: ChannelDef; index
         <span className="label">Name</span>
         <input value={ch.name} onChange={(e) => editChannels([ch.id], (c) => ({ ...c, name: e.target.value }))} />
       </label>
-      <label className="field">
+      <div className="field">
         <span className="label">What it does</span>
-        <FnSelect value={ch.fn} onChange={(fn) => setChannelFn([ch.id], fn)} />
-      </label>
+        <FnButton value={ch.fn} onPick={(fn) => setChannelFn([ch.id], fn)} />
+      </div>
       <p className="explain">{FN[ch.fn].explain}</p>
-      <label className="field">
+      <label className="field" title="Which part of the light this channel controls: the whole light, one cell, an LED ring, or a part of a multi-effect bar">
         <span className="label">Drives</span>
         <PartSelect def={def} value={ch.part} onChange={(part) => editChannels([ch.id], (c) => ({ ...c, part }))} />
       </label>
@@ -107,7 +108,7 @@ function OneChannel({ def, ch, index }: { def: FixtureDef; ch: ChannelDef; index
         <label className="check" title="The low byte of a 16-bit pair: it follows the channel before it with the same job, for smoother movement">
           <input type="checkbox" checked={!!ch.fine} onChange={(e) => editChannels([ch.id], (c) => ({ ...c, fine: e.target.checked || undefined }))} /> Fine (16-bit)
         </label>
-        <label className="field small">
+        <label className="field small" title="How sure we are about this channel: guessed and missing ones are worth checking on the twin or against the manual">
           <span className="label">Status</span>
           <select value={ch.confidence} onChange={(e) => editChannels([ch.id], (c) => ({ ...c, confidence: e.target.value as Confidence }))}>
             {(Object.keys(CONFIDENCE) as Confidence[]).map((k) => (
@@ -250,10 +251,10 @@ function ManyChannels({ def, chosen }: { def: FixtureDef; chosen: ChannelDef[] }
     <div className="many-ch">
       <div className="panel-title">{chosen.length} channels</div>
       <p className="hint">Changes here apply to all of them at once.</p>
-      <label className="field">
+      <div className="field">
         <span className="label">What they do</span>
-        <FnSelect value={fns.size === 1 ? [...fns][0] : ''} onChange={(fn) => setChannelFn(ids, fn)} />
-      </label>
+        <FnButton value={fns.size === 1 ? [...fns][0] : 'other'} several={fns.size !== 1} onPick={(fn) => setChannelFn(ids, fn)} />
+      </div>
       <label className="field">
         <span className="label">Drive</span>
         <PartSelect def={def} value={parts.size === 1 ? [...parts][0] : '~'} onChange={(part) => editChannels(ids, (c) => ({ ...c, part }))} />

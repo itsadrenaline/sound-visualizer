@@ -2,38 +2,36 @@
  * Fixture Studio's first screen: one step to a working twin, whatever you have.
  *  - Type the light's name: the Library (Open Fixture Library, QLC+, My Fixtures)
  *    and your show are searched as you type; pick one to open it.
- *  - Paste or type the manual's DMX chart; or drop the manual (PDF or photos,
- *    read by Claude) or a fixture file (GDTF, OFL, QLC+).
+ *  - Enter the manual's DMX chart in a table (pasting a chart fills it in).
+ *  - Ask Claude to make it: from its name (Claude finds the manual on the web)
+ *    or from a description.
+ *  - Drop the manual (PDF or photos, read by Claude) or a fixture file.
  *  - Search the web for the manual (Claude, or your browser).
- *  - Or start from a type of light.
+ *  - Or start from a kind of light, with the usual channel layouts to pick from.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { KINDS, KIND_ORDER, type FixtureKind } from '../../model/fixtureDef'
-import { parseChart } from '../../model/manualParser'
 import { readFixtureFile } from '../../model/fixtureFiles'
 import { plainName, type FixtureType } from '../../model/fixtureTypes'
 import { searchLibrary, useLibrary } from '../../state/library'
 import { useStore } from '../../state/store'
-import { newFromKind, useStudio } from '../../state/studio'
-import { openManualSearch, photoForClaude, readManualWithClaude, searchWebWithClaude, toBase64, type AiInput } from '../../state/fixtureAi'
+import { useStudio } from '../../state/studio'
+import { makeWithClaude, openManualSearch, photoForClaude, readManualWithClaude, searchWebWithClaude, toBase64, type AiInput } from '../../state/fixtureAi'
 import { notify } from '../../state/notices'
 import { KindIcon } from './LookPanel'
+import { ChartTable } from './ChartTable'
+import { StartPicker } from './StartPicker'
+import { ConnectClaude, useClaude } from './ClaudeBox'
 
-const EXAMPLE = `1  Dimmer  0-255
-2  Red
-3  Green
-4  Blue
-5  Strobe  0-9 no strobe
-           10-255 slow to fast
-6  Program  0-9 off
-            10-255 auto programs`
+const CLAUDE_EXAMPLES = ['Chauvet Intimidator Spot 360, 14-channel mode', 'ADJ Mega Hex Par', 'A 7-channel RGBW PAR with strobe and auto programs', 'A moving head wash with an RGB LED ring around the lens']
 
 export function StudioStart() {
   const [query, setQuery] = useState('')
-  const [chart, setChart] = useState<string | null>(null)
+  const [open, setOpen] = useState<'chart' | 'claude' | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [claude, setClaude] = useState(false)
-  const [kind, setKind] = useState<FixtureKind | ''>('')
+  const { connected: claude } = useClaude()
+  const [kind, setKind] = useState<FixtureKind | null>(null)
+  const [prompt, setPrompt] = useState('')
   const entries = useLibrary((s) => s.entries)
   const status = useLibrary((s) => s.status)
   const project = useStore((s) => s.project)
@@ -41,7 +39,6 @@ export function StudioStart() {
 
   useEffect(() => {
     void useLibrary.getState().load()
-    void window.api?.claudeStatus().then((s) => setClaude(s.connected))
   }, [])
 
   const results = useMemo(() => (query.trim().length > 1 ? searchLibrary(entries, query, 'all').slice(0, 8) : []), [entries, query])
@@ -60,19 +57,13 @@ export function StudioStart() {
     useStudio.getState().openDef(structuredClone(def), [`Opened from the Library: ${def.manufacturer} ${def.name}. Edits make your own copy; the Library keeps the original.`])
   }
 
-  const readText = () => {
-    if (!chart?.trim()) return
-    const { def, notes } = parseChart(chart, kind || undefined, model || query.trim() || undefined, model ? maker : undefined)
-    if (!def.modes[0]?.channels.length) {
-      notify('error', 'No channels found: each line should start with the channel number, like the example.')
-      return
-    }
-    useStudio.getState().openDef(def, [`Read ${def.modes[0].channels.length} channels from the text.`, ...notes])
+  const readTextWithClaude = async (text: string) => {
+    await withClaude('Claude is reading the chart…', () => readManualWithClaude([{ kind: 'text', text }], { name: model || query, manufacturer: model ? maker : undefined, kind: kind ?? undefined }))
   }
 
-  const readTextWithClaude = async () => {
-    if (!chart?.trim()) return
-    await withClaude('Claude is reading the chart…', () => readManualWithClaude([{ kind: 'text', text: chart }], { name: model || query, manufacturer: model ? maker : undefined, kind: kind || undefined }))
+  const askClaude = async (text: string) => {
+    if (!text.trim()) return
+    await withClaude('Claude is making the fixture…', () => makeWithClaude(text.trim(), { kind: kind ?? undefined }))
   }
 
   const withClaude = async (label: string, run: () => Promise<{ def: Parameters<ReturnType<typeof useStudio.getState>['openDef']>[0]; notes: string[]; sources?: string[] }>) => {
@@ -80,7 +71,7 @@ export function StudioStart() {
     try {
       const r = await run()
       const n = r.def.modes.reduce((a, m) => a + m.channels.length, 0)
-      useStudio.getState().openDef(r.def, [`Claude read ${r.def.modes.length} mode${r.def.modes.length === 1 ? '' : 's'} (${n} channels). Check the amber rows on the twin.`, ...r.notes, ...(r.sources?.length ? [`Sources: ${r.sources.join(', ')}`] : [])])
+      useStudio.getState().openDef(r.def, [`Claude made ${r.def.modes.length} mode${r.def.modes.length === 1 ? '' : 's'} (${n} channels). Check the amber rows on the twin.`, ...r.notes, ...(r.sources?.length ? [`Sources: ${r.sources.join(', ')}`] : [])])
     } catch (error) {
       notify('error', (error as Error).message)
     } finally {
@@ -103,8 +94,8 @@ export function StudioStart() {
     const manual = files.filter((f) => f.type.startsWith('image/') || /\.pdf$/i.test(f.name))
     if (!manual.length) return notify('error', 'Drop a manual (PDF or photos) or a fixture file (.gdtf, .json, .qxf, .svfixture).')
     if (!claude) {
-      notify('info', 'Reading photos and PDFs needs Claude connected (Build show ▸ Connect Claude). Meanwhile, type or paste the DMX chart: it’s read right here.')
-      setChart(chart ?? '')
+      notify('info', 'Reading photos and PDFs needs Claude: connect it in the “Ask Claude” box. Meanwhile, type or paste the DMX chart into the table.')
+      setOpen('chart')
       return
     }
     await withClaude(`Claude is reading ${manual.length} page${manual.length === 1 ? '' : 's'}…`, async () => {
@@ -113,7 +104,7 @@ export function StudioStart() {
         if (/\.pdf$/i.test(f.name)) inputs.push({ kind: 'pdf', base64: toBase64(new Uint8Array(await f.arrayBuffer())) })
         else inputs.push({ kind: 'image', ...(await photoForClaude(f)) })
       }
-      return readManualWithClaude(inputs, { name: model || query, manufacturer: model ? maker : undefined, kind: kind || undefined })
+      return readManualWithClaude(inputs, { name: model || query, manufacturer: model ? maker : undefined, kind: kind ?? undefined })
     })
   }
 
@@ -121,8 +112,8 @@ export function StudioStart() {
     if (!query.trim()) return notify('info', 'Type the light’s maker and model first, e.g. “Equinox SpectraPix Batten”.')
     if (!claude) {
       openManualSearch(model ? maker : '', model || query)
-      setChart(chart ?? '')
-      notify('info', 'Opened a search for the manual in your browser. Copy its DMX chart and paste it here.')
+      setOpen('chart')
+      notify('info', 'Opened a search for the manual in your browser. Copy its DMX chart and paste it into the table.')
       return
     }
     await withClaude(`Claude is searching the web for the ${query.trim()} manual…`, () => searchWebWithClaude(model ? maker : '', model || query))
@@ -143,8 +134,11 @@ export function StudioStart() {
 
         <div className="start-search">
           <input autoFocus placeholder="What light is it? e.g. Chauvet Freedom Stick" value={query} onChange={(e) => setQuery(e.target.value)} data-tour="studio-search" />
-          {status === 'loading' && <span className="hint">Loading the Library…</span>}
+          <button className="claude-btn" onClick={() => (setOpen('claude'), setPrompt(prompt || query))} title="Claude makes it: from the name (it finds the manual on the web) or from a description">
+            ✦ Make it with Claude
+          </button>
         </div>
+        {status === 'loading' && <p className="hint">Loading the Library…</p>}
         {results.length > 0 && (
           <div className="start-results">
             <div className="panel-sub">Already known: open it, test it, change it if you need to</div>
@@ -160,62 +154,98 @@ export function StudioStart() {
             ))}
           </div>
         )}
-        {query.trim().length > 1 && !results.length && status === 'ready' && <p className="hint">Not in the Library. Get its DMX chart: search the web for the manual, or paste or drop it below.</p>}
+        {query.trim().length > 1 && !results.length && status === 'ready' && <p className="hint">Not in the Library. Make it with Claude, get its DMX chart from the manual, or start from a kind of light below.</p>}
 
-        <div className="start-tiles">
-          <div className={`tile ${chart !== null ? 'open' : ''}`}>
-            <div className="tile-head" onClick={() => setChart(chart ?? '')}>
-              <span className="tile-title">Type or paste the DMX chart</span>
-              <span className="tile-text">Copy it from the manual's PDF or type it in: channel number, name, and value ranges if it has them.</span>
+        <div className={`start-tiles ${open ? 'has-open' : ''}`}>
+          <div className={`tile ${open === 'chart' ? 'open' : ''}`} onClick={() => open !== 'chart' && setOpen('chart')} title={open === 'chart' ? undefined : "Fill in a table from the manual's DMX chart, or paste the chart into it"}>
+            <div className="tile-head">
+              <span className="tile-title">Enter the DMX chart</span>
+              <span className="tile-text">From the manual: one row per channel. Paste the chart from a PDF and the table fills itself in.</span>
             </div>
-            {chart !== null && (
+            {open === 'chart' && (
               <>
-                <textarea autoFocus placeholder={EXAMPLE} value={chart} onChange={(e) => setChart(e.target.value)} spellCheck={false} />
-                <div className="tile-actions">
-                  <select value={kind} onChange={(e) => setKind(e.target.value as FixtureKind | '')} title="What kind of light is it? (worked out from the channels if you leave it)">
-                    <option value="">Kind: work it out</option>
-                    {KIND_ORDER.map((k) => (
-                      <option key={k} value={k}>
-                        {KINDS[k].label}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="primary" disabled={!chart.trim()} onClick={readText}>
-                    Read it
-                  </button>
-                  {claude && (
-                    <button disabled={!chart.trim()} onClick={() => void readTextWithClaude()} title="For messy text: Claude reads it instead">
-                      Read with Claude
-                    </button>
-                  )}
-                </div>
+                <ChartTable name={model || query.trim() || undefined} maker={model ? maker : undefined} claude={claude} onClaude={(t) => void readTextWithClaude(t)} onMake={(def, notes) => useStudio.getState().openDef(def, [`Made from the table: ${def.modes[0].channels.length} channels.`, ...notes])} />
+                <button className="mini quiet tile-close" onClick={(e) => (e.stopPropagation(), setOpen(null))} title="Close the table">
+                  Close
+                </button>
               </>
             )}
           </div>
 
-          <div className="tile drop" onClick={() => file.current?.click()}>
-            <span className="tile-title">Drop the manual or a fixture file</span>
-            <span className="tile-text">
-              Photos or a PDF of the manual{claude ? ' (read by Claude)' : ' (needs Claude connected)'}, or a fixture file from the maker, GDTF Share, the Open Fixture Library or QLC+ (.gdtf, .json, .qxf).
-            </span>
+          <div className={`tile claude-tile ${open === 'claude' ? 'open' : ''}`} onClick={() => open !== 'claude' && (setOpen('claude'), setPrompt(prompt || query))}>
+            <div className="tile-head">
+              <span className="tile-title">✦ Ask Claude to make it</span>
+              <span className="tile-text">{claude ? 'Name the light and Claude finds its manual on the web, or describe it and Claude builds it.' : 'Name or describe the light and Claude builds it (connects with your Anthropic API key).'}</span>
+            </div>
+            {open === 'claude' &&
+              (claude ? (
+                <div className="claude-make" onClick={(e) => e.stopPropagation()}>
+                  <textarea
+                    autoFocus
+                    value={prompt}
+                    placeholder="e.g. “Chauvet Intimidator Spot 360, 14-channel mode” or “a 7-channel RGBW PAR with strobe and programs”"
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), void askClaude(prompt))}
+                  />
+                  <div className="ask-examples">
+                    {CLAUDE_EXAMPLES.map((x) => (
+                      <button key={x} className="mini" onClick={() => setPrompt(x)}>
+                        {x}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="tile-actions">
+                    <button className="primary" disabled={!prompt.trim()} onClick={() => void askClaude(prompt)}>
+                      Make it
+                    </button>
+                    <span className="hint">Enter to make it · Claude marks what it guessed, so you can check it on the twin</span>
+                    <span className="spacer" />
+                    <button className="mini quiet" onClick={() => setOpen(null)}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <ConnectClaude onClose={() => setOpen(null)} />
+              ))}
+          </div>
+
+          <div className="tile drop" onClick={() => file.current?.click()} title="Or drop the files anywhere on this screen">
+            <div className="tile-head">
+              <span className="tile-title">Drop the manual or a fixture file</span>
+              <span className="tile-text">
+                Photos or a PDF of the manual{claude ? ' (read by Claude)' : ' (needs Claude)'}, or a fixture file: GDTF, Open Fixture Library, QLC+ or one shared from this app (.gdtf, .json, .qxf, .svfixture).
+              </span>
+            </div>
             <input ref={file} type="file" multiple hidden accept=".gdtf,.json,.qxf,.svfixture,.pdf,image/*" onChange={(e) => void takeFiles([...(e.target.files ?? [])])} />
           </div>
 
-          <div className="tile" onClick={() => void webSearch()}>
-            <span className="tile-title">Search the web for its manual</span>
-            <span className="tile-text">{claude ? 'Claude finds the manual and reads its DMX chart and size for you.' : 'Opens a search in your browser; paste the chart you find here. (With Claude connected, it does this for you.)'}</span>
+          <div className="tile" onClick={() => void webSearch()} title={claude ? 'Claude searches the web for the manual and reads it' : 'Opens a web search for the manual in your browser'}>
+            <div className="tile-head">
+              <span className="tile-title">Search the web for its manual</span>
+              <span className="tile-text">{claude ? 'Type the name above first: Claude finds the manual and reads its DMX chart and size.' : 'Type the name above first: opens a search in your browser, then paste the chart into the table.'}</span>
+            </div>
           </div>
         </div>
 
-        <div className="panel-sub">Or start from a type of light</div>
+        <div className="panel-sub">Or start from a kind of light</div>
         <div className="kind-grid big">
           {KIND_ORDER.map((k) => (
-            <button key={k} className="kind" title={KINDS[k].explain} onClick={() => newFromKind(k, model || query.trim() || undefined, model ? maker : undefined)}>
+            <button key={k} className={`kind ${kind === k ? 'active' : ''}`} title={KINDS[k].explain} onClick={() => setKind(kind === k ? null : k)}>
               <KindIcon kind={k} />
               <span>{KINDS[k].label}</span>
             </button>
           ))}
         </div>
+        {kind && (
+          <StartPicker
+            kind={kind}
+            name={model || query.trim() || undefined}
+            maker={model ? maker : undefined}
+            onClose={() => setKind(null)}
+            onPick={(def, note) => useStudio.getState().openDef(def, [note])}
+          />
+        )}
 
         {showTypes.length > 0 && (
           <>

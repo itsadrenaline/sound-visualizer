@@ -18,11 +18,12 @@ import { LOOK_DEFAULTS, type CellLayout, type FixtureSpec, type LookKind } from 
 // ---------------------------------------------------------------------------
 
 export type ChannelFn =
-  | 'dimmer' | 'red' | 'green' | 'blue' | 'white' | 'warmWhite' | 'coolWhite' | 'amber' | 'uv' | 'lime'
-  | 'cyan' | 'magenta' | 'yellow' | 'colorWheel' | 'colorMacro' | 'colorTemp'
-  | 'shutter' | 'pan' | 'tilt' | 'panTiltSpeed' | 'zoom' | 'focus' | 'iris' | 'frost'
+  | 'dimmer' | 'dimmerMode' | 'red' | 'green' | 'blue' | 'white' | 'warmWhite' | 'coolWhite' | 'amber' | 'uv' | 'lime' | 'indigo'
+  | 'cyan' | 'magenta' | 'yellow' | 'colorWheel' | 'colorMacro' | 'colorFx' | 'colorTemp' | 'hue' | 'saturation'
+  | 'shutter' | 'pan' | 'tilt' | 'panTiltSpeed' | 'panRotation' | 'tiltRotation' | 'positionFx'
+  | 'zoom' | 'focus' | 'iris' | 'frost' | 'beamShaper' | 'animation'
   | 'gobo' | 'goboRotation' | 'prism' | 'prismRotation' | 'rotation' | 'laser'
-  | 'program' | 'programSpeed' | 'sound' | 'fog' | 'fan' | 'control' | 'other' | 'none'
+  | 'program' | 'programSpeed' | 'sound' | 'fog' | 'specialFx' | 'fan' | 'control' | 'other' | 'none'
 
 export type FnGroup = 'Intensity' | 'Colour' | 'Position' | 'Beam' | 'Gobo and prism' | 'Effects' | 'Control'
 
@@ -43,6 +44,7 @@ export interface FnInfo {
 
 export const FN: Record<ChannelFn, FnInfo> = {
   dimmer: { label: 'Dimmer', group: 'Intensity', swatch: '#e8e8e8', head: 'dimmer', style: 'level', explain: 'How bright it is, from off to full.' },
+  dimmerMode: { label: 'Dimmer curve / speed', group: 'Intensity', swatch: '#b8b8b8', style: 'plain', explain: 'How the dimmer responds (linear, square, smooth). Kept, not shown.' },
   shutter: { label: 'Strobe / shutter', group: 'Intensity', swatch: '#fff27a', head: 'shutter', style: 'shutter', explain: 'Closed (dark), open, or flashing from slow to fast.' },
   red: { label: 'Red', group: 'Colour', swatch: '#ff3b30', head: 'red', style: 'level', explain: 'How much red light, from none to full.' },
   green: { label: 'Green', group: 'Colour', swatch: '#34c759', head: 'green', style: 'level', explain: 'How much green light.' },
@@ -53,19 +55,28 @@ export const FN: Record<ChannelFn, FnInfo> = {
   amber: { label: 'Amber', group: 'Colour', swatch: '#ffb000', head: 'amber', style: 'level', explain: 'How much amber light.' },
   uv: { label: 'UV', group: 'Colour', swatch: '#8e5cff', head: 'uv', style: 'level', explain: 'How much ultraviolet light.' },
   lime: { label: 'Lime', group: 'Colour', swatch: '#b5ff3b', head: 'green', style: 'level', explain: 'How much lime (yellow-green) light.' },
+  indigo: { label: 'Indigo', group: 'Colour', swatch: '#5b4bff', style: 'level', explain: 'How much indigo (deep blue-violet) light. Kept, not shown yet.' },
   cyan: { label: 'Cyan', group: 'Colour', swatch: '#3fe0ff', head: 'cyan', style: 'level', explain: 'Colour mixing on a white lamp: more cyan takes red out.' },
   magenta: { label: 'Magenta', group: 'Colour', swatch: '#ff4fd8', head: 'magenta', style: 'level', explain: 'Colour mixing on a white lamp: more magenta takes green out.' },
   yellow: { label: 'Yellow', group: 'Colour', swatch: '#ffe94f', head: 'yellow', style: 'level', explain: 'Colour mixing on a white lamp: more yellow takes blue out.' },
   colorWheel: { label: 'Colour wheel', group: 'Colour', swatch: '#ff8a00', head: 'colorWheel', style: 'slots', explain: 'Turns a wheel of colour filters: each range is one colour.' },
   colorMacro: { label: 'Colour presets', group: 'Colour', swatch: '#ff6ec7', head: 'colorWheel', style: 'slots', explain: 'Ready-made colours: each range picks one, replacing the mixed colour.' },
+  colorFx: { label: 'Colour effects', group: 'Colour', swatch: '#ff9de2', style: 'program', explain: 'Colour chases, fades and jumps built into the light. The twin shows the nearest pattern.' },
+  hue: { label: 'Hue', group: 'Colour', swatch: '#ff7a59', style: 'level', explain: 'Picks the colour around the colour wheel (with saturation). Kept, not shown yet.' },
+  saturation: { label: 'Saturation', group: 'Colour', swatch: '#ffb59e', style: 'level', explain: 'From white to the full colour picked by hue. Kept, not shown yet.' },
   colorTemp: { label: 'Colour temperature', group: 'Colour', swatch: '#ffd9a0', style: 'level', explain: 'Warm to cool white. Kept, but not shown on the twin yet.' },
   pan: { label: 'Pan', group: 'Position', swatch: '#5ac8fa', head: 'pan', style: 'level', explain: 'Turns the head left and right, across its whole pan range.' },
   tilt: { label: 'Tilt', group: 'Position', swatch: '#64d2ff', head: 'tilt', style: 'level', explain: 'Tips the head up and down, across its tilt range.' },
   panTiltSpeed: { label: 'Pan/tilt speed', group: 'Position', swatch: '#7fb8d8', head: 'moveSpeed', style: 'level', explain: 'How fast the head moves. Usually 0 is fastest.' },
+  panRotation: { label: 'Endless pan', group: 'Position', swatch: '#4fb3e8', style: 'spin', explain: 'Keeps the head turning round and round, one way or the other. Kept, not shown.' },
+  tiltRotation: { label: 'Endless tilt', group: 'Position', swatch: '#58c4ee', style: 'spin', explain: 'Keeps the head tipping over and over. Kept, not shown.' },
+  positionFx: { label: 'Movement effects', group: 'Position', swatch: '#8fc7e6', style: 'plain', explain: 'Built-in movement patterns (circles, figure-eights, sweeps). Kept, not shown.' },
   zoom: { label: 'Zoom', group: 'Beam', swatch: '#c7c7cc', head: 'zoom', style: 'level', explain: 'Makes the beam narrow or wide.' },
   focus: { label: 'Focus', group: 'Beam', swatch: '#aeaeb2', style: 'level', explain: 'Sharpens the gobo edge. Kept, but not shown on the twin yet.' },
   iris: { label: 'Iris', group: 'Beam', swatch: '#8e8e93', style: 'level', explain: 'Closes the beam down to a pencil. Kept, but not shown yet.' },
   frost: { label: 'Frost', group: 'Beam', swatch: '#d1d1d6', style: 'level', explain: 'Softens the beam. Kept, but not shown yet.' },
+  beamShaper: { label: 'Framing / blades', group: 'Beam', swatch: '#9ea3ab', style: 'plain', explain: 'Shutter blades or a beam shaper that cut the beam’s edges. Kept, not shown.' },
+  animation: { label: 'Animation wheel', group: 'Beam', swatch: '#b1a3d6', style: 'spin', explain: 'A turning wheel that makes the beam ripple (water, fire). Kept, not shown.' },
   gobo: { label: 'Gobo wheel', group: 'Gobo and prism', swatch: '#bf5af2', head: 'gobo', style: 'slots', explain: 'Picks a pattern (gobo) the beam projects: each range is one gobo.' },
   goboRotation: { label: 'Gobo rotation', group: 'Gobo and prism', swatch: '#da8fff', head: 'goboRotation', style: 'spin', explain: 'Spins the gobo one way or the other, slow to fast.' },
   prism: { label: 'Prism', group: 'Gobo and prism', swatch: '#ff9f0a', head: 'prism', style: 'plain', explain: 'Splits the beam into several copies.' },
@@ -76,9 +87,10 @@ export const FN: Record<ChannelFn, FnInfo> = {
   programSpeed: { label: 'Program speed', group: 'Effects', swatch: '#ffe066', style: 'level', explain: 'How fast the built-in program runs.' },
   sound: { label: 'Sound sensitivity', group: 'Effects', swatch: '#ffcc00', style: 'level', explain: 'How strongly sound-active programs react to music.' },
   fog: { label: 'Fog output', group: 'Effects', swatch: '#9aa0a6', style: 'level', explain: 'How much fog or haze it makes.' },
+  specialFx: { label: 'Special effect', group: 'Effects', swatch: '#c0c4ca', style: 'plain', explain: 'Bubbles, snow, sparks, CO₂ or flames: the machine’s output. Kept, not shown.' },
   fan: { label: 'Fan', group: 'Control', swatch: '#8e8e93', style: 'plain', explain: 'Fan speed or mode. Kept, not shown.' },
   control: { label: 'Control / reset', group: 'Control', swatch: '#636366', style: 'plain', explain: 'Reset, display or other settings. Kept, not shown.' },
-  other: { label: 'Other', group: 'Control', swatch: '#48484a', style: 'plain', explain: 'Something the twin doesn’t show. Kept in the file.' },
+  other: { label: 'Other (name it)', group: 'Control', swatch: '#48484a', style: 'plain', explain: 'Anything not listed: give it the manual’s name. Kept in the file and in exports.' },
   none: { label: 'No function', group: 'Control', swatch: '#2c2c2e', style: 'plain', explain: 'Does nothing (reserved by the maker).' }
 }
 
@@ -218,7 +230,8 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
       { title: 'Fine channels', text: 'Pan fine and tilt fine add smoothness: together with pan and tilt they make 65,536 steps instead of 256.', fns: ['pan', 'tilt'] },
       { title: 'Movement speed', text: 'Slows the head down for smooth moves. On most lights 0 is the fastest.', fns: ['panTiltSpeed'] },
       { title: 'Colour and zoom', text: 'Colour mixing like a PAR; zoom makes the beam narrow or wide.', fns: ['red', 'green', 'blue', 'white', 'zoom'] },
-      { title: 'Dimmer and strobe', text: 'The beam needs the dimmer up and the shutter open to show.', fns: ['dimmer', 'shutter'] }
+      { title: 'Dimmer and strobe', text: 'The beam needs the dimmer up and the shutter open to show.', fns: ['dimmer', 'shutter'] },
+      { title: 'LED ring', text: 'Some heads have a ring of LEDs around the lens with its own colour channels (and often its own effects). It’s a part of its own: + Add ▸ LED ring adds one.', fns: [] }
     ]
   },
   spot: {
@@ -229,7 +242,8 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
       { title: 'Colour wheel', text: 'A wheel of coloured glass: each range of values is one colour, sometimes with half-colours in between.', fns: ['colorWheel'] },
       { title: 'Gobos', text: 'A wheel of patterns the beam projects. A second channel spins the gobo.', fns: ['gobo', 'goboRotation'] },
       { title: 'Prism', text: 'Splits the beam into copies; its rotation channel turns them.', fns: ['prism', 'prismRotation'] },
-      { title: 'Dimmer and shutter', text: 'Nothing shows unless the dimmer is up and the shutter is open.', fns: ['dimmer', 'shutter'] }
+      { title: 'Dimmer and shutter', text: 'Nothing shows unless the dimmer is up and the shutter is open.', fns: ['dimmer', 'shutter'] },
+      { title: 'LED ring', text: 'Some heads have a ring of LEDs around the lens with its own colour channels (and often its own effects). It’s a part of its own: + Add ▸ LED ring adds one.', fns: [] }
     ]
   },
   beam: {
@@ -238,7 +252,8 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
     concepts: [
       { title: 'Pan and tilt', text: 'Fast, wide moves: pan, tilt and their fine channels.', fns: ['pan', 'tilt'] },
       { title: 'Colour, gobo, prism', text: 'Like a spot, but the beam is tight: gobos look like shapes in the haze.', fns: ['colorWheel', 'gobo', 'prism'] },
-      { title: 'Dimmer and shutter', text: 'Up and open, or the beam stays dark.', fns: ['dimmer', 'shutter'] }
+      { title: 'Dimmer and shutter', text: 'Up and open, or the beam stays dark.', fns: ['dimmer', 'shutter'] },
+      { title: 'LED ring', text: 'Some heads have a ring of LEDs around the lens with its own colour channels (and often its own effects). It’s a part of its own: + Add ▸ LED ring adds one.', fns: [] }
     ]
   },
   bar: {
@@ -361,10 +376,18 @@ export function defaultRanges(fn: ChannelFn): RangeDef[] {
     case 'goboRotation':
     case 'prismRotation':
     case 'rotation':
+    case 'panRotation':
+    case 'tiltRotation':
+    case 'animation':
       return [
         { lo: 0, hi: 9, label: 'Stop', kind: 'spin', from: 0, to: 0 },
         { lo: 10, hi: 127, label: 'One way, slow to fast', kind: 'spin', from: 0.1, to: 1.5 },
         { lo: 128, hi: 255, label: 'Other way, slow to fast', kind: 'spin', from: -0.1, to: -1.5 }
+      ]
+    case 'colorFx':
+      return [
+        { lo: 0, hi: 9, label: 'No effect', kind: 'off', pattern: 'none' },
+        { lo: 10, hi: 255, label: 'Colour effects', kind: 'program', pattern: 'fade' }
       ]
     case 'program':
       return [
@@ -545,7 +568,7 @@ export function headsFromDef(def: FixtureDef, mode: ModeDef): { heads: HeadDef[]
     applyRanges(h, ch)
   })
   // Programs: each one drives its target parts (or every part that makes light).
-  const programs = mode.channels.filter((c) => c.fn === 'program')
+  const programs = mode.channels.filter((c) => c.fn === 'program' || c.fn === 'colorFx')
   programs.forEach((pc, n) => {
     const ref: ChannelRef = { coarse: index.get(pc.id)! }
     const speedCh = mode.channels.find((c) => c.fn === 'programSpeed' && (c.part === pc.part || !c.part)) ?? undefined
@@ -628,6 +651,7 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
     speed: moving ? 220 : undefined,
     output: look.output,
     leds: pixels > 1 ? pixels : undefined,
+    halo: heads.some((h) => h.role === 'halo') || undefined,
     mount: look.mount,
     note: `${def.manufacturer} ${def.name}, from Fixture Studio.`
   }
@@ -795,6 +819,25 @@ export function colorName(rgb: [number, number, number]): string {
     if (d < bestD) [best, bestD] = [n, d]
   }
   return best[0]
+}
+
+/**
+ * Makes a definition safe to open: a channel job this version doesn't know
+ * (from a newer version, or another app) becomes "Other" with its name kept,
+ * and missing lists are filled in, so nothing is lost and nothing breaks.
+ */
+export function normaliseDef(def: FixtureDef): FixtureDef {
+  let changed = false
+  const modes = (def.modes ?? []).map((m) => ({
+    ...m,
+    channels: (m.channels ?? []).map((c) => {
+      if (FN[c.fn as ChannelFn]) return c.ranges ? c : { ...c, ranges: [] }
+      changed = true
+      return { ...c, fn: 'other' as const, ranges: c.ranges ?? [], note: c.note ?? `Was “${String(c.fn)}” in the file: set what it does if the twin should show it.` }
+    })
+  }))
+  if (!changed && def.parts && def.modes) return def
+  return { ...def, parts: def.parts ?? [], modes }
 }
 
 /** Every channel of a mode as [first DMX channel (1-based), channel]: fine channels included. */

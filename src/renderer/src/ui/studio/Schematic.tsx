@@ -47,7 +47,9 @@ export function Schematic({ def }: { def: FixtureDef }) {
   if (!mode) return null
   const live = twinNow.heads
   const look = def.look
-  const lightParts = def.parts.filter((p) => partHead.has(p.id) && p.role !== 'master')
+  // LED rings around the lens (no cell of their own) are drawn around the light, not as cells.
+  const rings = def.parts.filter((p) => partHead.has(p.id) && p.role === 'halo' && p.cell === undefined)
+  const lightParts = def.parts.filter((p) => partHead.has(p.id) && p.role !== 'master' && !rings.includes(p))
   const cells = [...new Set(lightParts.map((p, k) => p.cell ?? k))].sort((a, b) => a - b)
   const aspect = look.size[0] / Math.max(0.01, look.size[1])
   const pos = cellPositions(cells.length, look.layout, look.shape === 'tube' ? 0.1 : aspect)
@@ -75,6 +77,19 @@ export function Schematic({ def }: { def: FixtureDef }) {
         ) : (
           <rect x={10} y={10} width={W} height={H} rx={look.shape === 'tube' ? 18 : 10} className="body" />
         )}
+        {rings.map((p, k) => {
+          const r0 = !cells.length ? Math.min(W, H) / 2.8 + 9 + k * 9 : 0
+          return (
+            <g key={p.id} className={`cell ${selectedPart === p.id ? 'on' : ''}`} onClick={() => selectPart(p.id)}>
+              {r0 ? (
+                <circle className="ring-shape" cx={W / 2 + 10} cy={H / 2 + 10} r={r0} fill="none" style={{ stroke: glow(live[partHead.get(p.id) ?? -1]), strokeWidth: 6 }} />
+              ) : (
+                <rect className="ring-shape" x={14 + k * 6} y={14 + k * 6} width={W - 8 - k * 12} height={H - 8 - k * 12} rx={8} fill="none" style={{ stroke: glow(live[partHead.get(p.id) ?? -1]), strokeWidth: 4 }} />
+              )}
+              <title>{p.name}: click to see its channels</title>
+            </g>
+          )
+        })}
         {/* The whole fixture's own light (a PAR, a moving head's beam) */}
         {main && main.role !== 'master' && !cells.length && (
           <circle cx={W / 2 + 10} cy={H / 2 + 10} r={Math.min(W, H) / 2.8} fill={glow(mainLive)} className={`cell ${selectedPart === null && selected.length && mode.channels.filter((c) => selected.includes(c.id)).every((c) => c.part === null) ? 'on' : ''}`} onClick={() => selectPart(null)}>
@@ -93,7 +108,7 @@ export function Schematic({ def }: { def: FixtureDef }) {
                 const on = selectedPart === p.id
                 const r = parts.length > 1 ? (k === 0 ? cellR * 0.55 : cellR) : cellR
                 const shape = round || look.shape === 'tube' ? (
-                  k === 0 || parts.length === 1 ? <circle cx={cx} cy={cy} r={r} fill={glow(h)} /> : <circle cx={cx} cy={cy} r={r * 0.85} fill="none" stroke={glow(h)} strokeWidth={r * 0.32} />
+                  k === 0 || parts.length === 1 ? <circle cx={cx} cy={cy} r={r} fill={glow(h)} /> : <circle className="ring-shape" cx={cx} cy={cy} r={r * 0.85} fill="none" style={{ stroke: glow(h), strokeWidth: r * 0.32 }} />
                 ) : (
                   <rect x={cx - r} y={cy - r * 0.8} width={r * 2} height={r * 1.6} rx={3} fill={glow(h)} />
                 )

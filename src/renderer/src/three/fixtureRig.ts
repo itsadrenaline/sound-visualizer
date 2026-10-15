@@ -692,6 +692,16 @@ export class FixtureRig {
             this.dotsFollow = new GlowEmitter(dots, 3)
             this.dotsHead = main
           }
+          // An LED ring around the face, lit by its own channels.
+          const halo = this.headIndex((x) => x.role === 'halo')[0]
+          if (halo !== undefined) {
+            const r = s.look === 'par' ? w * 0.47 : Math.min(w, h) * 0.46
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.004, r * 0.06), 8, 48))
+            ring.rotation.x = Math.PI / 2
+            ring.position.y = faceY + 0.002
+            aim.add(ring)
+            this.emitters[halo] = new GlowEmitter([ring], 2)
+          }
         }
         break
       }

@@ -8,7 +8,7 @@
  * step there; "Back to the original" removes the edit from the show.
  */
 import { create } from 'zustand'
-import { blankDef, defaultRanges, defFromTypes, FN, makeChannel, studioTypeId, typeFromDef, newKey, type ChannelDef, type ChannelFn, type FixtureDef, type FixtureKind, type PartDef } from '../model/fixtureDef'
+import { normaliseDef, blankDef, defaultRanges, defFromTypes, FN, makeChannel, studioTypeId, typeFromDef, newKey, type ChannelDef, type ChannelFn, type FixtureDef, type FixtureKind, type PartDef } from '../model/fixtureDef'
 import { checkDef } from '../model/fixtureChecks'
 import { restValue } from '../model/fixtureTests'
 import { getFixtureType, originalFixtureType, type FixtureType } from '../model/fixtureTypes'
@@ -54,6 +54,8 @@ interface StudioState {
   openDef(def: FixtureDef, report?: string[], origin?: StudioState['origin']): void
   openType(type: FixtureType): void
   close(force?: boolean): void
+  /** Back to the Studio's start screen, leaving the fixture (unsaved changes are dropped). */
+  home(): void
   edit(change: (d: FixtureDef) => FixtureDef): void
   undo(): void
   redo(): void
@@ -96,10 +98,16 @@ export const useStudio = create<StudioState>((set, get) => ({
   verdicts: {},
 
   start() {
-    set({ open: true, screen: 'start' })
+    const { open, screen, dirty } = get()
+    if (open && screen === 'edit' && dirty) {
+      notify('info', 'This fixture has unsaved changes: save it, or press ← Fixtures and leave without saving, to start another.')
+      return
+    }
+    set({ open: true, screen: 'start', def: null })
   },
 
-  openDef(def, report = [], origin = null) {
+  openDef(raw, report = [], origin = null) {
+    const def = normaliseDef(raw)
     const modeIndex = Math.max(0, def.modes.length - 1 >= 0 ? def.modes.reduce((best, m, i) => (m.channels.length > def.modes[best].channels.length ? i : best), 0) : 0)
     set({
       open: true, screen: 'edit', def, modeIndex, selected: [], selectedPart: null, past: [], future: [],
@@ -131,6 +139,10 @@ export const useStudio = create<StudioState>((set, get) => ({
   close(force = false) {
     if (!force && get().dirty && get().screen === 'edit' && !confirm('Close Fixture Studio without saving this fixture?')) return
     set({ open: false, driving: { scene: null, follow: null }, preview: null })
+  },
+
+  home() {
+    set({ screen: 'start', def: null, past: [], future: [], dirty: false, selected: [], selectedPart: null, driving: { scene: null, follow: null }, preview: null, report: [], origin: null, verdicts: {} })
   },
 
   edit(change) {

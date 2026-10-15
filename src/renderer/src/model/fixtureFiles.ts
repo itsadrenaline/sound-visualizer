@@ -267,7 +267,7 @@ function readGdtf(fileName: string, bytes: Uint8Array): ReadResult {
 // ---------------------------------------------------------------------------
 
 const OFL_COLOR: Partial<Record<ChannelFn, string>> = {
-  red: 'Red', green: 'Green', blue: 'Blue', white: 'White', warmWhite: 'Warm White', coolWhite: 'Cold White', amber: 'Amber', uv: 'UV', lime: 'Lime', cyan: 'Cyan', magenta: 'Magenta', yellow: 'Yellow'
+  red: 'Red', green: 'Green', blue: 'Blue', indigo: 'Indigo', white: 'White', warmWhite: 'Warm White', coolWhite: 'Cold White', amber: 'Amber', uv: 'UV', lime: 'Lime', cyan: 'Cyan', magenta: 'Magenta', yellow: 'Yellow'
 }
 
 const OFL_CATEGORY: Record<FixtureDef['kind'], string[]> = {
@@ -311,10 +311,24 @@ function capabilities(def: FixtureDef, c: ChannelDef, wheelName: string): Array<
       return single({ type: 'FogOutput', fogOutputStart: 'off', fogOutputEnd: 'high' })
     case 'none':
       return single({ type: 'NoFunction' })
+    case 'panRotation':
+      if (!c.ranges.length) return single({ type: 'PanContinuous', speedStart: 'slow CW', speedEnd: 'fast CW' })
+      break
+    case 'tiltRotation':
+      if (!c.ranges.length) return single({ type: 'TiltContinuous', speedStart: 'slow CW', speedEnd: 'fast CW' })
+      break
+    case 'dimmerMode':
+      return single({ type: 'Maintenance', comment: c.name })
+    case 'beamShaper':
+      return single({ type: 'Generic', comment: c.name })
+    case 'specialFx':
+      return single({ type: 'Effect', effectName: c.name })
+    case 'hue':
+    case 'saturation':
     case 'fan':
     case 'control':
     case 'other':
-      return single({ type: 'Generic' })
+      return single({ type: 'Generic', comment: c.name })
   }
   const color = OFL_COLOR[c.fn]
   if (color) return single({ type: 'ColorIntensity', color })
@@ -353,6 +367,10 @@ function capabilities(def: FixtureDef, c: ChannelDef, wheelName: string): Array<
         break
       case 'prismRotation':
         out.push({ dmxRange, type: 'PrismRotation', speedStart: spinText(r.from ?? 0), speedEnd: spinText(r.to ?? 0), comment })
+        break
+      case 'panRotation':
+      case 'tiltRotation':
+        out.push({ dmxRange, type: c.fn === 'panRotation' ? 'PanContinuous' : 'TiltContinuous', speedStart: spinText(r.from ?? 0), speedEnd: spinText(r.to ?? 0), comment })
         break
       case 'rotation':
         out.push({ dmxRange, type: 'Rotation', speedStart: spinText(r.from ?? 0), speedEnd: spinText(r.to ?? 0), comment })

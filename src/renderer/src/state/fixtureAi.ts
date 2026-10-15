@@ -52,7 +52,7 @@ const MAKE_FIXTURE = {
                   name: { type: 'string', description: 'The name the manual uses, e.g. "R1" or "Warm white COB effect".' },
                   function: { type: 'string', enum: FUNCTIONS },
                   cell: { type: 'number', description: 'Cell number (1 = first) if this channel controls one cell; omit for the whole fixture.' },
-                  part: { type: 'string', description: 'If a cell has two parts (e.g. a white COB and an RGB ring), which one: "white" or "ring". Or a named part on multi-effect bars: "Derby 1", "Laser".' },
+                  part: { type: 'string', description: 'If a cell has two parts (e.g. a white COB and an RGB ring), which one: "white" or "ring". "ring" with no cell: an LED ring around a moving head or PAR lens. Or a named part on multi-effect bars: "Derby 1", "Laser".' },
                   fine: { type: 'boolean', description: 'True for the fine (low byte) channel of a 16-bit pair.' },
                   ranges: { type: 'array', items: { type: 'object', properties: { from: { type: 'number' }, to: { type: 'number' }, label: { type: 'string' } }, required: ['from', 'to', 'label'] } },
                   guessed: { type: 'boolean', description: 'True if this row was not printed and you filled it in (e.g. the manual skipped rows with "..." or "data increases by").' }
@@ -116,8 +116,8 @@ export function defFromAi(input: Record<string, unknown>, sourceLabel: FixtureDe
     const key = `${cell ?? ''}|${label.toLowerCase()}`
     let p = partKey.get(key)
     if (!p) {
-      const name = cell ? `Cell ${cell}${label ? ` ${label}` : ''}` : label
-      const role = /laser/i.test(label) ? 'laser' : /derby|moon/i.test(label) ? 'derby' : /strobe/i.test(label) ? 'strobe' : cell ? 'pixel' : 'beam'
+      const name = cell ? `Cell ${cell}${label ? ` ${label}` : ''}` : /^(ring|halo|aura)$/i.test(label) ? 'LED ring' : label
+      const role = /laser/i.test(label) ? 'laser' : /derby|moon/i.test(label) ? 'derby' : /strobe/i.test(label) ? 'strobe' : cell ? 'pixel' : /ring|halo|aura/i.test(label) ? 'halo' : 'beam'
       p = { id: newKey('p'), name, role, ...(cell ? { cell: cell - 1 } : {}), ...(fn === 'warmWhite' || (whiteFamily && /warm|cob/i.test(label)) ? { tint: 'warm' as const } : {}) }
       partKey.set(key, p)
       parts.push(p)
@@ -185,6 +185,83 @@ export async function searchWebWithClaude(manufacturer: string, model: string): 
   )
   const result = defFromAi(input, { kind: 'web', label: 'Found on the web by Claude', url: typeof input.manual_url === 'string' ? input.manual_url : sources[0] })
   return { ...result, sources }
+}
+
+/**
+ * Make a fixture from a description or a name: "Chauvet Intimidator Spot 360 in
+ * its 14-channel mode", or "a 6-channel RGBW PAR with a strobe and auto programs".
+ * A real product is looked up on the web; anything else is built as described.
+ */
+export async function makeWithClaude(prompt: string, hint: { kind?: FixtureKind } = {}): Promise<AiResult> {
+  const { input, sources } = await ask(
+    [
+      {
+        type: 'text',
+        text: `Make a lighting fixture for a visualizer from this request:\n\n${prompt}\n\nIf it names a real product, search the web for its manual or DMX chart (the maker's site, retailers, manual sites) and use the real channels, size and beam angle, with the manual's URL. If it describes a light instead, build what it describes using the usual channel order for that kind of light, and mark every channel guessed.${hint.kind ? ` It is a ${KINDS[hint.kind].label.toLowerCase()}.` : ''} Then call make_fixture once with every mode and channel.`
+      }
+    ],
+    true
+  )
+  const real = sources.length > 0 || typeof input.manual_url === 'string'
+  const result = defFromAi(input, real ? { kind: 'web', label: 'Made by Claude from the web', url: typeof input.manual_url === 'string' ? input.manual_url : sources[0] } : { kind: 'scratch', label: 'Made by Claude from a description' })
+  return { ...result, sources }
+}
+
+/** The fixture as Claude reads it back: every mode and channel, by number. */
+function defForClaude(def: FixtureDef): unknown {
+  const part = (id: string | null) => def.parts.find((p) => p.id === id)
+  return {
+    name: def.name,
+    manufacturer: def.manufacturer,
+    kind: def.kind,
+    size_mm: def.look.size.map((v) => Math.round(v * 1000)),
+    beam_degrees: def.look.beam,
+    modes: def.modes.map((m) => ({
+      name: m.name,
+      channels: m.channels.map((c, i) => {
+        const p = part(c.part)
+        return {
+          number: i + 1,
+          name: c.name,
+          function: c.fn,
+          ...(p?.cell !== undefined ? { cell: p.cell + 1 } : {}),
+          ...(p && (p.cell === undefined || /ring|white/i.test(p.name)) ? { part: p.cell === undefined ? (p.role === 'halo' ? 'ring' : p.name) : /ring/i.test(p.name) ? 'ring' : 'white' } : {}),
+          ...(c.fine ? { fine: true } : {}),
+          ...(c.ranges.length ? { ranges: c.ranges.map((r) => ({ from: r.lo, to: r.hi, label: r.label })) } : {}),
+          ...(c.confidence === 'guessed' || c.confidence === 'missing' ? { guessed: true } : {})
+        }
+      })
+    }))
+  }
+}
+
+/**
+ * Change the open fixture as asked ("add a 3-channel mode", "channel 7 is the
+ * strobe", "add the LED ring from the manual"). Claude returns the whole fixture;
+ * the look and identity stay, so the change is one undoable edit.
+ */
+export async function editWithClaude(def: FixtureDef, request: string): Promise<AiResult> {
+  const { input, sources } = await ask(
+    [
+      {
+        type: 'text',
+        text: `Here is a lighting fixture as JSON:\n${JSON.stringify(defForClaude(def))}\n\nChange it as the user asks:\n${request}\n\nKeep everything they didn't ask to change exactly as it is (names, order, ranges). Mark channels you add or change without a manual as guessed. If they ask for something from the real manual, search the web for it. Then call make_fixture once with the complete, updated fixture (every mode and channel), and say what you changed in notes.`
+      }
+    ],
+    true
+  )
+  const result = defFromAi(input, def.source)
+  const sameKind = result.def.kind === def.kind
+  const next: FixtureDef = {
+    ...result.def,
+    id: def.id,
+    revision: def.revision,
+    history: def.history,
+    replaces: def.replaces,
+    manualUrl: result.def.manualUrl ?? def.manualUrl,
+    look: sameKind ? { ...def.look, ...(Array.isArray(input.size_mm) ? { size: result.def.look.size } : {}), layout: def.look.layout ?? result.def.look.layout } : result.def.look
+  }
+  return { def: next, notes: result.notes, sources }
 }
 
 /** Without Claude: a web search for the manual in the browser. */
