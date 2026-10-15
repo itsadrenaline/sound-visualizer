@@ -43,6 +43,10 @@ export interface FixtureType {
   heads?: HeadDef[]
   /** Real-world size and look, from the manufacturer's specs. */
   spec?: FixtureSpec
+  /** The look was worked out, not known (no spec for this model yet): Fixture Studio can fix it. */
+  lookGuessed?: boolean
+  /** Made or edited in Fixture Studio: the id of its definition there. */
+  studioId?: string
 }
 
 export const FIXTURE_TYPES: Record<string, FixtureType> = {
@@ -100,8 +104,39 @@ const UNKNOWN: FixtureType = {
   body: 'par'
 }
 
+/**
+ * Fixture types edited in Fixture Studio stand in for the original (a SoundSwitch
+ * or Library type) in this show: the show keeps the original's id, so SoundSwitch
+ * syncs and copies keep working, and "Back to the original" just drops the override.
+ */
+const overrides = new Map<string, FixtureType>()
+
+// The same stored type always gives the same object, so the 3D view only rebuilds a fixture when its type really changed.
+const wrapped = new WeakMap<FixtureType, FixtureType>()
+
+export function setTypeOverrides(map: Record<string, FixtureType> | undefined): void {
+  overrides.clear()
+  for (const [id, type] of Object.entries(map ?? {})) {
+    let w = wrapped.get(type)
+    if (!w || w.id !== id) {
+      w = { ...type, id }
+      wrapped.set(type, w)
+    }
+    overrides.set(id, w)
+  }
+}
+
 export function getFixtureType(id: string): FixtureType {
+  return overrides.get(id) ?? FIXTURE_TYPES[id] ?? registered.get(id) ?? UNKNOWN
+}
+
+/** The type as it was before any Fixture Studio edit. */
+export function originalFixtureType(id: string): FixtureType {
   return FIXTURE_TYPES[id] ?? registered.get(id) ?? UNKNOWN
+}
+
+export function isOverridden(id: string): boolean {
+  return overrides.has(id)
 }
 
 /** Every type the app knows right now: built in, plus imported ones. */

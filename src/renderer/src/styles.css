@@ -663,3 +663,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .tabs { display: flex; flex-wrap: wrap; }
 .inspector input, .inspector select { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .presets, .problem-actions, .row-buttons, .arrange-row, .seg.small { flex-wrap: wrap; }
+
+/* Fixture Studio links from the main window */
+.lib-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.type-info .studio-open { margin-top: 6px; }
+.warn-text { color: var(--warn); }

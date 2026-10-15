@@ -9,7 +9,7 @@ import { app, Menu, shell, type BrowserWindow, type MenuItemConstructorOptions }
 import { logFolder } from './log'
 
 export type MenuCommand =
-  | 'new' | 'open' | 'save' | 'saveAs' | 'importFixtures' | 'saveImage'
+  | 'new' | 'newFixture' | 'open' | 'save' | 'saveAs' | 'importFixtures' | 'saveImage'
   | 'undo' | 'redo' | 'selectAll' | 'duplicate' | 'delete'
   | 'viewPerspective' | 'viewTop' | 'viewFront' | 'viewLeft' | 'viewRight' | 'viewUp' | 'focusSelection' | 'focusAll' | 'toggleFullView'
   | 'showLibrary' | 'showFixtures' | 'toolSelect' | 'toolMove' | 'toolOrbit'
@@ -51,6 +51,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
           ]
         },
         { type: 'separator' },
+        { label: 'New Fixture…', accelerator: 'Shift+CmdOrCtrl+N', click: send('newFixture') },
         { label: 'Import Fixture File…', click: send('importFixtures') },
         { label: 'Save View as Image…', accelerator: 'Shift+CmdOrCtrl+E', click: send('saveImage') },
         ...(isMac ? [] : [{ type: 'separator' as const }, { role: 'quit' as const }])
@@ -107,6 +108,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
             { label: 'Getting Around the Screen', click: send('tour:basics') },
             { label: 'Making a Show', click: send('tour:build') },
             { label: 'Adding Lights', click: send('tour:lights') },
+            { label: 'Making or Fixing a Fixture', click: send('tour:studio') },
             { label: 'Objects, Moving and Lining Up', click: send('tour:objects') },
             { label: 'SoundSwitch and Live DMX', click: send('tour:soundswitch') },
             { label: 'Looking Good: Cameras, Room and Pictures', click: send('tour:present') },

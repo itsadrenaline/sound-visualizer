@@ -10,6 +10,8 @@ import { addLibraryFixtures } from '../state/commands'
 import type { LibraryEntry } from '../model/oflImport'
 import { plainName, type FixtureType } from '../model/fixtureTypes'
 import { planPatch } from '../model/project'
+import { useStudio } from '../state/studio'
+import { runCommand } from '../state/menuCommands'
 
 export const DRAG_TYPE = 'application/x-ssvis-fixture'
 
@@ -17,7 +19,7 @@ export const DRAG_TYPE = 'application/x-ssvis-fixture'
 export type DragPayload = { library: string; mode: number } | { rig: string }
 
 export function LibraryPanel() {
-  const { status, error, entries, recent, load, library } = useLibrary()
+  const { status, error, entries, recent, load, library, qlcCredit } = useLibrary()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('all')
   const [open, setOpen] = useState<Set<string>>(new Set())
@@ -35,6 +37,11 @@ export function LibraryPanel() {
   }, [results])
   const searching = query.trim().length > 0
   const recentEntries = recent.map((k) => entries.find((e) => e.key === k)).filter((e): e is LibraryEntry => !!e)
+  const mine = entries.filter((e) => e.source === 'mine')
+  const pick = (key: string) => {
+    setPicked(key)
+    void useLibrary.getState().loadDef(key)
+  }
   const pickedEntry = entries.find((e) => e.key === picked) ?? null
 
   const toggle = (maker: string) => {
@@ -51,7 +58,10 @@ export function LibraryPanel() {
           Library <span className="count">{entries.length}</span>
         </h2>
         <div className="list-tools">
-          <button className="mini" onClick={() => useLibrary.getState().importFiles()} title="Add fixture files downloaded from open-fixture-library.org">
+          <button className="mini" onClick={() => useStudio.getState().start()} title="Make a fixture that isn't here: from its manual, a file, the web or a type (⇧⌘N)" data-tour="new-fixture">
+            New fixture…
+          </button>
+          <button className="mini" onClick={() => runCommand('importFixtures')} title="Open a fixture file (GDTF, Open Fixture Library, QLC+ or Sound Visualizer) in Fixture Studio">
             Import…
           </button>
         </div>
@@ -70,24 +80,39 @@ export function LibraryPanel() {
         {status === 'error' && <p className="problem">{error}</p>}
         {status === 'ready' && (
           <>
+            {!searching && category === 'all' && mine.length > 0 && (
+              <Group title="My Fixtures" count={mine.length} open onToggle={() => {}}>
+                {mine.map((e) => (
+                  <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} showMaker />
+                ))}
+              </Group>
+            )}
             {!searching && category === 'all' && <RigTypes />}
             {!searching && category === 'all' && recentEntries.length > 0 && (
               <Group title="Recent" count={recentEntries.length} open onToggle={() => {}}>
                 {recentEntries.map((e) => (
-                  <Row key={e.key} entry={e} picked={picked === e.key} onPick={setPicked} />
+                  <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} />
                 ))}
               </Group>
             )}
             {searching
-              ? results.slice(0, 300).map((e) => <Row key={e.key} entry={e} picked={picked === e.key} onPick={setPicked} showMaker />)
+              ? results.slice(0, 300).map((e) => <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} showMaker />)
               : byMaker.map(([maker, list]) => (
                   <Group key={maker} title={maker} count={list.length} open={open.has(maker)} onToggle={() => toggle(maker)}>
                     {list.map((e) => (
-                      <Row key={e.key} entry={e} picked={picked === e.key} onPick={setPicked} />
+                      <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} />
                     ))}
                   </Group>
                 ))}
-            {results.length === 0 && <p className="hint">Nothing matches. Missing a fixture? Download it from open-fixture-library.org and use Import….</p>}
+            {results.length === 0 && (
+              <div className="hint">
+                Not in the Library?{' '}
+                <button className="link" onClick={() => useStudio.getState().start()}>
+                  Make it in Fixture Studio
+                </button>{' '}
+                from its manual, a file or the web.
+              </div>
+            )}
             {searching && results.length > 300 && <p className="hint">Showing the first 300. Type more to narrow it down.</p>}
           </>
         )}
@@ -100,7 +125,17 @@ export function LibraryPanel() {
           <a href="https://open-fixture-library.org" target="_blank" rel="noreferrer">
             Open Fixture Library
           </a>{' '}
-          (MIT){library.built ? `, ${library.built}` : ''}.
+          (MIT){library.built ? `, ${library.built}` : ''}
+          {qlcCredit !== null && (
+            <>
+              {' '}and the{' '}
+              <a href="https://www.qlcplus.org" target="_blank" rel="noreferrer">
+                QLC+
+              </a>{' '}
+              fixture library (Apache 2.0)
+            </>
+          )}
+          .
         </p>
       )}
     </div>
@@ -129,6 +164,7 @@ function Row({ entry, picked, onPick, showMaker }: { entry: LibraryEntry; picked
       onClick={() => onPick(entry.key)}
       draggable
       onDragStart={(e) => {
+        void useLibrary.getState().loadDef(entry.key)
         const payload: DragPayload = { library: entry.key, mode: 0 }
         e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(payload))
         e.dataTransfer.effectAllowed = 'copy'
@@ -138,6 +174,7 @@ function Row({ entry, picked, onPick, showMaker }: { entry: LibraryEntry; picked
       <div className="lib-name">{showMaker ? `${entry.manufacturer} ${entry.name}` : entry.name}</div>
       <div className="sub">
         {kindOf(entry.categories)} · {entry.modes.length} mode{entry.modes.length === 1 ? '' : 's'}
+        {entry.source === 'qlc' ? ' · QLC+' : entry.source === 'mine' ? ' · yours' : ''}
       </div>
     </div>
   )
@@ -206,9 +243,14 @@ function Details({ entry }: { entry: LibraryEntry }) {
   const first = plan[0]
   const last = plan.at(-1)
 
-  const add = () => {
+  const add = async () => {
+    await useLibrary.getState().loadDef(entry.key)
     const type = useLibrary.getState().typeFor(entry.key, mode)
     if (type) addLibraryFixtures(type, count, { start: startAt })
+  }
+  const openInStudio = async () => {
+    const def = await useLibrary.getState().defFor(entry.key)
+    if (def) useStudio.getState().openDef(structuredClone(def), entry.source === 'mine' ? [] : [`Opened from the Library: ${entry.manufacturer} ${entry.name}. Test it on the twin; changes make your own copy.`])
   }
 
   return (
@@ -263,12 +305,21 @@ function Details({ entry }: { entry: LibraryEntry }) {
             : `Patched ${first.universe + 1}.${first.address} to ${last.universe + 1}.${last.address + channels - 1}${last.universe !== first.universe ? ' (continues into the next universe)' : ''}.`
           : 'No room to patch these.'}
       </p>
-      <button className="primary" disabled={!plan.length} onClick={add} title="Add them to the show, patched where the line above says">
-        Add {count > 1 ? `${count} fixtures` : 'to rig'}
-      </button>
-      <a className="lib-link" href={`https://open-fixture-library.org/${entry.key}`} target="_blank" rel="noreferrer">
-        View on open-fixture-library.org
-      </a>
+      <div className="lib-actions">
+        <button className="primary" disabled={!plan.length} onClick={() => void add()} title="Add them to the show, patched where the line above says">
+          Add {count > 1 ? `${count} fixtures` : 'to rig'}
+        </button>
+        <button onClick={() => void openInStudio()} title="See every channel on a 3D twin and run its tests, before or after adding it">
+          Open in Fixture Studio
+        </button>
+      </div>
+      {entry.source === 'ofl' || !entry.source ? (
+        <a className="lib-link" href={`https://open-fixture-library.org/${entry.key}`} target="_blank" rel="noreferrer">
+          View on open-fixture-library.org
+        </a>
+      ) : entry.source === 'qlc' ? (
+        <span className="lib-link">From the QLC+ fixture library</span>
+      ) : null}
     </div>
   )
 }

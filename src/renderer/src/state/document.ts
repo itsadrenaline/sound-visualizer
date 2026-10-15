@@ -7,7 +7,7 @@
  */
 import { create } from 'zustand'
 import { useStore } from './store'
-import { registerFixtureTypes } from '../model/fixtureTypes'
+import { registerFixtureTypes, setTypeOverrides } from '../model/fixtureTypes'
 import { defaultProject, type Project } from '../model/project'
 import { notify } from './notices'
 import { view } from './viewBus'
@@ -75,6 +75,7 @@ export async function saveDocument(saveAs = false): Promise<boolean> {
 /** Replace the project with one from a file (undoable, like everything else). */
 export function loadDocument(path: string, project: Project): void {
   registerFixtureTypes(project.fixtureTypes)
+  setTypeOverrides(project.typeOverrides)
   useStore.getState().apply(`Open ${path.split('/').pop()}`, () => project)
   useStore.getState().select([])
   useDocument.getState().setSaved(path, useStore.getState().project)

@@ -7,7 +7,7 @@
  */
 import { create } from 'zustand'
 import { blankProject, type Project } from '../model/project'
-import { registerFixtureTypes } from '../model/fixtureTypes'
+import { registerFixtureTypes, setTypeOverrides } from '../model/fixtureTypes'
 import { settle } from '../model/physics'
 
 const STORAGE_KEY = 'lighting-visualizer:project'
@@ -50,6 +50,7 @@ function loadProject(): Project {
     if (saved) {
       const project = JSON.parse(saved) as Project
       registerFixtureTypes(project.fixtureTypes)
+      setTypeOverrides(project.typeOverrides)
       return settle(project)
     }
   } catch {
@@ -71,6 +72,7 @@ export const useStore = create<AppState>((set, get) => ({
     const changed = change(before)
     if (changed === before) return
     registerFixtureTypes(changed.fixtureTypes)
+    setTypeOverrides(changed.typeOverrides)
     // Physics: everything rests on something, attached fixtures follow their structure.
     const after = settle(changed, before)
     const now = Date.now()
@@ -91,6 +93,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { past, future, project } = get()
     const last = past.at(-1)
     if (!last) return
+    setTypeOverrides(last.project.typeOverrides)
     set({ project: last.project, past: past.slice(0, -1), future: [{ label: last.label, project }, ...future] })
   },
 
@@ -98,6 +101,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { past, future, project } = get()
     const next = future[0]
     if (!next) return
+    setTypeOverrides(next.project.typeOverrides)
     set({ project: next.project, future: future.slice(1), past: [...past, { label: next.label, project }] })
   },
 

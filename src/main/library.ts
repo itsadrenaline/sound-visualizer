@@ -7,7 +7,7 @@
  * "Open Fixture Library JSON" file and import it with File ▸ Import Fixture File.
  */
 import { dialog, type BrowserWindow } from 'electron'
-import { copyFileSync, existsSync, readdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { log } from './log'
 import { resourcePath, userPath } from './paths'
@@ -86,4 +86,78 @@ export async function importFixtureFiles(window: BrowserWindow | null): Promise<
   }
   if (added) loadLibrary(true)
   return { added, rejected }
+}
+
+// --- The QLC+ library (bundled) -----------------------------------------------------
+
+interface QlcLibrary {
+  source: string
+  url: string
+  built: string
+  entries: unknown[]
+  fixtures: Record<string, unknown>
+}
+
+let qlc: QlcLibrary | null | undefined
+
+function loadQlc(): QlcLibrary | null {
+  if (qlc !== undefined) return qlc
+  try {
+    qlc = JSON.parse(readFileSync(resourcePath('library', 'qlcplus.json'), 'utf8')) as QlcLibrary
+  } catch (error) {
+    log('warn', "Couldn't read the QLC+ fixture library", error)
+    qlc = null
+  }
+  return qlc
+}
+
+/** The QLC+ library's list (what the Library browser shows); definitions come one at a time. */
+export function qlcEntries(): { source: string; url: string; built: string; entries: unknown[] } | null {
+  const lib = loadQlc()
+  return lib ? { source: lib.source, url: lib.url, built: lib.built, entries: lib.entries } : null
+}
+
+export function qlcDefinition(key: string): unknown {
+  return loadQlc()?.fixtures[key] ?? null
+}
+
+// --- My Fixtures: fixtures made or edited in Fixture Studio --------------------------
+
+function myFixturesDir(): string {
+  const dir = userPath('fixtures', 'x').replace(/x$/, '')
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+const safeId = (id: string) => id.replace(/[^\w-]/g, '').slice(0, 80)
+
+export function listMyFixtures(): unknown[] {
+  const dir = myFixturesDir()
+  const out: unknown[] = []
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith('.json')) continue
+    try {
+      const def = JSON.parse(readFileSync(join(dir, file), 'utf8'))
+      if (def?.format === 'sound-visualizer-fixture') out.push(def)
+    } catch (error) {
+      log('warn', `Skipped My Fixtures file ${file}`, error)
+    }
+  }
+  return out
+}
+
+export function saveMyFixture(def: { id?: string; format?: string }): { ok: true } | { error: string } {
+  if (def?.format !== 'sound-visualizer-fixture' || !def.id) return { error: 'Not a Fixture Studio definition.' }
+  try {
+    writeFileSync(join(myFixturesDir(), `${safeId(def.id)}.json`), JSON.stringify(def, null, 1))
+    return { ok: true }
+  } catch (error) {
+    log('error', 'Could not save a fixture', error)
+    return { error: (error as Error).message }
+  }
+}
+
+export function deleteMyFixture(id: string): void {
+  const path = join(myFixturesDir(), `${safeId(id)}.json`)
+  if (existsSync(path)) unlinkSync(path)
 }

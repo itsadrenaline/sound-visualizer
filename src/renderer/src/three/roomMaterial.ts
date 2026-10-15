@@ -29,6 +29,10 @@ const shared = {
   gobos: { value: null as THREE.Texture | null }
 }
 
+export function getRoomAmbient(): THREE.Color {
+  return shared.ambient.value.clone()
+}
+
 export function setRoomAmbient(color: THREE.Color): void {
   shared.ambient.value.copy(color)
 }

@@ -10,7 +10,7 @@
  */
 import type { FixtureType } from './fixtureTypes'
 import { channelListFromHeads, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type SpinRange, type WheelSlot } from './heads'
-import { catalogSpec, type FixtureSpec, type LookKind } from './catalog'
+import { catalogSpec, LOOK_DEFAULTS, type FixtureSpec, type LookKind } from './catalog'
 
 // --- The parts of the OFL format we read -------------------------------------------------
 
@@ -88,6 +88,8 @@ export interface LibraryEntry {
   weight?: number
   /** The light source, e.g. "100W LED + RGB halo ring". */
   bulb?: string
+  /** Where it comes from: the Open Fixture Library, QLC+, or My Fixtures (Fixture Studio). */
+  source?: 'ofl' | 'qlc' | 'mine'
 }
 
 // --- Matrix pixels ------------------------------------------------------------------------
@@ -355,15 +357,8 @@ function classify(key: string, def: OflChannel, fx: OflFixture): Classified {
 
 // --- Looks --------------------------------------------------------------------------------
 
-const DEFAULT_SIZE: Record<LookKind, [number, number, number]> = {
-  mover: [0.3, 0.42, 0.24], moverWash: [0.3, 0.4, 0.22], gigbar: [1.1, 0.45, 0.14], tube: [0.05, 1.0, 0.05],
-  bar: [1.0, 0.1, 0.08], strip: [1.0, 0.012, 0.012], uplight: [0.16, 0.06, 0.15], flood: [0.3, 0.2, 0.12],
-  spider: [0.3, 0.22, 0.19], par: [0.22, 0.25, 0.22]
-}
-const DEFAULT_BEAM: Record<LookKind, [number, number]> = {
-  mover: [12, 20], moverWash: [10, 40], gigbar: [11, 19], tube: [180, 180], bar: [120, 120], strip: [120, 120],
-  uplight: [25, 25], flood: [40, 60], spider: [20, 20], par: [25, 40]
-}
+const DEFAULT_SIZE = (look: LookKind) => LOOK_DEFAULTS[look].size
+const DEFAULT_BEAM = (look: LookKind) => LOOK_DEFAULTS[look].beam
 
 function lookFor(fx: OflFixture, heads: HeadDef[], hasMovement: boolean, size?: [number, number, number]): LookKind {
   const cats = fx.categories ?? []
@@ -375,7 +370,11 @@ function lookFor(fx: OflFixture, heads: HeadDef[], hasMovement: boolean, size?: 
     if (size && size[1] > size[0] * 2.5) return 'tube'
     return size && size[1] < 0.03 ? 'strip' : 'bar'
   }
-  if (cats.includes('Laser') || cats.includes('Effect') || cats.includes('Flower')) return 'uplight'
+  if (cats.includes('Laser')) return 'laser'
+  if (cats.includes('Effect') || cats.includes('Flower')) return 'derby'
+  if (cats.includes('Matrix')) return 'panel'
+  if ((cats.includes('Strobe') || cats.includes('Blinder')) && pixels <= 1) return 'strobe'
+  if (pixels > 1 && (/retro|blinder|cluster|\bcob\b/i.test(name) || cats.includes('Blinder'))) return 'cluster'
   if (/par\b|par\d|can\b/i.test(name)) return 'par'
   return 'flood'
 }
@@ -419,6 +418,12 @@ export function libraryIndex(lib: OflLibrary): LibraryEntry[] {
       }
     })
     .sort((a, b) => a.manufacturer.localeCompare(b.manufacturer) || a.name.localeCompare(b.name))
+}
+
+/** The names of a mode's channels, in order (OFL channel keys; empty slots are "No function"). */
+export function oflModeChannelNames(fx: OflFixture, modeIndex: number): string[] {
+  const mode = fx.modes[Math.max(0, Math.min(fx.modes.length - 1, modeIndex))]
+  return expandMode(fx, mode).map(({ key }) => key ?? 'No function')
 }
 
 export function oflTypeId(key: string, mode: OflMode): string {
@@ -482,14 +487,14 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
   const known = catalogSpec(fx.name)
   const look = known?.look ?? lookFor(fx, heads, hasMovement, size)
   const lens = fx.physical?.lens?.degreesMinMax
-  const beam: [number, number] = zoom ?? (lens ? [Math.min(...lens), Math.max(...lens)] : DEFAULT_BEAM[look])
+  const beam: [number, number] = zoom ?? (lens ? [Math.min(...lens), Math.max(...lens)] : DEFAULT_BEAM(look))
   const pixelCount = heads.filter((h) => h.role === 'pixel').length
   const power = fx.physical?.power ?? 0
   const output = power ? Math.max(0.2, Math.min(2.5, power / 100)) : 0.6
 
   const spec: FixtureSpec = known ? { ...known, leds: pixelCount > 1 ? pixelCount : known.leds } : {
     look,
-    size: size ?? DEFAULT_SIZE[look],
+    size: size ?? DEFAULT_SIZE(look),
     pan: hasMovement ? panRange || 540 : undefined,
     tilt: hasMovement ? tiltRange || 270 : undefined,
     beam,

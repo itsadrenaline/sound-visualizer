@@ -37,6 +37,7 @@ import { roomOf, type RoomSettings } from '../model/project'
 import { useFixtureMenu } from '../state/fixtureMenu'
 import { FixtureHud, FixtureMenu } from '../ui/FixtureActions'
 import { FixtureRig } from './fixtureRig'
+import { useStudio } from '../state/studio'
 
 export function Viewport() {
   const host = useRef<HTMLDivElement>(null)
@@ -825,6 +826,8 @@ export function Viewport() {
     let frameId = 0
     const tick = (now?: number) => {
       frameId = requestAnimationFrame(tick)
+      // Fixture Studio covers the show and has its own view: don't draw this one meanwhile.
+      if (useStudio.getState().open) return
       timer.update(now)
       const dt = Math.min(0.1, timer.getDelta())
       const time = timer.getElapsed()

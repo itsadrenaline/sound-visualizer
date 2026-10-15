@@ -10,7 +10,7 @@ import type { SoundSwitchAttribute, SoundSwitchFixture, SoundSwitchHead } from '
 import { plainName, type FixtureType } from './fixtureTypes'
 import { channelListFromHeads, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
 import type { Fixture, Project } from './project'
-import { specFor } from './catalog'
+import { catalogSpec, LOOK_DEFAULTS, specFor, type FixtureSpec, type LookKind } from './catalog'
 import { autoLayout } from './layout'
 
 /** SoundSwitch attribute codes, worked out from the names SoundSwitch shows for them. */
@@ -115,11 +115,18 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
     }
   }
 
+  // Cells that SoundSwitch names something other than "Cell" or "Pixel" ("1", "Stick 1",
+  // "Segment A") are still cells: several parts, each with its own colour, on one fixture.
+  const COLOUR: HeadFunction[] = ['red', 'green', 'blue', 'white', 'amber', 'uv']
+  const coloured = heads.filter((h) => h.role === 'beam' && !h.ch.pan && !h.ch.tilt && COLOUR.some((fn) => h.ch[fn]))
+  if (!fixtureHasMover && coloured.length > 1) for (const h of coloured) h.role = 'pixel'
+
   // A flat channel list too, for the fader panel and the universe view.
   const channels = channelListFromHeads(f.mode.channels, heads)
 
-  const spec = specFor(f.definition, fixtureHasMover)
   const pixelHeads = heads.filter((h) => h.role === 'pixel').length
+  const known = catalogSpec(f.definition)
+  const spec = known ?? (pixelHeads > 1 ? multiCellSpec(f.definition, pixelHeads) : specFor(f.definition, fixtureHasMover))
   const body: FixtureType['body'] = fixtureHasMover ? 'movingHead' : pixelHeads > 1 ? 'bar' : 'par'
   return {
     id: typeIdFor(f),
@@ -135,8 +142,16 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
     cells: Math.max(1, pixelHeads),
     source: 'SoundSwitch',
     heads,
-    spec
+    spec,
+    lookGuessed: !known
   }
+}
+
+/** A believable look for a multi-cell fixture we have no spec for, from its name and cell count. */
+export function multiCellSpec(name: string, cells: number): FixtureSpec {
+  const look: LookKind = /stick|tube|pole/i.test(name) ? 'tube' : /retro|cluster|blinder|\bcob\b/i.test(name) ? 'cluster' : /panel|matrix|wall/i.test(name) ? 'panel' : 'bar'
+  const size: [number, number, number] = look === 'bar' ? [Math.max(0.5, Math.min(1.2, cells * 0.08)), 0.1, 0.08] : LOOK_DEFAULTS[look].size
+  return { look, size, beam: LOOK_DEFAULTS[look].beam, output: 0.6, leds: cells, mount: 'floor', note: `${name}: look worked out from its ${cells} cells. Choose its real look in Fixture Studio.` }
 }
 
 /** How a SoundSwitch fixture is recognised across syncs and in a show's fixture choice. */

@@ -1,6 +1,6 @@
 # Sound Visualizer
 
-A 3D lighting visualizer. It reads your SoundSwitch rig, draws each fixture to its real size, and plays SoundSwitch's show live over Art-Net. A library of 669 real fixtures (the Open Fixture Library plus Both Lighting) lets you add anything else.
+A 3D lighting visualizer. It reads your SoundSwitch rig, draws each fixture to its real size, and plays SoundSwitch's show live over Art-Net. A library of about 2,300 real fixtures (the Open Fixture Library, QLC+'s fixture library and Both Lighting) lets you add anything else, and the Fixture Studio makes or fixes any fixture that isn't there.
 
 *Works with SoundSwitch. SoundSwitch is a trademark of inMusic; Sound Visualizer is not affiliated with or endorsed by inMusic.*
 
@@ -74,6 +74,19 @@ Press **+ Add fixtures** (or Cmd+L) to open the Library tab, like Capture's.
 The fixture types you use are saved inside the project, so a project opens the same on any computer.
 
 **Both Lighting.** The library includes 24 Both Lighting fixtures (MH-150, Hybrid 300W, BPM-Spots and BPM-Beams, Mini Beam Mover, Splash Pro/X, Aura 1915, Spider Wash, the IR/S/SQ uplights, Chroma Cannon, SQ-BAR9, FX Pix Bar 1000, 360 Tubes, Retro bars and hexes, G-Pins), written from Both Lighting's own user manuals, with colour wheel orders from their SoundSwitch profiles. Search "both lighting". Where a manual leaves something out (a pan range, a colour name), the fixture's notes say what was assumed.
+
+**QLC+ fixtures.** About 1,600 more fixtures come from the QLC+ project's fixture library (Apache 2.0, see `resources/library/LICENSE-QLCPLUS.txt`); ones already in the Open Fixture Library are left out. `node scripts/build-qlcplus.mjs` (optionally with a path to a QLC+ `resources/fixtures` folder) rebuilds `resources/library/qlcplus.json`.
+
+## Fixture Studio: make or fix a fixture
+
+**File ▸ New Fixture…** (Shift+Cmd+N), **New fixture…** in the Library, or **Open in Fixture Studio** on any fixture (from the Library, the inspector, or the right-click menu). No real light is needed.
+
+- **Start from anything**: paste or type the DMX chart from the manual, drop a manual (PDF or photo), a fixture file (.svfixture, QLC+ .qxf, GDTF, Open Fixture Library .json), pick a kind of light to start from a template, or **Search the web** for the manual. With a Claude key, Claude reads photos and PDFs and searches for the manual; without one, the built-in reader handles pasted charts and the web search opens in your browser.
+- **See it working**: a 3D twin of the fixture in a test room, and a schematic of its face and every DMX channel, both lit live as you move a slider or hover a value.
+- **Tests for its kind** (PARs, washes, bars and tubes, clusters, moving heads, lasers, effects, GigBar-style combos): each says what you should see; *Something's off* offers the usual fixes. Built-in programs and gobos are shown as close as a generic pattern allows. Or follow a fixture in your show and watch exactly what SoundSwitch sends it.
+- **Edit in batches**: select many channels to change them together, *Repeat for cells*, drag the lines between value ranges. **Problems** lists what still looks wrong, with one-click fixes. Each channel shows whether it was read for sure, guessed, or is missing.
+- **Look**: shape, size, housing colour, cell layout and beam, from a template, a photo, or borrowed from a similar Library fixture.
+- **Save** keeps it in **My Fixtures** (Library); **Save & add to show** also makes it stand in for the fixture it fixes (SoundSwitch ones included; **Back to the original** undoes that). **Export** writes a `.svfixture` file to share: it holds an Open Fixture Library fixture plus the Studio's own details, so it opens in other tools and comes back here fully editable.
 
 ## Objects: stands, truss, staging, sound, furniture, people
 

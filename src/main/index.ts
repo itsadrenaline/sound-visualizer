@@ -9,7 +9,7 @@ import { cpSync, existsSync } from 'node:fs'
 import { handle, hardenApp, listen, setRendererOrigin } from './security'
 import { basename } from 'node:path'
 import { catchCrashes, log, logFolder } from './log'
-import { importFixtureFiles, loadLibrary } from './library'
+import { deleteMyFixture, importFixtureFiles, listMyFixtures, loadLibrary, qlcDefinition, qlcEntries, saveMyFixture } from './library'
 import { openProject, readProject, saveImage, saveProject } from './files'
 import { buildMenu } from './menu'
 import { claudeRequest, claudeStatus, clearClaudeKey, setClaudeKey } from './claude'
@@ -130,6 +130,11 @@ listen('set-title', (_e, name: string, path: string | null, edited: boolean) => 
 // --- Fixture library -------------------------------------------------------------
 handle('library-load', () => loadLibrary())
 handle('library-import', () => importFixtureFiles(window))
+handle('library-qlc', () => qlcEntries())
+handle('library-qlc-def', (_e, key: string) => qlcDefinition(String(key)))
+handle('my-fixtures', () => listMyFixtures())
+handle('my-fixture-save', (_e, def: { id?: string; format?: string }) => saveMyFixture(def))
+handle('my-fixture-delete', (_e, id: string) => deleteMyFixture(String(id)))
 
 // --- First launch, reinstalls and starting fresh ---------------------------------------
 handle('install-info', () => checkInstall())

@@ -18,6 +18,7 @@ import { getFixtureType } from '../model/fixtureTypes'
 import { headsOf } from '../model/heads'
 import { view } from '../state/viewBus'
 import { MenuItem, MenuShell } from './Menu'
+import { useStudio } from '../state/studio'
 import { ArrangeMenu } from './ArrangeMenu'
 import type { Fixture } from '../model/project'
 
@@ -185,6 +186,7 @@ export function FixtureMenu() {
         <hr />
         <Item label="Focus on it" keys="F" onClick={run(() => view.focus(ids))} />
         <Item label="Select same type" onClick={run(() => selectSameType(ids))} />
+        <Item label="Edit in Fixture Studio…" onClick={run(() => useStudio.getState().openType(getFixtureType(info.chosen[0].typeId)))} />
         <Item
           label="Show in inspector"
           onClick={run(() => {

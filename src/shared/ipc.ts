@@ -74,6 +74,13 @@ export interface VisualizerApi {
   /** The fixture library (Open Fixture Library plus your imported files), as raw OFL JSON. */
   loadLibrary(): Promise<unknown>
   importFixtureFiles(): Promise<{ added: number; rejected: string[] }>
+  /** The bundled QLC+ library's list; each definition is fetched with qlcDefinition when it's picked. */
+  loadQlcLibrary(): Promise<{ source: string; url: string; built: string; entries: unknown[] } | null>
+  qlcDefinition(key: string): Promise<unknown>
+  /** Fixtures made or edited in Fixture Studio, kept on this Mac. */
+  myFixtures(): Promise<unknown[]>
+  saveMyFixture(def: unknown): Promise<{ ok: true } | { error: string }>
+  deleteMyFixture(id: string): Promise<void>
 
   onMenu(callback: (command: string) => void): () => void
   onNotice(callback: (notice: Notice) => void): () => void

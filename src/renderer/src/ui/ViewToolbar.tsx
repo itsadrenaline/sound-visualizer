@@ -2,7 +2,8 @@
  * Buttons floating over the 3D view: camera presets, framing, stored camera
  * positions (Capture's Camera Positions) and saving the view as an image.
  */
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useDismiss } from './useDismiss'
 import { view, type ViewPreset } from '../state/viewBus'
 import { useStore } from '../state/store'
 import { deleteCamera, storeCamera, updateRoom } from '../state/commands'
@@ -43,6 +44,7 @@ export function ViewToolbar() {
   const fullView = useViewSettings((s) => s.fullView)
   const setFullView = useViewSettings((s) => s.setFullView)
   const [menu, setMenu] = useState(false)
+  const camerasRef = useDismiss<HTMLDivElement>(menu, useCallback(() => setMenu(false), []))
 
   const store = () => {
     const now = view.current()
@@ -66,12 +68,12 @@ export function ViewToolbar() {
       <button onClick={() => view.focus(selection.length ? selection : 'all')} title="Frame the selection, or everything (F)">
         Focus
       </button>
-      <div className="dropdown">
+      <div className="dropdown" ref={camerasRef}>
         <button data-tour="cameras" onClick={() => setMenu(!menu)} className={menu ? 'on' : ''} title="Stored camera positions">
           Cameras ▾
         </button>
         {menu && (
-          <div className="dropdown-menu" onMouseLeave={() => setMenu(false)}>
+          <div className="dropdown-menu">
             {cameras.length === 0 && <div className="hint">No stored positions yet.</div>}
             {cameras.map((c) => (
               <div key={c.name} className="dropdown-row">
@@ -114,13 +116,14 @@ function RoomMenu() {
   const room = roomOf(project)
   const fit = roomFit(project, room.ceilingHeight)
   const [open, setOpen] = useState(false)
+  const ref = useDismiss<HTMLDivElement>(open, useCallback(() => setOpen(false), []))
   return (
-    <div className="dropdown">
+    <div className="dropdown" ref={ref}>
       <button data-tour="room" onClick={() => setOpen(!open)} className={open ? 'on' : ''} title="Room light and ceiling">
         Room ▾
       </button>
       {open && (
-        <div className="dropdown-menu room-menu" onMouseLeave={() => setOpen(false)}>
+        <div className="dropdown-menu room-menu">
           <div className="room-row">
             <span className="label">Room light</span>
             <span className="hint">{Math.round(room.ambient * 100)}%</span>

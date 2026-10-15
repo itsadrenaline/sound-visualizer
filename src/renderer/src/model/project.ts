@@ -67,6 +67,8 @@ export interface Project {
   fixtures: Fixture[]
   /** Fixture types that aren't built in, e.g. imported from SoundSwitch. */
   fixtureTypes?: FixtureType[]
+  /** Fixture types edited in Fixture Studio, standing in for the original type with that id. */
+  typeOverrides?: Record<string, FixtureType>
   /** Which version of the automatic SoundSwitch layout placed the fixtures. */
   layoutVersion?: number
   /** Stored camera positions (Capture's "Camera Positions"). */

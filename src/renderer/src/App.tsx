@@ -19,6 +19,8 @@ import { Inspector } from './ui/Inspector'
 import { DmxMap } from './ui/DmxMap'
 import { Faders } from './ui/Faders'
 import { ErrorBoundary } from './ui/ErrorBoundary'
+import { FixtureStudio } from './ui/studio/FixtureStudio'
+import { useStudio } from './state/studio'
 import { useStore } from './state/store'
 import { dmxBus } from './state/dmxBus'
 import { homeFixtures } from './state/demo'
@@ -86,6 +88,15 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target
       if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return
+      // Fixture Studio has its own keys; only undo, redo and save reach it from here.
+      if (useStudio.getState().open) {
+        const command = commandForKey(e)
+        if (command && (command === 'undo' || command === 'redo' || command === 'save') && !(window.api && MENU_OWNED.has(command))) {
+          e.preventDefault()
+          runCommand(command)
+        }
+        return
+      }
       const { selection, select } = useStore.getState()
       const key = e.key.toLowerCase()
       if (!e.metaKey && !e.ctrlKey && !e.altKey && selection.length && (key === 'm' || key === 's' || key === 'h')) {
@@ -117,6 +128,7 @@ export function App() {
       <ToursDialog />
       <TourOverlay />
       <Tooltips />
+      <FixtureStudio />
       <Toolbar artNet={artNet} />
       {!fullView && (
         <aside className="panel left">

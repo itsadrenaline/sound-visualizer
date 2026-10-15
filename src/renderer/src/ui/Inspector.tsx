@@ -10,7 +10,8 @@ import { FIXTURE_PROPERTIES, type PropertyDescriptor } from '../state/properties
 import { footprint, type Fixture } from '../model/project'
 import { mirrorsOf } from '../model/patchCheck'
 import { SelectionProblems } from './PatchProblems'
-import { getFixtureType } from '../model/fixtureTypes'
+import { getFixtureType, isOverridden } from '../model/fixtureTypes'
+import { useStudio } from '../state/studio'
 import { ArrangePanel } from './ArrangePanel'
 import { ArrangeButtons } from './ArrangeMenu'
 import { FixtureMount, StructureInspector } from './StructureActions'
@@ -154,6 +155,10 @@ function TypeInfo({ fixture }: { fixture: Fixture }) {
       <div className="sub">
         Universe {fixture.universe + 1}, channels {fixture.address}–{end} ({footprint(fixture)} ch)
       </div>
+      {type.lookGuessed && !isOverridden(fixture.typeId) && <div className="sub warn-text">Its look is a guess: open it in Fixture Studio to choose its real shape and size.</div>}
+      <button className="mini studio-open" onClick={() => useStudio.getState().openType(type)} title="See every channel on a 3D twin, test it, and fix or improve it">
+        Open in Fixture Studio
+      </button>
     </div>
   )
 }

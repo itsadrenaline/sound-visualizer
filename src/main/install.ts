@@ -78,7 +78,10 @@ export function freshStart(options: { claudeKey?: boolean; importedFixtures?: bo
   }
   remove('soundswitch.json')
   remove('soundswitch-exclude.json')
-  if (options.importedFixtures) remove('library')
+  if (options.importedFixtures) {
+    remove('library')
+    remove('fixtures')
+  }
   if (options.claudeKey) clearClaudeKey()
   log('info', 'Started fresh', options)
 }

@@ -7,6 +7,7 @@
  */
 import { create } from 'zustand'
 import { useViewSettings } from './viewSettings'
+import { newFromKind, useStudio } from './studio'
 
 export interface TourStep {
   /** The data-tour name of what to light up; none = a note in the middle. */
@@ -104,6 +105,22 @@ export const TOURS: Tour[] = [
       { target: 'tab-dmx', title: 'The DMX map', body: 'Each universe the way SoundSwitch shows it, with live levels. Click a fixture to select it.' },
       { target: 'shows', title: 'A show from SoundSwitch', body: 'Shows ▸ New show… makes a show with just the SoundSwitch fixtures you pick, with copies that share a patch.' }
     ]
+  },
+  {
+    id: 'studio',
+    title: 'Making or fixing a fixture',
+    summary: 'Fixture Studio: a 3D twin of any light, from its name, manual or a file, with tests.',
+    steps: [
+      { title: 'Fixture Studio', body: 'Any light can be in your show, even one that isn\u2019t in the Library. Fixture Studio builds it as a 3D twin you can test without the real light, and fixes ones that look wrong.', prepare: () => (useStudio.getState().close(true), panels()) },
+      { target: 'new-fixture', title: 'Start here', body: 'New fixture… in the Library (or File ▸ New Fixture, ⇧⌘N). For a light already in your show: right-click it ▸ Edit in Fixture Studio, or Open in Fixture Studio in the inspector.', prepare: leftTab('library') },
+      { target: 'studio-search', title: 'Say what light it is', body: 'Type its name: the Library is searched as you type (Open Fixture Library, QLC+ and your own). Not there? Paste its DMX chart, drop the manual or a fixture file, search the web, or start from a type.', prepare: () => useStudio.getState().start() },
+      { target: 'studio-twin', title: 'The twin', body: 'The light in a small test room, drawn exactly as it will be in your show. Drag to look around; the buttons jump to the front, the beam on the wall or a close-up.', prepare: () => newFromKind('bar', 'Example LED bar') },
+      { target: 'studio-schematic', title: 'Schematic and DMX strip', body: 'The face of the light, lit as the twin shows it: click a cell to see its channels. Below, every DMX channel in order, filling up with its value.' },
+      { target: 'studio-channels', title: 'Channels', body: 'One row per channel: what it does, a slider to try it, and a dot for how sure we are (amber = guessed, red = missing). Hover a row and the twin shows it. Pick several to change them together.' },
+      { target: 'studio-tests', title: 'Tests', body: 'Ready-made tests for this kind of light, each saying what you should see. If the twin does something else, \u201cSomething\u2019s off\u201d offers the usual fixes.', prepare: () => useStudio.getState().setRightTab('tests') },
+      { title: 'Save, share, edit later', body: 'Save keeps it in My Fixtures, and updates your show if it uses it. Export makes a file to share, or to send to the Open Fixture Library. Open it again any time to change it.' }
+    ],
+    finish: () => useStudio.getState().close(true)
   },
   {
     id: 'present',

@@ -22,9 +22,92 @@ export type LookKind =
   | 'flood' // rectangular LED flood on a yoke bracket
   | 'spider' // box with a face of separately coloured lenses
   | 'par' // generic can
+  | 'cluster' // round cells on a frame (retro hex lights, multi-cell blinders): each cell its own lens
+  | 'panel' // flat panel of square cells in a grid (matrix, pixel panel, blinder)
+  | 'laser' // small box with a laser aperture on the front
+  | 'derby' // box with a dome of rotating multi-coloured beams (derby, moonflower)
+  | 'strobe' // flat bright panel (strobe, blinder)
+
+/** How a fixture's cells sit on its face, for looks that draw cells (cluster, panel). */
+export interface CellLayout {
+  kind: 'row' | 'column' | 'grid' | 'ring' | 'ringCentre' | 'hex'
+  /** For grids: how many across (rows follow from the cell count). */
+  cols?: number
+}
+
+/** Where each of `n` cells sits, in units of the face's half-size (-1..1), first cell first. */
+export function cellPositions(n: number, layout: CellLayout | undefined, aspect = 1): Array<[number, number]> {
+  const kind = layout?.kind ?? (n <= 1 ? 'row' : aspect > 2.5 ? 'row' : aspect < 0.4 ? 'column' : n === 7 ? 'ringCentre' : 'grid')
+  if (n <= 1) return [[0, 0]]
+  switch (kind) {
+    case 'row':
+      return Array.from({ length: n }, (_, i) => [-1 + (2 * (i + 0.5)) / n, 0])
+    case 'column':
+      return Array.from({ length: n }, (_, i) => [0, 1 - (2 * (i + 0.5)) / n])
+    case 'ring':
+      return Array.from({ length: n }, (_, i) => {
+        const a = Math.PI / 2 - (i / n) * Math.PI * 2
+        return [Math.cos(a) * 0.72, Math.sin(a) * 0.72]
+      })
+    case 'ringCentre': {
+      const ring = n - 1
+      const out: Array<[number, number]> = Array.from({ length: ring }, (_, i) => {
+        const a = Math.PI / 2 - (i / ring) * Math.PI * 2
+        return [Math.cos(a) * 0.66, Math.sin(a) * 0.66]
+      })
+      return [...out, [0, 0]]
+    }
+    case 'hex': {
+      const out: Array<[number, number]> = [[0, 0]]
+      let ring = 1
+      while (out.length < n) {
+        const count = ring * 6
+        for (let i = 0; i < count && out.length < n; i++) {
+          const a = Math.PI / 2 - (i / count) * Math.PI * 2
+          out.push([Math.cos(a) * ring, Math.sin(a) * ring])
+        }
+        ring++
+      }
+      const s = 0.8 / Math.max(1, ring - 1)
+      return out.map(([x, y]) => [x * s, y * s])
+    }
+    default: {
+      const cols = Math.max(1, layout?.cols ?? Math.ceil(Math.sqrt(n * aspect)))
+      const rows = Math.ceil(n / cols)
+      return Array.from({ length: n }, (_, i) => {
+        const c = i % cols
+        const r = Math.floor(i / cols)
+        return [-1 + (2 * (c + 0.5)) / cols, 1 - (2 * (r + 0.5)) / rows]
+      })
+    }
+  }
+}
+
+/** A sensible size and beam for each look, when nothing better is known. */
+export const LOOK_DEFAULTS: Record<LookKind, { size: [number, number, number]; beam: [number, number] }> = {
+  mover: { size: [0.3, 0.42, 0.24], beam: [12, 20] },
+  moverWash: { size: [0.3, 0.4, 0.22], beam: [10, 40] },
+  gigbar: { size: [1.1, 0.45, 0.14], beam: [11, 19] },
+  tube: { size: [0.05, 1.0, 0.05], beam: [180, 180] },
+  bar: { size: [1.0, 0.1, 0.08], beam: [120, 120] },
+  strip: { size: [1.0, 0.012, 0.012], beam: [120, 120] },
+  uplight: { size: [0.16, 0.06, 0.15], beam: [25, 25] },
+  flood: { size: [0.3, 0.2, 0.12], beam: [40, 60] },
+  spider: { size: [0.3, 0.22, 0.19], beam: [20, 20] },
+  par: { size: [0.22, 0.25, 0.22], beam: [25, 40] },
+  cluster: { size: [0.42, 0.42, 0.16], beam: [30, 30] },
+  panel: { size: [0.5, 0.5, 0.1], beam: [60, 60] },
+  laser: { size: [0.2, 0.1, 0.22], beam: [40, 40] },
+  derby: { size: [0.3, 0.22, 0.25], beam: [15, 15] },
+  strobe: { size: [0.35, 0.12, 0.12], beam: [110, 110] }
+}
 
 export interface FixtureSpec {
   look: LookKind
+  /** How the cells sit on the face (cluster and panel looks). */
+  layout?: CellLayout
+  /** Housing colour, e.g. "#18191c" (black) or "#d8d8d8" (white). */
+  bodyColor?: string
   /** Overall size: width (left-right), height, depth, metres. */
   size: [number, number, number]
   /** Movement range in degrees (movers only). */

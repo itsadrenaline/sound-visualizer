@@ -1,0 +1,33 @@
+37CH
+13  Warm White COB effect   0-4  no function
+5-11  warm white COB effect 1
+12-18  warm white COB effect 2
+19-25  warm white COB effect 3
+****  ***  Data increases by 6
+194-200  warm white COB effect 28
+201-207  warm white COB effect 29
+208-214  warm white COB effect 30
+215-239  warm white COB effect with auxiliary light effect
+240-244  sound control effect 1
+245-249  sound control effect 2
+250-255  sound control effect 3
+14  Speed adjustment  0-127  warm white COB changes in the positive direction, the speed changes from slow to fast
+128-255  warm white COB effect changes in the reverse direction, the speed changes from slow to fast
+Sound control sensitivity adjustment  0-255  In sound control mode, 0-255 is used to adjust the sound control sensitivity
+15  Auxiliary light effect  0-4  no function
+5-11  Auxiliary light effect 1
+12-18  Auxiliary light effect 2
+19-25  Auxiliary light effect 3
+****  ***  Data increases by 6
+194-200  Auxiliary light effect 28
+201-207  Auxiliary light effect 29
+208-255  Auxiliary light effect 30
+16  Speed adjustment  0-127  Auxiliary light effect changes in the positive direction, the speed changes from slow to fast
+128-255  Auxiliary light effect changes in the reverse direction, the speed changes from slow to fast
+17  R1  0-255  The first light is red (Auxiliary light)
+18  G1  0-255  The first light is green (Auxiliary light)
+19  B1  0-255  The first light is blue (Auxiliary light)
+......
+35  R6  0-255  The seventh light is red (Auxiliary light)
+36  G6  0-255  The seventh light is green (Auxiliary light)
+37  B6  0-255  The seventh light is blue (Auxiliary light)

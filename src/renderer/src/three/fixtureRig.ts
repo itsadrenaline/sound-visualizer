@@ -11,7 +11,7 @@ import * as THREE from 'three'
 import type { Fixture } from '../model/project'
 import type { FixtureType } from '../model/fixtureTypes'
 import { headsOf, type HeadDef, type HeadState } from '../model/heads'
-import { specFor, type FixtureSpec } from '../model/catalog'
+import { cellPositions, specFor, type FixtureSpec } from '../model/catalog'
 import { createBeamMaterial } from './beamMaterial'
 import { projectors } from './projectors'
 import { goboCell } from './gobos'
@@ -306,6 +306,7 @@ export class FixtureRig {
     this.heads = headsOf(type)
     this.spec = type.spec ?? specFor(type.name, type.body === 'movingHead')
     if (!type.spec && type.body === 'bar') this.spec = specFor('pixel tube', false)
+    if (this.spec.bodyColor) this.body.color.set(this.spec.bodyColor)
     this.emitters = this.heads.map(() => null)
     this.root.add(this.mount)
     this.build()
@@ -525,6 +526,106 @@ export class FixtureRig {
         break
       }
 
+      case 'cluster':
+      case 'panel': {
+        // A face of cells: round lenses on a frame (cluster) or square cells (panel).
+        // Each cell glows in its part's colour; parts sharing a cell are drawn as a
+        // centre lens and a ring around it (a warm white COB inside an RGB ring).
+        const aim = new THREE.Group()
+        this.mount.add(aim)
+        aim.position.y = d * 0.5
+        this.aimGroup = aim
+        const round = s.look === 'cluster'
+        const housing = round ? cylinder(Math.max(w, h) / 2, d * 0.7, this.body, 40) : box(w, d * 0.7, h, this.body)
+        aim.add(housing)
+        const faceY = d * 0.35 + 0.002
+        const lights = this.headIndex((x) => x.role !== 'master' && x.role !== 'laser' && x.role !== 'derby')
+        const cellOf = (i: number, k: number) => this.heads[i].cell ?? k
+        const cellIds = [...new Set(lights.map((i, k) => cellOf(i, k)))].sort((a, b) => a - b)
+        const n = Math.max(1, cellIds.length)
+        const pos = cellPositions(n, s.layout, w / Math.max(0.01, h))
+        // Each cell as big as it can be without touching its nearest neighbour.
+        const pts = pos.map(([px, py]) => [(px * w) / 2, (py * h) / 2])
+        let nearest = Infinity
+        for (let a = 0; a < pts.length; a++) for (let b = a + 1; b < pts.length; b++) nearest = Math.min(nearest, Math.hypot(pts[a][0] - pts[b][0], pts[a][1] - pts[b][1]))
+        const pitch = n <= 1 ? Math.min(w, h) * 0.38 : nearest * 0.42
+        const bezel = new THREE.MeshStandardMaterial({ color: 0x3c3f45, roughness: 0.4, metalness: 0.5 })
+        cellIds.forEach((cell, c) => {
+          const [px, py] = pos[c] ?? [0, 0]
+          const x = (px * w) / 2
+          const z = (-py * h) / 2
+          const parts = lights.filter((i, k) => cellOf(i, k) === cell)
+          // A metal bezel around each cell, so the layout shows even when it's dark.
+          const rim = new THREE.Mesh(round ? new THREE.RingGeometry(pitch * 1.0, pitch * 1.16, 32) : new THREE.RingGeometry(pitch * 1.45, pitch * 1.6, 4, 1, Math.PI / 4), bezel)
+          rim.rotation.x = -Math.PI / 2
+          rim.position.set(x, faceY - 0.0005, z)
+          aim.add(rim)
+          parts.forEach((i, k) => {
+            const inner = k === 0
+            const geo = round
+              ? inner ? new THREE.CircleGeometry(parts.length > 1 ? pitch * 0.62 : pitch, 28) : new THREE.RingGeometry(pitch * 0.72, pitch, 32)
+              : inner ? new THREE.PlaneGeometry(pitch * 1.9, pitch * 1.9) : new THREE.RingGeometry(pitch * 1.1, pitch * 1.35, 4, 1, Math.PI / 4)
+            const m = new THREE.Mesh(geo)
+            m.rotation.x = -Math.PI / 2
+            m.position.set(x, faceY + 0.001 * k, z)
+            aim.add(m)
+            this.emitters[i] = new GlowEmitter([m], 2.6)
+          })
+        })
+        // One soft beam for the whole face: the mix of its cells.
+        const beamHolder = new THREE.Group()
+        beamHolder.position.y = faceY
+        aim.add(beamHolder)
+        if (lights.length) this.extraBeam = { emitter: new BeamEmitter(beamHolder, this.root, 0.001, 0, candela, 0), heads: lights }
+        for (const i of this.headIndex((x) => x.role === 'laser' || x.role === 'derby')) {
+          const holder = new THREE.Group()
+          holder.position.y = faceY
+          aim.add(holder)
+          this.emitters[i] = this.heads[i].role === 'laser' ? new LaserEmitter(holder, !!this.heads[i].ch.laser) : new DerbyEmitter(holder)
+        }
+        break
+      }
+
+      case 'laser':
+      case 'derby':
+      case 'strobe': {
+        // A small box. Lasers and derbies throw their beams up and out from the top;
+        // a strobe's whole top face flashes.
+        const aim = new THREE.Group()
+        this.mount.add(aim)
+        aim.position.y = h * 0.5
+        this.aimGroup = aim
+        aim.add(box(w, h, d, this.body))
+        const top = h / 2 + 0.002
+        if (s.look === 'strobe') {
+          const panel = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.9, d * 0.8))
+          panel.rotation.x = -Math.PI / 2
+          panel.position.y = top
+          aim.add(panel)
+          const lights = this.headIndex((x) => x.role !== 'master')
+          const main = lights[0] ?? 0
+          this.emitters[main] = new GlowEmitter([panel], 4)
+          const holder = new THREE.Group()
+          holder.position.y = top
+          aim.add(holder)
+          this.extraBeam = { emitter: new BeamEmitter(holder, this.root, 0.001, 0, candela, 0), heads: lights.length ? lights : [main] }
+          break
+        }
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(Math.min(w, d) * 0.3, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.body)
+        dome.position.y = top
+        aim.add(dome)
+        const holder = new THREE.Group()
+        holder.position.y = top + 0.02
+        aim.add(holder)
+        const effectHeads = this.headIndex((x) => x.role !== 'master')
+        effectHeads.forEach((i, k) => {
+          if (k === 0 || this.heads[i].role === 'laser' || this.heads[i].role === 'derby') {
+            const asLaser = this.heads[i].role === 'laser' || (s.look === 'laser' && this.heads[i].role !== 'derby')
+            this.emitters[i] = asLaser ? new LaserEmitter(holder, !!this.heads[i].ch.laser) : new DerbyEmitter(holder)
+          }
+        })
+        break
+      }
       case 'uplight':
       case 'flood':
       case 'spider':

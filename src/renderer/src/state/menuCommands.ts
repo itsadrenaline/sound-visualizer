@@ -4,7 +4,9 @@
  */
 import { useStore } from './store'
 import { useViewSettings } from './viewSettings'
-import { useLibrary } from './library'
+import { deleteChannels, useStudio } from './studio'
+import { readFixtureFile } from '../model/fixtureFiles'
+import { notify } from './notices'
 import { deleteFixtures, deleteStructures, duplicateFixtures, duplicateStructures } from './commands'
 import { openDocument, saveDocument } from './document'
 import { view } from './viewBus'
@@ -14,6 +16,16 @@ import { saveViewImage } from '../ui/ViewToolbar'
 import { exportCsv, exportMvr, importShowInto, openMvr, startFromTemplate } from './shows'
 
 export function runCommand(command: string): void {
+  // While Fixture Studio is open, undo, redo, save and delete work on the fixture.
+  const studio = useStudio.getState()
+  if (studio.open && studio.screen === 'edit') {
+    if (command === 'undo') return studio.undo()
+    if (command === 'redo') return studio.redo()
+    if (command === 'save' || command === 'saveAs') return void studio.save()
+    if (command === 'delete') return deleteChannels(studio.selected)
+    if (command === 'selectAll') return studio.select(studio.def?.modes[studio.modeIndex]?.channels.map((c) => c.id) ?? [])
+  }
+  if (command === 'newFixture') return studio.start()
   const { undo, redo, select, selection, project } = useStore.getState()
   const settings = useViewSettings.getState()
   if (command.startsWith('template:')) return void startFromTemplate(command.slice('template:'.length))
@@ -45,8 +57,7 @@ export function runCommand(command: string): void {
     case 'saveAs':
       return void saveDocument(true)
     case 'importFixtures':
-      settings.setLeftTab('library')
-      return void useLibrary.getState().importFiles()
+      return void importFixtureFile()
     case 'saveImage':
       return void saveViewImage()
     case 'undo':
@@ -125,4 +136,17 @@ export function commandForKey(e: KeyboardEvent): string | null {
   // (e.code, not e.key: with Shift, "1" arrives as "!" on most keyboards.)
   if (!e.shiftKey || e.altKey) return null
   return ({ Digit1: 'viewPerspective', Digit2: 'viewTop', Digit3: 'viewFront', Digit4: 'viewLeft', Digit5: 'viewRight', Digit6: 'viewUp' } as Record<string, string>)[e.code] ?? null
+}
+
+/** File ▸ Import Fixture File: any fixture file opens in Fixture Studio, with a report of what was read. */
+async function importFixtureFile(): Promise<void> {
+  if (!window.api) return
+  const file = await window.api.openFile([{ name: 'Fixture files', extensions: ['gdtf', 'json', 'qxf', 'svfixture'] }])
+  if (!file) return
+  try {
+    const { def, report } = readFixtureFile(file.name, file.bytes)
+    useStudio.getState().openDef(def, report)
+  } catch (error) {
+    notify('error', `${file.name}: ${(error as Error).message}`)
+  }
 }
