@@ -26,7 +26,9 @@ export function StartPicker({ kind, onPick, onClose, name, maker, action = 'Star
   }
   const n = Number(count)
   const box = useRef<HTMLDivElement>(null)
-  useEffect(() => box.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), [kind])
+  useEffect(() => {
+    box.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [kind])
   return (
     <div className="start-picker" ref={box}>
       <div className="sp-head">
