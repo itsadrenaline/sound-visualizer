@@ -47,8 +47,8 @@ export function checkDef(def: FixtureDef, modeIndex: number): Problem[] {
   }
   const label = (c: ChannelDef) => `Channel ${mode.channels.indexOf(c) + 1} (${c.name})`
 
-  // Nothing makes light.
-  if (!mode.channels.some((c) => LIGHT.has(c.fn))) {
+  // Nothing makes light (fine for a fog or effect machine, which makes something else).
+  if (!mode.channels.some((c) => LIGHT.has(c.fn) || c.fn === 'fog' || c.fn === 'specialFx')) {
     out.push({ id: 'dark', level: 'error', text: 'Nothing in this mode makes light: give at least one channel a job like Dimmer or Red.' })
   }
 

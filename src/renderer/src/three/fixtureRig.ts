@@ -5,7 +5,7 @@
  * A fixture is made of heads (see model/heads.ts). Each head gets an emitter:
  * a beam (lens, haze cone and a real spotlight), glowing pixels, a derby's fan
  * of beams, a strobe panel, a laser fan or a halo ring. Moving heads travel at
- * the fixture's top speed instead of jumping (like Capture's Mechanical model).
+ * the fixture's top speed instead of jumping.
  */
 import * as THREE from 'three'
 import type { Fixture } from '../model/project'
@@ -166,6 +166,43 @@ class GlowEmitter implements Emitter {
   }
   dispose(): void {
     this.material.dispose()
+  }
+}
+
+/**
+ * A fog or haze machine's output: soft puffs drifting out of the nozzle, more and
+ * thicker the higher the fog channel. Lit by the machine's own LEDs if it has them.
+ */
+class FogEmitter implements Emitter {
+  private group = new THREE.Group()
+  private puffs: Array<{ mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; phase: number }> = []
+  private level = 0
+  constructor(parent: THREE.Object3D, private reach: number) {
+    parent.add(this.group)
+    for (let i = 0; i < 9; i++) {
+      const material = new THREE.MeshBasicMaterial({ color: 0xdfe6ee, transparent: true, opacity: 0, depthWrite: false })
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), material)
+      this.group.add(mesh)
+      this.puffs.push({ mesh, material, phase: i / 9 })
+    }
+  }
+  update(s: HeadState, _haze: number, time: number): void {
+    // The output builds up and fades away rather than switching instantly.
+    this.level += (s.fog - this.level) * 0.08
+    const lit = s.intensity > 0.02
+    for (const p of this.puffs) {
+      const t = (time * 0.35 + p.phase) % 1
+      const size = (0.04 + t * 0.22) * this.reach * (0.5 + this.level * 0.5)
+      p.mesh.position.set(Math.sin(p.phase * 9) * t * 0.12 * this.reach, t * 0.1 * this.reach, t * this.reach)
+      p.mesh.scale.setScalar(Math.max(0.001, size))
+      p.material.opacity = this.level * 0.22 * (1 - t) * Math.min(1, t * 6)
+      if (lit) p.material.color.setRGB(0.55 + s.color[0] * 0.45 * s.intensity, 0.55 + s.color[1] * 0.45 * s.intensity, 0.55 + s.color[2] * 0.45 * s.intensity)
+      else p.material.color.setRGB(0.85, 0.88, 0.92)
+    }
+    this.group.visible = this.level > 0.01
+  }
+  dispose(): void {
+    for (const p of this.puffs) p.material.dispose()
   }
 }
 
@@ -626,6 +663,36 @@ export class FixtureRig {
         })
         break
       }
+      case 'fog': {
+        // A box on the floor with a nozzle at the front; the fog drifts out of it.
+        const aim = new THREE.Group()
+        this.mount.add(aim)
+        aim.position.y = h * 0.5
+        aim.add(box(w, h, d, this.body))
+        const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(Math.min(w, h) * 0.12, Math.min(w, h) * 0.14, d * 0.12, 16), this.body)
+        nozzle.rotation.x = Math.PI / 2
+        nozzle.position.z = d / 2 + d * 0.06
+        aim.add(nozzle)
+        const out = new THREE.Group()
+        out.position.z = d / 2 + d * 0.12
+        aim.add(out)
+        const fogHead = this.headIndex((x) => !!x.ch.fog)[0] ?? 0
+        this.emitters[fogHead] = new FogEmitter(out, Math.max(0.9, d * 3))
+        // LEDs on the front (some machines light their fog): a glowing ring round the nozzle.
+        const leds = this.headIndex((x) => !!(x.ch.red || x.ch.white) && !x.ch.fog)
+        const ledHead = leds[0] ?? (this.heads[fogHead]?.ch.red ? fogHead : -1)
+        if (ledHead >= 0) {
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(Math.min(w, h) * 0.22, Math.min(w, h) * 0.04, 8, 24))
+          ring.position.z = d / 2 + 0.002
+          aim.add(ring)
+          if (ledHead === fogHead) {
+            const glow = new GlowEmitter([ring], 2.5)
+            const fog = this.emitters[fogHead]!
+            this.emitters[fogHead] = { update: (st, hz, t) => (fog.update(st, hz, t), glow.update(st)), dispose: () => (fog.dispose(), glow.dispose()) }
+          } else this.emitters[ledHead] = new GlowEmitter([ring], 2.5)
+        }
+        break
+      }
       case 'uplight':
       case 'flood':
       case 'spider':
@@ -782,4 +849,4 @@ export class FixtureRig {
   }
 }
 
-const DARK: HeadState = { intensity: 0, color: BLACK, pan: 0, tilt: 0, beamAngle: 10, gobo: 0, goboSpin: 0, prismSpin: 0, moveSpeed: 1, prism: false, rotation: 0 }
+const DARK: HeadState = { intensity: 0, color: BLACK, pan: 0, tilt: 0, beamAngle: 10, gobo: 0, goboSpin: 0, prismSpin: 0, moveSpeed: 1, prism: false, rotation: 0, fog: 0 }

@@ -4,7 +4,7 @@
  * Instead of hand-building a form for fixtures, we describe each editable
  * property once: its label, type, limits, and how to read and write it.
  * The Inspector then draws a form for whatever is selected, including several
- * fixtures at once. (This is Capture's UIProperty + UIPropertyTable idea.)
+ * fixtures at once.
  */
 import type { Fixture } from '../model/project'
 import { listFixtureTypes } from '../model/fixtureTypes'

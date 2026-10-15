@@ -46,7 +46,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
         {
           label: 'Export',
           submenu: [
-            { label: 'MVR for Capture, grandMA3, Vectorworks…', click: send('exportMvr') },
+            { label: 'MVR (for other lighting software)…', click: send('exportMvr') },
             { label: 'Patch List (CSV)…', click: send('exportCsv') }
           ]
         },

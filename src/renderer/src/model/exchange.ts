@@ -3,7 +3,7 @@
  *
  *  - mergeShow: bring another show into this one (its objects and fixtures),
  *    re-patching anything that would clash with what's already here.
- *  - MVR (My Virtual Rig, the open GDTF/MVR standard used by Capture, grandMA3,
+ *  - MVR (My Virtual Rig, the open GDTF/MVR standard used by lighting design software and consoles such as grandMA3,
  *    Vectorworks, Depence and others): a zip with GeneralSceneDescription.xml.
  *    We write fixtures with their position, patch and GDTF name, objects as
  *    scene objects with 3D models (glTF), and our own show file inside UserData

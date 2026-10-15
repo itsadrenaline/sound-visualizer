@@ -113,7 +113,7 @@ function ShowsMenu() {
               <hr />
               <MenuItem label="Import show into this one…" onClick={run('importShow')} />
               <MenuItem label="Open MVR…" onClick={run('openMvr')} />
-              <MenuItem label="Export MVR (Capture, grandMA3…)…" onClick={run('exportMvr')} />
+              <MenuItem label="Export MVR (for other lighting software)…" onClick={run('exportMvr')} />
               <MenuItem label="Export patch list (CSV)…" onClick={run('exportCsv')} />
             </>
           )}

@@ -11,7 +11,7 @@ const byId = (id: string) => fixtures().find((f) => f.id === id)!
 
 beforeEach(() => useStore.setState({ project: defaultProject(), past: [], future: [], selection: [] }))
 
-describe('patching like Capture', () => {
+describe('patching into free gaps', () => {
   it('fills the free gaps and carries on into the next universe', () => {
     // The default rig uses 1-128 of universe 0.
     const plan = planPatch(defaultProject().fixtures, 4, 120, { universe: 0, address: 1 })

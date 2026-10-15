@@ -247,7 +247,7 @@ export function Viewport() {
       }
     })
 
-    // --- Drag the selection around with a move gizmo (Capture's Move tool) ---
+    // --- Drag the selection around with a move gizmo ---
     const gizmo = new TransformControls(camera, renderer.domElement)
     gizmo.setTranslationSnap(0.05)
     gizmo.setSize(0.75)

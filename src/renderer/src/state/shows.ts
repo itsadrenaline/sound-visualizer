@@ -1,6 +1,6 @@
 /**
  * Shows in and out (File menu): bring another show into this one, open or
- * export MVR for Capture and other lighting software, export a CSV patch list,
+ * export MVR for other lighting software, export a CSV patch list,
  * and start from a ready-made show.
  */
 import { useStore } from './store'
@@ -87,7 +87,7 @@ export async function exportMvr(): Promise<void> {
   try {
     const bytes = await toMvr(project, { model: structureGlb })
     const path = await window.api.saveFile(`${project.name || 'Show'}.mvr`, [{ name: 'MVR (My Virtual Rig)', extensions: ['mvr'] }], bytes)
-    if (path) notify('info', `Exported ${path.split('/').pop()}: open it in Capture, grandMA3, Vectorworks or Depence (File ▸ Import MVR).`)
+    if (path) notify('info', `Exported ${path.split('/').pop()}: open it in any lighting software that imports MVR.`)
   } catch (error) {
     notify('error', `Couldn't export MVR: ${(error as Error).message}`)
   }

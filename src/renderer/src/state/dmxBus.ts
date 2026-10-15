@@ -1,7 +1,6 @@
 /**
  * Live DMX levels. Deliberately NOT part of the project or React state:
  * levels change ~44 times a second and must never enter undo or the saved file.
- * (Capture keeps them on a separate "volatile" channel for the same reason.)
  *
  * Two sources feed it: Art-Net from the network, and the on-screen test faders.
  *

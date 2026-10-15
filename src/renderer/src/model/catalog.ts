@@ -27,6 +27,7 @@ export type LookKind =
   | 'laser' // small box with a laser aperture on the front
   | 'derby' // box with a dome of rotating multi-coloured beams (derby, moonflower)
   | 'strobe' // flat bright panel (strobe, blinder)
+  | 'fog' // fog or haze machine: a box with a nozzle
 
 /** How a fixture's cells sit on its face, for looks that draw cells (cluster, panel). */
 export interface CellLayout {
@@ -99,7 +100,8 @@ export const LOOK_DEFAULTS: Record<LookKind, { size: [number, number, number]; b
   panel: { size: [0.5, 0.5, 0.1], beam: [60, 60] },
   laser: { size: [0.2, 0.1, 0.22], beam: [40, 40] },
   derby: { size: [0.3, 0.22, 0.25], beam: [15, 15] },
-  strobe: { size: [0.35, 0.12, 0.12], beam: [110, 110] }
+  strobe: { size: [0.35, 0.12, 0.12], beam: [110, 110] },
+  fog: { size: [0.25, 0.2, 0.5], beam: [30, 30] }
 }
 
 export interface FixtureSpec {

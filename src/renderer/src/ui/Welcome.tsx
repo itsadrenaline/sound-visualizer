@@ -100,7 +100,7 @@ export function Welcome() {
             <b>Save</b> (⌘S) keeps the show, set and fixtures in one file. <b>Shows ▾</b> has templates and imports one show into another.
           </li>
           <li>
-            <b>Export MVR</b> for Capture, grandMA3 and Vectorworks, or a patch list for the paperwork.
+            <b>Export MVR</b> for other lighting software, or a patch list for the paperwork.
           </li>
           <li>
             Lost? <b>? Learn</b> (top right) or <b>Help ▸ Guided Tours</b> walk you through each part of the app, pointing at the real buttons.

@@ -2,7 +2,7 @@
  * The project document: plain data only, no three.js and no React.
  *
  * Keeping the document as plain, immutable objects is what makes undo, saving
- * and testing easy. (Capture does the same job with its DocumentNode tree.)
+ * and testing easy.
  */
 import { getFixtureType, type FixtureType } from './fixtureTypes'
 import type { Structure } from './structures'
@@ -71,7 +71,7 @@ export interface Project {
   typeOverrides?: Record<string, FixtureType>
   /** Which version of the automatic SoundSwitch layout placed the fixtures. */
   layoutVersion?: number
-  /** Stored camera positions (Capture's "Camera Positions"). */
+  /** Stored camera positions. */
   cameras?: CameraPosition[]
   /** The room: ceiling and how bright the room's own light is. */
   room?: RoomSettings
@@ -147,8 +147,8 @@ export function nextFreeAddress(fixtures: Fixture[], universe: number, channels:
 }
 
 /**
- * Where `count` fixtures of `channels` channels each go, like Capture's Patch
- * dialog: from `start` onward, each in the next free gap, carrying on into the
+ * Where `count` fixtures of `channels` channels each go: from `start` onward,
+ * each in the next free gap, carrying on into the
  * following universes when one is full. Returns fewer spots only if universe
  * `maxUniverse` runs out too.
  */

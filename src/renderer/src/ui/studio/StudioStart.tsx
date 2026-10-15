@@ -32,6 +32,12 @@ export function StudioStart() {
   const { connected: claude } = useClaude()
   const [kind, setKind] = useState<FixtureKind | null>(null)
   const [prompt, setPrompt] = useState('')
+  const kindSection = useRef<HTMLDivElement>(null)
+  // Picking a kind brings the whole kind-and-layouts section into view.
+  const kindOpen = kind !== null
+  useEffect(() => {
+    if (kindOpen) kindSection.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [kindOpen])
   const entries = useLibrary((s) => s.entries)
   const status = useLibrary((s) => s.status)
   const project = useStore((s) => s.project)
@@ -228,24 +234,40 @@ export function StudioStart() {
           </div>
         </div>
 
-        <div className="panel-sub">Or start from a kind of light</div>
-        <div className="kind-grid big">
-          {KIND_ORDER.map((k) => (
-            <button key={k} className={`kind ${kind === k ? 'active' : ''}`} title={KINDS[k].explain} onClick={() => setKind(kind === k ? null : k)}>
-              <KindIcon kind={k} />
-              <span>{KINDS[k].label}</span>
-            </button>
-          ))}
+        <div className="kind-section" ref={kindSection}>
+          <div className="kind-section-head">
+            <span className="tile-title">Start from a kind of light</span>
+            <span className="tile-text">{kind ? 'Pick how many channels it has, or switch to another kind on the left.' : 'Pick the kind, then how many channels it has: you get a working fixture to adjust.'}</span>
+          </div>
+          {kind ? (
+            <div className="kind-split">
+              <div className="kind-list" role="listbox" aria-label="Kinds of light">
+                {KIND_ORDER.map((k) => (
+                  <button key={k} role="option" aria-selected={kind === k} className={`kind-item ${kind === k ? 'active' : ''}`} title={KINDS[k].explain} onClick={() => setKind(k)}>
+                    <KindIcon kind={k} />
+                    <span>{KINDS[k].label}</span>
+                  </button>
+                ))}
+              </div>
+              <StartPicker
+                kind={kind}
+                name={model || query.trim() || undefined}
+                maker={model ? maker : undefined}
+                onClose={() => setKind(null)}
+                onPick={(def, note) => useStudio.getState().openDef(def, [note])}
+              />
+            </div>
+          ) : (
+            <div className="kind-grid big">
+              {KIND_ORDER.map((k) => (
+                <button key={k} className="kind" title={KINDS[k].explain} onClick={() => setKind(k)}>
+                  <KindIcon kind={k} />
+                  <span>{KINDS[k].label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        {kind && (
-          <StartPicker
-            kind={kind}
-            name={model || query.trim() || undefined}
-            maker={model ? maker : undefined}
-            onClose={() => setKind(null)}
-            onPick={(def, note) => useStudio.getState().openDef(def, [note])}
-          />
-        )}
 
         {showTypes.length > 0 && (
           <>

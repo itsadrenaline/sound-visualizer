@@ -275,6 +275,10 @@ function classify(key: string, def: OflChannel, fx: OflFixture): Classified {
       case 'Prism':
         vote('prism', c)
         break
+      case 'Fog':
+      case 'FogOutput':
+        vote('fog', c)
+        break
       case 'ShutterStrobe': {
         vote('shutter', c)
         const effect = c.shutterEffect ?? 'Strobe'
@@ -370,6 +374,7 @@ function lookFor(fx: OflFixture, heads: HeadDef[], hasMovement: boolean, size?: 
     if (size && size[1] > size[0] * 2.5) return 'tube'
     return size && size[1] < 0.03 ? 'strip' : 'bar'
   }
+  if (cats.includes('Smoke') || cats.includes('Hazer') || heads.some((h) => h.ch.fog)) return 'fog'
   if (cats.includes('Laser')) return 'laser'
   if (cats.includes('Effect') || cats.includes('Flower')) return 'derby'
   if (cats.includes('Matrix')) return 'panel'

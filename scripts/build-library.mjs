@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { bothLightingFixtures } from './both-lighting.mjs'
+import { manualFixtures } from './manual-fixtures.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = join(root, 'resources', 'library')
@@ -59,11 +59,13 @@ for (const man of readdirSync(source, { withFileTypes: true })) {
   }
 }
 
-// Fixtures written from manufacturers' manuals (see scripts/both-lighting.mjs).
-for (const [slug, fixture] of Object.entries(bothLightingFixtures())) {
-  fixtures[`both-lighting/${slug}`] = fixture
-  manufacturers['both-lighting'] = 'Both Lighting'
-  count++
+// Fixtures written from manufacturers' manuals (scripts/both-lighting.mjs, betopper.mjs, rockville.mjs).
+for (const { maker, slug: makerSlug, fixtures: list } of manualFixtures()) {
+  for (const [slug, fixture] of Object.entries(list)) {
+    fixtures[`${makerSlug}/${slug}`] = { ...fixture, fromManual: true }
+    manufacturers[makerSlug] = maker
+    count++
+  }
 }
 
 mkdirSync(outDir, { recursive: true })

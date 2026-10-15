@@ -3,7 +3,7 @@
  *
  * Every change to the project goes through `apply(label, change)`: one named,
  * undoable step. Buttons, menus and shortcuts all call the same commands in
- * commands.ts, so there's one way to change anything. (Capture's UserAction.)
+ * commands.ts, so there's one way to change anything.
  */
 import { create } from 'zustand'
 import { blankProject, type Project } from '../model/project'

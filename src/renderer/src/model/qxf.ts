@@ -201,6 +201,11 @@ function kindOf(type: string, name: string, heads: number, channels: ChannelFn[]
       return 'bar'
     case 'Strobe':
       return 'strobe'
+    case 'Smoke':
+    case 'Hazer':
+      return 'fog'
+    case 'Dimmer':
+      return heads > 1 ? 'dimmer' : 'par'
     case 'Laser':
       return 'laser'
     case 'Flower':

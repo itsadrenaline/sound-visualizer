@@ -16,7 +16,8 @@ describe('Starting layouts', () => {
         const def = s.build('Test', 'Maker')
         expect(def.kind).toBe(kind)
         expect(def.modes[0].channels.length).toBe(s.count)
-        expect(checkDef(def, 0).filter((p) => p.level === 'error'), `${kind} ${s.label}`).toEqual([])
+        // Blank starting points are meant to be filled in: their channels are "missing" on purpose.
+        if (!s.label.startsWith('Blank')) expect(checkDef(def, 0).filter((p) => p.level === 'error'), `${kind} ${s.label}`).toEqual([])
         expect(() => typeFromDef(def, 0)).not.toThrow()
       }
     }
@@ -38,6 +39,20 @@ describe('Starting layouts', () => {
     const w = startWithCount('wash', 75)
     expect(w.def.modes[0].channels.length).toBe(75)
     expect(w.def.modes[0].channels.at(-1)!.confidence).toBe('missing')
+  })
+
+  it('other kinds: fog, effects, dimmer packs and something else', () => {
+    const fog = startsFor('fog')[0].build()
+    const t = typeFromDef(fog, 0)
+    expect(t.spec!.look).toBe('fog')
+    expect(t.heads!.some((h) => h.ch.fog)).toBe(true)
+    const dim = startWithCount('dimmer', 6).def
+    expect(dim.modes[0].channels.every((c) => c.fn === 'dimmer')).toBe(true)
+    expect(dim.parts.map((p) => p.name)).toEqual(['Light 1', 'Light 2', 'Light 3', 'Light 4', 'Light 5', 'Light 6'])
+    expect(guessKind(dim)).toBe('dimmer')
+    expect(guessKind(fog)).toBe('fog')
+    const other = startWithCount('other', 5).def
+    expect(other.modes[0].channels.every((c) => c.confidence === 'missing')).toBe(true)
   })
 
   it('cells × colours with a master', () => {

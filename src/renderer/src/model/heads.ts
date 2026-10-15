@@ -34,7 +34,7 @@ export interface ShutterRange {
 export type HeadFunction =
   | 'dimmer' | 'pan' | 'tilt' | 'red' | 'green' | 'blue' | 'white' | 'amber' | 'uv'
   | 'shutter' | 'zoom' | 'colorWheel' | 'gobo' | 'goboRotation' | 'prism' | 'prismRotation' | 'moveSpeed' | 'rotation' | 'laser'
-  | 'cyan' | 'magenta' | 'yellow'
+  | 'cyan' | 'magenta' | 'yellow' | 'fog'
 
 /** What a built-in program looks like on the twin: the nearest of a few generic patterns. */
 export type ProgramPattern = 'none' | 'chase' | 'fade' | 'jump' | 'rainbow' | 'strobe' | 'pulse' | 'static'
@@ -113,6 +113,8 @@ export interface HeadState {
   prism: boolean
   /** 0..1, e.g. derby rotation speed or laser pattern. */
   rotation: number
+  /** 0..1 fog or haze output (fog machines). */
+  fog: number
 }
 
 const ROLE_FUNCTIONS: ChannelFunction[] = ['red', 'green', 'blue', 'white', 'amber', 'uv']
@@ -245,7 +247,8 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const r = (fn: HeadFunction) => read(levels, address, head.ch[fn])
     const hasColor = head.ch.red || head.ch.green || head.ch.blue || head.ch.white || head.ch.amber || head.ch.uv
     const hasCmy = !hasColor && (head.ch.cyan || head.ch.magenta || head.ch.yellow)
-    let color: [number, number, number] = [1, 1, 1]
+    // A plain lamp (dimmer only) glows in its own white: warm for incandescent and COB parts.
+    let color: [number, number, number] = head.whiteTint ? [...head.whiteTint] : [1, 1, 1]
     if (hasColor) {
       const w = r('white') ?? 0
       const a = r('amber') ?? 0
@@ -301,7 +304,8 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const moveSpeed = speedOf(r('moveSpeed'), head.moveSpeed)
     const prism = (r('prism') ?? 0) * 255 > 20
     const rotation = r('rotation') ?? r('laser') ?? 0
-    return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation }
+    const fog = r('fog') ?? 0
+    return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation, fog }
   })
 }
 

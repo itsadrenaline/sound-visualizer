@@ -1,6 +1,6 @@
 /**
  * Buttons floating over the 3D view: camera presets, framing, stored camera
- * positions (Capture's Camera Positions) and saving the view as an image.
+ * positions and saving the view as an image.
  */
 import { useCallback, useState } from 'react'
 import { useDismiss } from './useDismiss'

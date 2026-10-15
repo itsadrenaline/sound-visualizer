@@ -1,5 +1,5 @@
 /**
- * Arranging the selection, after Capture's Align, Spread Even, Mirror and
+ * Arranging the selection: Align, Spread Even, Mirror and
  * Duplicate dialogs, but kept in the inspector so nothing pops up.
  */
 import { useState } from 'react'

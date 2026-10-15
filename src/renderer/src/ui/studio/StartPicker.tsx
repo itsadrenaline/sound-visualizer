@@ -4,7 +4,7 @@
  * counted across SoundSwitch's fixture library), plus any count you type, any
  * number of cells, and an LED ring around the lens for lights that have one.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { KINDS, type FixtureDef, type FixtureKind } from '../../model/fixtureDef'
 import { CELL_COLOURS, CELL_KINDS, RING_KINDS, addRing, cellsStart, describeStart, startWithCount, startsFor, type CellColours } from '../../model/fixtureStarts'
 import { KindIcon } from './LookPanel'
@@ -26,20 +26,17 @@ export function StartPicker({ kind, onPick, onClose, name, maker, action = 'Star
   }
   const n = Number(count)
   const box = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    box.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [kind])
   return (
     <div className="start-picker" ref={box}>
       <div className="sp-head">
         <KindIcon kind={kind} />
         <div>
           <div className="sp-title">{KINDS[kind].label}: how many channels?</div>
-          <div className="hint">Pick the mode your manual lists (its channel count). The common ones are marked. Every channel starts as “guessed”: check it against the manual or the tests.</div>
+          <div className="sp-sub">Pick the mode your manual lists (its channel count, e.g. “7CH”). The most common ones are highlighted. You can change any channel afterwards.</div>
         </div>
         {onClose && (
-          <button className="mini quiet sp-close" onClick={onClose} title="Pick another kind">
-            ✕
+          <button className="mini sp-close" onClick={onClose} title="Back to all the kinds of light">
+            All kinds
           </button>
         )}
       </div>
@@ -48,14 +45,20 @@ export function StartPicker({ kind, onPick, onClose, name, maker, action = 'Star
           const sample = s.build(name, maker)
           return (
             <button key={s.id} className={`sp-row ${s.common ? 'common' : ''}`} onClick={() => finish(sample, `Started from the ${s.count}-channel ${KINDS[kind].label.toLowerCase()} layout (${s.label}).`)} title={describeStart(sample)}>
-              <span className="sp-count">{s.count}</span>
-              <span className="sp-ch">ch</span>
-              <span className="sp-label">{s.label}</span>
-              {s.common && <span className="sp-badge" title="One of the most common sizes for this kind of light">common</span>}
+              <span className="sp-num">
+                <span className="sp-count">{s.count}</span>
+                <span className="sp-ch">ch</span>
+              </span>
+              <span className="sp-text">
+                <span className="sp-label">{s.label}</span>
+                <span className="sp-desc">{describeStart(sample)}</span>
+              </span>
+              {s.common && <span className="sp-badge" title="One of the most common sizes for this kind of light">Common</span>}
             </button>
           )
         })}
       </div>
+      <div className="sp-more">Not listed?</div>
       <div className="sp-custom">
         <label title="Any number of channels: the nearest layout is used and the rest left for you to fill in from the manual">
           Another count

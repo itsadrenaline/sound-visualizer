@@ -62,11 +62,11 @@ On first launch macOS asks to let the app find devices on your local network: al
 
 ## Adding fixtures: the Library
 
-Press **+ Add fixtures** (or Cmd+L) to open the Library tab, like Capture's.
+Press **+ Add fixtures** (or Cmd+L) to open the Library tab.
 
 - **Search** by maker, model or type ("chauvet spot", "pixel bar"), or browse by maker. The chips filter by kind: moving heads, pars and washes, bars and pixels, strobes, effects and lasers, smoke.
 - **Click a fixture** to see its real size, weight and power, and choose a **mode**.
-- **How many** and **Patch from** work like Capture's Patch dialog: each fixture goes in the next free gap, carrying on into the next universe when one is full. The line underneath tells you where they'll land before you add them.
+- **How many** and **Patch from** set how many to add and where they start: each fixture goes in the next free gap, carrying on into the next universe when one is full. The line underneath tells you where they'll land before you add them.
 - **Drag** a fixture (or the ⠿ handle in the details, which keeps the chosen mode) onto the floor in the 3D view to place one there.
 - **In your rig** lists the fixture types already in your show (including the SoundSwitch ones). Press + to add another of the same type with its own patch.
 - **Import…** adds fixture files you download from [open-fixture-library.org](https://open-fixture-library.org) (choose "Open Fixture Library JSON"). They're kept in your user data folder, so updates never lose them.
@@ -145,7 +145,7 @@ A show made from SoundSwitch follows that project: patch changes there come in, 
 - **Save and open** `.ssvis` files (below): everything is in them, objects and fixture types included.
 - **Shows ▾ / File ▸ New from Template**: start from a Mobile DJ, Club stage, Wedding/event or empty room rig, built from Both Lighting fixtures. Undo puts your previous show back.
 - **Import Show into This One**: adds another show's objects and fixtures to the current one, re-patching anything that would clash. Objects you already have (the same stage in the same place) aren't doubled.
-- **MVR** (My Virtual Rig, the open format Capture, grandMA3, Vectorworks and Depence exchange): **Export** writes fixtures with their position, patch and GDTF name, and objects as 3D models. **Open MVR** reads fixtures from any MVR: matched to the library by name, or built from the GDTF file inside it. An MVR this app wrote comes back exactly as it was.
+- **MVR** (My Virtual Rig, the open format lighting design and console software uses to exchange rigs): **Export** writes fixtures with their position, patch and GDTF name, and objects as 3D models. **Open MVR** reads fixtures from any MVR: matched to the library by name, or built from the GDTF file inside it. An MVR this app wrote comes back exactly as it was.
 - **Export ▸ Patch List (CSV)**: every fixture with its universe, address, group and what it's attached to, for a spreadsheet.
 
 ## Working in the 3D view
@@ -197,7 +197,7 @@ With any tool, **hold Space** and drag to orbit, **Space+Shift** drag to pan, **
 
 **Moving heads** move like the real fixture: pan and tilt over the fixture's own ranges at its real top speed, slowed by the pan/tilt speed channel; the prism and gobos turn only when their rotation channels say so.
 
-In the inspector, **Arrange** has Capture's tools for the selection: align left/centre/right (and by height or depth), spread evenly, **Mirror copy** (a copy on the other side of the stage, panning the opposite way, on the same patch), **Select same type**, and **Duplicate** a number of copies with an offset, either mirroring the original's patch or each with its own.
+In the inspector, **Arrange** has tools for the selection: align left/centre/right (and by height or depth), spread evenly, **Mirror copy** (a copy on the other side of the stage, panning the opposite way, on the same patch), **Select same type**, and **Duplicate** a number of copies with an offset, either mirroring the original's patch or each with its own.
 
 ## Project files
 
@@ -321,7 +321,6 @@ scripts/artnet-test.mjs  Art-Net test sender
 
 ## What's next
 
-- **Capture's own project format**: Capture's .c2p files are proprietary; MVR is the open way to move a rig between them.
 - **More objects**: circle truss, arches, tents, hazers on the floor.
 - **Gobo images**: draw the fixture's real gobo glass where a GDTF file includes it, instead of the representative shapes.
 

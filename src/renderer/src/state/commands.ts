@@ -131,7 +131,7 @@ export function syncFromSoundSwitch(fixtures: SoundSwitchFixture[], projectName:
 // ---------------------------------------------------------------------------
 
 /**
- * Add `count` fixtures of a library type, patched like Capture's Patch dialog:
+ * Add `count` fixtures of a library type, patched in the next free gaps:
  * from `start` (or the first free address), each in the next free gap, carrying
  * on into the next universe when one is full. They're spaced out from `at`.
  */
@@ -177,7 +177,7 @@ export function addLibraryFixtures(
 }
 
 // ---------------------------------------------------------------------------
-// Arranging (Capture's Align, Spread Even, Mirror and Duplicate)
+// Arranging (Align, Spread Even, Mirror and Duplicate)
 // ---------------------------------------------------------------------------
 
 export type Axis = 0 | 1 | 2
@@ -266,7 +266,7 @@ export function duplicateArray(ids: string[], count: number, offset: Vec3, newPa
   store().select(copies.map((c) => c.id))
 }
 
-/** Select every fixture of the same type(s) as the selection (Capture's Select ▸ By Fixture Type). */
+/** Select every fixture of the same type(s) as the selection. */
 export function selectSameType(ids: string[]): void {
   const types = new Set(selected(ids).map((f) => f.typeId))
   store().select(store().project.fixtures.filter((f) => types.has(f.typeId)).map((f) => f.id))

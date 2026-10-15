@@ -14,7 +14,7 @@ import { notify } from '../../state/notices'
 const SHAPES: Array<[LookKind, string]> = [
   ['par', 'Round can (PAR)'], ['flood', 'Box flood'], ['uplight', 'Small uplight'], ['spider', 'Box of lenses'], ['cluster', 'Round cells on a frame'],
   ['panel', 'Panel of square cells'], ['bar', 'Bar of cells'], ['tube', 'Tube / stick'], ['strip', 'Thin strip'], ['mover', 'Moving head (spot/beam)'],
-  ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar on a stand'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box']
+  ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar on a stand'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box'], ['fog', 'Machine with a nozzle (fog, effects)']
 ]
 
 const LAYOUTS: Array<[CellLayout['kind'], string]> = [['row', 'In a row'], ['column', 'In a column'], ['grid', 'In a grid'], ['ring', 'In a ring'], ['ringCentre', 'A ring and a centre one'], ['hex', 'Packed (honeycomb)']]
@@ -244,5 +244,13 @@ export function KindIcon({ kind }: { kind: FixtureKind }) {
       return <svg viewBox="0 0 32 32" className="kind-icon"><rect x="8" y="20" width="16" height="8" rx="2" {...common} /><path d="M16 20L6 4M16 20L12 3M16 20l4-17M16 20L26 4" {...common} /></svg>
     case 'effect':
       return <svg viewBox="0 0 32 32" className="kind-icon"><rect x="8" y="20" width="16" height="8" rx="2" {...common} /><path d="M11 20a5 5 0 0110 0" {...common} /><path d="M12 16L5 8M16 15V4M20 16l7-8" {...common} /></svg>
+    case 'fog':
+      return <svg viewBox="0 0 32 32" className="kind-icon"><rect x="3" y="17" width="14" height="9" rx="2" {...common} /><path d="M17 21h3" {...common} /><path d="M22 21c2-3 5-3 6-1M21 16c2-3 6-3 7 0M22 26c2 2 5 2 6 0" {...common} /></svg>
+    case 'sfx':
+      return <svg viewBox="0 0 32 32" className="kind-icon"><rect x="6" y="20" width="20" height="8" rx="2" {...common} /><circle cx="11" cy="12" r="3" {...common} /><circle cx="20" cy="9" r="4" {...common} /><circle cx="17" cy="16" r="1.8" {...common} /><circle cx="25" cy="15" r="1.5" {...common} /></svg>
+    case 'dimmer':
+      return <svg viewBox="0 0 32 32" className="kind-icon"><path d="M3 9h26M16 9v19M11 29h10" {...common} />{[5, 12, 20, 27].map((x) => <rect key={x} x={x - 2.5} y="10" width="5" height="6" rx="1.5" {...common} />)}</svg>
+    case 'other':
+      return <svg viewBox="0 0 32 32" className="kind-icon"><rect x="6" y="6" width="20" height="20" rx="4" {...common} /><path d="M13 13a3 3 0 116 0c0 2-3 2.5-3 5" {...common} /><circle cx="16" cy="22" r="1.2" fill={c} /></svg>
   }
 }

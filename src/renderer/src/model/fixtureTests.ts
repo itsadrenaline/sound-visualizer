@@ -321,6 +321,29 @@ export function scenesFor(def: FixtureDef, modeIndex: number): TestScene[] {
   for (const c of of('rotation')) {
     out.push({ id: `rot-${c.id}`, title: 'Rotation', set: 'Effects', steps: rangeWalk(mode, c, 'Rotation', 2.5, lightsUp) })
   }
+  for (const c of of('fog')) {
+    out.push({
+      id: `fog-${c.id}`,
+      title: 'Fog output',
+      set: 'Effects',
+      steps: [
+        step('Fog off: nothing comes out of the nozzle.', 2, () => base(mode)),
+        step('Fog building up from low to full: more and thicker fog drifts out of the front.', 5, (t) => {
+          const l = base(mode)
+          l[idx(c)] = Math.round(t * 255)
+          return l
+        }),
+        step('Full output.', 3, () => {
+          const l = base(mode)
+          l[idx(c)] = 255
+          return l
+        })
+      ]
+    })
+  }
+  for (const c of of('specialFx')) {
+    out.push({ id: `sfx-${c.id}`, title: 'Effect output', set: 'Effects', steps: c.ranges.length ? rangeWalk(mode, c, 'Output', 2) : [step('Output from off to full. The twin doesn’t draw bubbles, snow or flames: check the value goes up on the DMX strip.', 4, (t) => { const l = base(mode); l[idx(c)] = Math.round(t * 255); return l })] })
+  }
   return out
 }
 

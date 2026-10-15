@@ -274,23 +274,46 @@
 .fn-explain { border-top: 1px solid var(--line); padding: 7px 6px 3px; font-size: 11.5px; line-height: 1.45; color: #b7c2d0; min-height: 34px; }
 
 /* Starting layouts */
-.start-picker { border: 1px solid #2f4a78; background: #121a2a; border-radius: 12px; padding: 14px 16px; margin: 4px 0 14px; }
-.sp-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
-.sp-head .kind-icon { flex-shrink: 0; }
-.sp-title { font-weight: 600; font-size: 14px; margin-bottom: 3px; }
-.sp-close { margin-left: auto; }
-.sp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 5px; }
-.sp-row { display: flex; align-items: baseline; gap: 6px; text-align: left; padding: 8px 10px; }
-.sp-row .sp-count { font-size: 15px; min-width: 26px; }
-.sp-row .sp-ch { color: var(--muted); font-size: 11px; }
-.sp-row .sp-label { flex: 1; font-size: 12.5px; }
-.sp-row.common { border-color: #2f4a78; }
-.sp-badge { font-size: 10px; color: #8fb6ff; border: 1px solid #2f4a78; border-radius: 999px; padding: 1px 7px; }
-.sp-custom { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: #c9d4e3; flex-wrap: wrap; }
+.start-picker { border: 1px solid #3a5f9e; background: var(--panel); border-radius: 12px; padding: 16px 18px; box-shadow: 0 0 0 3px #3d7cf01a, 0 10px 30px #0006; min-width: 0; }
+.sp-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.sp-head .kind-icon { flex-shrink: 0; width: 36px; height: 36px; color: #cfe0ff; }
+.sp-title { font-weight: 650; font-size: 16px; color: #fff; margin-bottom: 4px; }
+.sp-sub { font-size: 12.5px; line-height: 1.45; color: #b7c2d0; }
+.sp-close { margin-left: auto; flex-shrink: 0; }
+.sp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 8px; }
+.sp-row { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; background: #161a20; border: 1px solid #2c333d; border-radius: 10px; min-width: 0; }
+.sp-row:hover { border-color: var(--accent); background: #1a2333; }
+.sp-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sp-num { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 44px; height: 44px; border-radius: 8px; background: #222935; flex-shrink: 0; }
+.sp-row .sp-count { font-size: 18px; font-weight: 700; color: #fff; line-height: 1; min-width: 0; text-align: center; }
+.sp-row .sp-ch { color: #9fb0c6; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+.sp-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sp-row .sp-label { font-size: 13px; font-weight: 550; color: #eef3f9; }
+.sp-desc { font-size: 11px; color: #8f9bab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-row.common { border-color: #355a96; background: #172238; }
+.sp-row.common .sp-num { background: #2a4a85; }
+.sp-badge { font-size: 10.5px; font-weight: 600; color: #fff; background: #3d7cf0; border-radius: 999px; padding: 2px 8px; flex-shrink: 0; }
+.sp-more { margin-top: 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.sp-custom { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: #dbe3ee; flex-wrap: wrap; }
 .sp-custom label { display: inline-flex; align-items: center; gap: 6px; }
-.sp-custom input[type='number'] { width: 70px; padding: 4px 6px; }
-.sp-custom select { width: auto; padding: 4px 6px; }
-.sp-ring { margin-top: 10px; }
+.sp-custom input[type='number'] { width: 76px; padding: 5px 7px; }
+.sp-custom select { width: auto; padding: 5px 7px; }
+.sp-ring { margin-top: 12px; color: #dbe3ee; }
+
+/* The kind section on the start screen */
+.kind-section { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 16px; background: #13161b; scroll-margin-top: 12px; }
+.kind-section-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.kind-section .kind-grid { margin-bottom: 0; }
+.kind-split { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 14px; align-items: start; }
+.kind-list { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 8px; max-height: calc(100vh - 140px); overflow-y: auto; padding-right: 2px; }
+.kind-item { display: flex; align-items: center; gap: 10px; text-align: left; padding: 6px 10px; border: 1px solid transparent; background: transparent; border-radius: 8px; font-size: 12.5px; color: #c9d4e3; }
+.kind-item .kind-icon { width: 22px; height: 22px; flex-shrink: 0; }
+.kind-item:hover { background: #1b2028; }
+.kind-item.active { background: #1c2c48; border-color: var(--accent); color: #fff; }
+@media (max-width: 800px) {
+  .kind-split { grid-template-columns: 1fr; }
+  .kind-list { position: static; flex-direction: row; flex-wrap: wrap; max-height: none; }
+}
 .kind-grid .kind.active { border-color: var(--accent); background: #1c2c48; }
 
 /* Chart table */

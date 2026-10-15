@@ -823,8 +823,8 @@ export function mountGuides(structures: Structure[]): THREE.Group {
 }
 
 /**
- * A object as a binary glTF (.glb), for MVR files: other programs (Capture,
- * Vectorworks, grandMA3) show the totem or stage too. Our room materials are
+ * A object as a binary glTF (.glb), for MVR files: other programs
+ * (Vectorworks, grandMA3) show the totem or stage too. Our room materials are
  * shaders, so the copy uses plain materials of the same colour.
  */
 export async function structureGlb(s: Structure): Promise<Uint8Array | null> {

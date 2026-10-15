@@ -1,5 +1,5 @@
 /**
- * The fixture library, laid out like Capture's Library tab: search, browse by
+ * The fixture library: search, browse by
  * manufacturer or kind of fixture, see a fixture's size and modes, then add it
  * (with a quantity and a patch) or drag it into the 3D view.
  */

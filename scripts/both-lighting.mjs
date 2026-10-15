@@ -12,57 +12,7 @@
  * build-library.mjs adds these to resources/library/ofl.json under "Both Lighting".
  */
 
-// --- Small builders for OFL capabilities --------------------------------------------------
-
-const cap = (lo, hi, c) => ({ dmxRange: [lo, hi], ...c })
-
-/** Fill the gaps between ranges with "no function", so every value 0-255 means something. */
-function fill(caps) {
-  const sorted = [...caps].sort((a, b) => a.dmxRange[0] - b.dmxRange[0])
-  const out = []
-  let next = 0
-  for (const c of sorted) {
-    if (c.dmxRange[0] > next) out.push(cap(next, c.dmxRange[0] - 1, { type: 'NoFunction' }))
-    const lo = Math.max(next, c.dmxRange[0])
-    if (lo <= c.dmxRange[1]) out.push({ ...c, dmxRange: [lo, c.dmxRange[1]] })
-    next = Math.max(next, c.dmxRange[1] + 1)
-  }
-  if (next <= 255) out.push(cap(next, 255, { type: 'NoFunction' }))
-  return out
-}
-
-const intensity = () => ({ capability: { type: 'Intensity' } })
-const color = (c) => ({ capability: { type: 'ColorIntensity', color: c } })
-const pan = (deg, fine = true) => ({ ...(fine ? { fineChannelAliases: ['Pan fine'] } : {}), capability: { type: 'Pan', angleStart: '0deg', angleEnd: `${deg}deg` } })
-const tilt = (deg, fine = true) => ({ ...(fine ? { fineChannelAliases: ['Tilt fine'] } : {}), capability: { type: 'Tilt', angleStart: '0deg', angleEnd: `${deg}deg` } })
-const ptSpeed = () => ({ capability: { type: 'PanTiltSpeed', speedStart: 'fast', speedEnd: 'slow' } })
-const zoom = (a, b) => ({ capability: { type: 'Zoom', angleStart: `${a}deg`, angleEnd: `${b}deg` } })
-const focus = () => ({ capability: { type: 'Focus', distanceStart: 'near', distanceEnd: 'far' } })
-const generic = (name) => ({ capability: { type: 'Generic', comment: name } })
-const effect = (name) => ({ capability: { type: 'Effect', effectName: name } })
-const maintenance = (name) => ({ capability: { type: 'Maintenance', comment: name } })
-const caps = (...list) => ({ capabilities: fill(list) })
-
-/** Strobe channel from [lo, hi, 'Open' | 'Closed' | 'Strobe' | 'Pulse' | 'RandomStrobe'] triples. */
-function strobe(...ranges) {
-  return caps(...ranges.map(([lo, hi, kind]) => cap(lo, hi, { type: 'ShutterStrobe', shutterEffect: kind, ...(kind === 'RandomStrobe' ? { shutterEffect: 'Strobe', randomTiming: true } : {}) })))
-}
-
-/** Wheel slot ranges: [lo, hi, slotNumber]. Extra caps (rotation, shake) can follow. */
-function wheel(name, slots, ...more) {
-  return caps(...slots.map(([lo, hi, slot]) => cap(lo, hi, { type: 'WheelSlot', wheel: name, slotNumber: slot })), ...more)
-}
-const spin = (lo, hi, start, end, wheelName) => cap(lo, hi, { type: 'WheelRotation', ...(wheelName ? { wheel: wheelName } : {}), speedStart: start, speedEnd: end })
-const shake = (lo, hi, slot, wheelName) => cap(lo, hi, { type: 'WheelShake', wheel: wheelName, slotNumber: slot, shakeSpeedStart: 'slow', shakeSpeedEnd: 'fast' })
-const goboSpin = (lo, hi, start, end, wheelName) => cap(lo, hi, { type: 'WheelSlotRotation', wheel: wheelName, speedStart: start, speedEnd: end })
-
-/** Even slot ranges: `count` slots of `step` values starting at `from`. */
-function slots(from, step, count, first = 1) {
-  return Array.from({ length: count }, (_, i) => [from + i * step, from + (i + 1) * step - 1, first + i])
-}
-
-const colorSlots = (hexes) => [{ type: 'Open' }, ...hexes.map(([name, hex]) => ({ type: 'Color', name, colors: [hex] }))]
-const goboSlots = (n) => [{ type: 'Open' }, ...Array.from({ length: n }, () => ({ type: 'Gobo' }))]
+import { cap, fill, intensity, color, pan, tilt, ptSpeed, zoom, focus, generic, effect, maintenance, caps, strobe, wheel, spin, shake, goboSpin, slots, colorSlots, goboSlots } from './ofl-helpers.mjs'
 
 // Colour orders from Both Lighting's SoundSwitch profiles.
 const MH150_COLORS = [['Red', '#fc0107'], ['Yellow', '#ffff0a'], ['Blue', '#0000ff'], ['Green', '#21ff06'], ['Orange', '#fd8008'], ['Magenta', '#fc02ff'], ['Cyan', '#20ffff']]

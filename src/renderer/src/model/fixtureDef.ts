@@ -86,7 +86,7 @@ export const FN: Record<ChannelFn, FnInfo> = {
   program: { label: 'Built-in program', group: 'Effects', swatch: '#ffd60a', style: 'program', explain: 'Runs the light’s own effects (auto, chase, sound mode). The twin shows the nearest pattern.' },
   programSpeed: { label: 'Program speed', group: 'Effects', swatch: '#ffe066', style: 'level', explain: 'How fast the built-in program runs.' },
   sound: { label: 'Sound sensitivity', group: 'Effects', swatch: '#ffcc00', style: 'level', explain: 'How strongly sound-active programs react to music.' },
-  fog: { label: 'Fog output', group: 'Effects', swatch: '#9aa0a6', style: 'level', explain: 'How much fog or haze it makes.' },
+  fog: { label: 'Fog output', group: 'Effects', swatch: '#9aa0a6', head: 'fog', style: 'level', explain: 'How much fog or haze it makes. The twin shows it drifting out of the nozzle.' },
   specialFx: { label: 'Special effect', group: 'Effects', swatch: '#c0c4ca', style: 'plain', explain: 'Bubbles, snow, sparks, CO₂ or flames: the machine’s output. Kept, not shown.' },
   fan: { label: 'Fan', group: 'Control', swatch: '#8e8e93', style: 'plain', explain: 'Fan speed or mode. Kept, not shown.' },
   control: { label: 'Control / reset', group: 'Control', swatch: '#636366', style: 'plain', explain: 'Reset, display or other settings. Kept, not shown.' },
@@ -159,7 +159,7 @@ export interface ModeDef {
   channels: ChannelDef[]
 }
 
-export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'bar' | 'tube' | 'panel' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight'
+export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'bar' | 'tube' | 'panel' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight' | 'fog' | 'sfx' | 'dimmer' | 'other'
 
 export interface LookDef {
   shape: LookKind
@@ -332,10 +332,43 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
     label: 'Uplight / small wash', shape: 'uplight', mount: 'floor',
     explain: 'A small box on a kickstand that washes a wall with colour.',
     concepts: [{ title: 'Colour', text: 'Mix with red, green, blue, white, amber and UV.', fns: ['red', 'green', 'blue', 'white', 'amber', 'uv'] }]
+  },
+  fog: {
+    label: 'Fog / haze machine', shape: 'fog', mount: 'floor',
+    explain: 'Makes fog or haze so beams show in the air. Usually one channel for the output, sometimes a fan, a timer or LEDs that light the fog.',
+    concepts: [
+      { title: 'Output', text: 'The fog channel sets how much comes out, from none to full. Many machines only fire above a threshold (e.g. 10%).', fns: ['fog'] },
+      { title: 'Fan', text: 'Hazers often have a fan channel that spreads the haze.', fns: ['fan'] },
+      { title: 'LEDs', text: 'Some machines light their fog with RGB LEDs: dimmer, colour and strobe like a PAR.', fns: ['dimmer', 'red', 'green', 'blue', 'shutter'] }
+    ]
+  },
+  sfx: {
+    label: 'Special effect machine', shape: 'fog', mount: 'floor',
+    explain: 'Bubbles, snow, sparks (cold spark), flames, CO₂ jets or confetti. The twin draws the machine, not the effect: check its output on the DMX strip.',
+    concepts: [
+      { title: 'Output', text: 'The effect channel fires it or sets how much. Flame and spark machines often need a safety or arm channel too.', fns: ['specialFx', 'control'] },
+      { title: 'Fan or speed', text: 'Bubble and snow machines usually have a fan or motor speed.', fns: ['fan'] }
+    ]
+  },
+  dimmer: {
+    label: 'Dimmer pack / PAR can bar', shape: 'bar', mount: 'stand',
+    explain: 'Plain (incandescent or single-colour) lights on a dimmer pack or relay: each channel dims one light or one socket, 0 to full.',
+    concepts: [
+      { title: 'One channel per light', text: 'Channel 1 dims the first light, channel 2 the second… The cell chase test shows which is which.', fns: ['dimmer'] },
+      { title: 'Warm white', text: 'Incandescent lamps glow warmer as they dim. Change a light’s colour under its part if it’s gelled.', fns: [] }
+    ]
+  },
+  other: {
+    label: 'Something else', shape: 'flood', mount: 'floor',
+    explain: 'A light or device that isn’t one of the kinds above. Start from a few channels, name each one from the manual and pick what it does; change the shape under Look.',
+    concepts: [
+      { title: 'Name every channel', text: 'Give each channel the manual’s name and pick the nearest job. Anything without a match stays as “Other”: it’s kept and exported with its name.', fns: [] },
+      { title: 'Make it light up', text: 'A dimmer or colour channels make the twin glow; pick a shape that looks like the real thing under Look.', fns: ['dimmer', 'red', 'green', 'blue'] }
+    ]
   }
 }
 
-export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'bar', 'tube', 'cluster', 'panel', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip']
+export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'bar', 'tube', 'cluster', 'panel', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip', 'fog', 'sfx', 'dimmer', 'other']
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -480,6 +513,17 @@ export function blankDef(kind: FixtureKind, name = 'New fixture', manufacturer =
       return single(['laser', 'program', 'programSpeed'])
     case 'effect':
       return single(['colorMacro', 'shutter', 'rotation', 'program'])
+    case 'fog':
+      return single(['fog'])
+    case 'sfx':
+      return single(['specialFx'])
+    case 'other':
+      return single(['dimmer'])
+    case 'dimmer': {
+      const d = withLayout(cellsDef(base, 4, ['dimmer'], [], 'Light'), { kind: 'row' })
+      d.parts.forEach((p) => (p.tint = 'warm'))
+      return d
+    }
     case 'bar':
       return withLayout(cellsDef(base, 8, ['red', 'green', 'blue'], ['dimmer', 'shutter']), { kind: 'row' })
     case 'tube':
@@ -681,7 +725,7 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
 const HEAD_TO_FN: Partial<Record<HeadFunction, ChannelFn>> = {
   dimmer: 'dimmer', red: 'red', green: 'green', blue: 'blue', white: 'white', amber: 'amber', uv: 'uv', cyan: 'cyan', magenta: 'magenta', yellow: 'yellow',
   shutter: 'shutter', pan: 'pan', tilt: 'tilt', zoom: 'zoom', colorWheel: 'colorWheel', gobo: 'gobo', goboRotation: 'goboRotation',
-  prism: 'prism', prismRotation: 'prismRotation', moveSpeed: 'panTiltSpeed', rotation: 'rotation', laser: 'laser'
+  prism: 'prism', prismRotation: 'prismRotation', moveSpeed: 'panTiltSpeed', rotation: 'rotation', laser: 'laser', fog: 'fog'
 }
 
 function kindFromType(t: FixtureType): FixtureKind {
@@ -699,6 +743,7 @@ function kindFromType(t: FixtureType): FixtureKind {
   if (look === 'derby') return 'effect'
   if (look === 'strobe') return 'strobe'
   if (look === 'uplight') return 'uplight'
+  if (look === 'fog') return 'fog'
   if (t.body === 'bar') return 'bar'
   return 'par'
 }

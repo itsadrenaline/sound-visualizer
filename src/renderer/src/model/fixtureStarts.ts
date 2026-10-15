@@ -58,6 +58,8 @@ interface PartSpec {
 interface Spec {
   label: string
   fns?: ChannelFn[]
+  /** Channels to name and fill in from the manual (marked missing). */
+  blank?: number
   cells?: CellSpec
   parts?: { shared?: ChannelFn[]; list: PartSpec[] }
   common?: boolean
@@ -214,6 +216,39 @@ const SPECS: Record<FixtureKind, Spec[]> = {
     { label: '+ colour, rotation, size', fns: ['control', 'laser', 'colorMacro', 'zoom', 'rotation', 'positionFx', 'programSpeed'], common: true },
     { label: 'Full', fns: ['control', 'laser', 'colorMacro', 'zoom', 'rotation', 'rotation', 'rotation', 'positionFx', S, 'program', 'programSpeed', 'sound'] }
   ],
+  fog: [
+    { label: 'Fog output', fns: ['fog'], common: true },
+    { label: 'Output and timer', fns: ['fog', 'control'], common: true },
+    { label: 'Hazer: output and fan', fns: ['fog', 'fan'], common: true },
+    { label: 'Output, fan, timer, mode', fns: ['fog', 'fan', 'control', 'control'] },
+    { label: 'With RGB LEDs: output, dimmer, RGB, strobe, programs', fns: ['fog', D, ...RGB, S, 'program'], common: true },
+    { label: 'With RGBA LEDs: output, dimmer, RGBA, strobe, programs, speed', fns: ['fog', D, ...RGB, 'amber', S, 'program', 'programSpeed'] }
+  ],
+  sfx: [
+    { label: 'Output', fns: ['specialFx'], common: true },
+    { label: 'Output and fan / motor speed', fns: ['specialFx', 'fan'], common: true },
+    { label: 'Flame or spark: safety, output', fns: ['control', 'specialFx'] },
+    { label: 'Flame or spark: safety, output, height, mode', fns: ['control', 'specialFx', 'zoom', 'control'] },
+    { label: 'Bubbles with RGB LEDs', fns: ['specialFx', 'fan', D, ...RGB, S] }
+  ],
+  dimmer: [
+    { label: '1 light', cells: { n: 1, per: [D], layout: { kind: 'row' } } },
+    { label: '2 lights', cells: { n: 2, per: [D], layout: { kind: 'row' } } },
+    { label: '4 lights (PAR can bar, 4-channel pack)', cells: { n: 4, per: [D], layout: { kind: 'row' } }, common: true },
+    { label: '6 lights (6-channel pack)', cells: { n: 6, per: [D], layout: { kind: 'row' } }, common: true },
+    { label: '8 lights', cells: { n: 8, per: [D], layout: { kind: 'row' } } },
+    { label: '12 lights', cells: { n: 12, per: [D], layout: { kind: 'row' } } }
+  ],
+  other: [
+    { label: 'Dimmer (or on/off)', fns: [D], common: true },
+    { label: 'Dimmer and strobe', fns: [D, S] },
+    { label: 'RGB colour', fns: RGB },
+    { label: 'Dimmer and RGB', fns: [D, ...RGB], common: true },
+    { label: 'Dimmer, RGB, strobe, program', fns: [D, ...RGB, S, 'program'] },
+    { label: 'Blank: name each channel from the manual', blank: 4, common: true },
+    { label: 'Blank: name each channel from the manual', blank: 8 },
+    { label: 'Blank: name each channel from the manual', blank: 16 }
+  ],
   effect: [
     { label: 'RGB', fns: RGB },
     { label: 'RGBW, strobe, rotation', fns: [...RGBW, S, 'rotation'], common: true },
@@ -251,6 +286,7 @@ function withMode(def: FixtureDef, channels: ChannelDef[], parts: PartDef[], lay
 
 function buildSpec(kind: FixtureKind, spec: Spec, name: string, maker: string): FixtureDef {
   const base = blankDef(kind, name, maker)
+  if (spec.blank) return pad(withMode(base, [], [], base.look.layout), spec.blank)
   if (spec.fns) return withMode(base, channelsFor(spec.fns), [], base.look.layout)
   if (spec.cells) return buildCells(base, spec.cells)
   const parts: PartDef[] = []
@@ -274,7 +310,8 @@ function buildCells(base: FixtureDef, c: CellSpec): FixtureDef {
       parts.push(centre, ring)
       for (const fn of c.per) channels.push(makeChannel(fn, whites.has(fn) ? centre.id : ring.id))
     } else {
-      const p: PartDef = { id: newKey('p'), name: `Cell ${k + 1}`, role: 'pixel', cell: k, ...(c.per.includes('warmWhite') && !c.per.includes('coolWhite') ? { tint: 'warm' as const } : {}) }
+      const lamp = c.per.length === 1 && c.per[0] === 'dimmer'
+      const p: PartDef = { id: newKey('p'), name: `${lamp ? 'Light' : 'Cell'} ${k + 1}`, role: 'pixel', cell: k, ...((c.per.includes('warmWhite') && !c.per.includes('coolWhite')) || lamp ? { tint: 'warm' as const } : {}) }
       parts.push(p)
       for (const fn of c.per) channels.push(makeChannel(fn, p.id))
     }
@@ -353,6 +390,15 @@ export function cellsStart(kind: FixtureKind, cells: number, colours: CellColour
  */
 export function startWithCount(kind: FixtureKind, count: number, colours: CellColours = 'RGB', name = 'New fixture', maker = 'Generic'): { def: FixtureDef; note: string } {
   const n = Math.max(1, Math.min(512, Math.round(count)))
+  if (kind === 'dimmer') {
+    const def = buildCells(blankDef('dimmer', name, maker), { n, per: [D], layout: { kind: 'row' } })
+    def.parts.forEach((p) => (p.tint = 'warm'))
+    return { def, note: `${n} light${n === 1 ? '' : 's'}, one dimmer channel each.` }
+  }
+  if (kind === 'other') {
+    const def = pad(withMode(blankDef('other', name, maker), [], [], undefined), n)
+    return { def, note: `${n} blank channel${n === 1 ? '' : 's'}: name each from the manual and pick what it does.` }
+  }
   if (CELL_KINDS.includes(kind)) {
     const order: CellColours[] = [colours, ...(['RGB', 'RGBW', 'RGBWAUV', 'RGBWA', 'RGBA', 'W'] as CellColours[]).filter((c) => c !== colours)]
     for (const c of order) {
@@ -450,6 +496,9 @@ export function guessKind(def: FixtureDef): FixtureKind {
   const chs = def.modes.flatMap((m) => m.channels)
   const fns = new Set(chs.map((c) => c.fn))
   const cells = new Set(def.parts.filter((p) => p.role === 'pixel').map((p) => p.cell)).size
+  if (fns.has('fog')) return 'fog'
+  if (fns.has('specialFx')) return 'sfx'
+  if (cells > 1 && chs.filter((c) => c.part).every((c) => c.fn === 'dimmer')) return 'dimmer'
   if (fns.has('pan') || fns.has('tilt')) return fns.has('gobo') ? (fns.has('goboRotation') || fns.has('focus') || fns.has('zoom') || !fns.has('prism') ? 'spot' : 'beam') : 'wash'
   if (fns.has('laser')) return def.parts.some((p) => p.role === 'derby') ? 'gigbar' : 'laser'
   if (def.parts.some((p) => p.role === 'derby')) return 'gigbar'
