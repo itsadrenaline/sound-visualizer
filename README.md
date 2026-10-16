@@ -1,6 +1,6 @@
 # Sound Visualizer
 
-A 3D lighting visualizer. It reads your SoundSwitch rig, draws each fixture to its real size, and plays SoundSwitch's show live over Art-Net. A library of about 2,300 real fixtures (the Open Fixture Library, QLC+'s fixture library and Both Lighting) lets you add anything else, and the Fixture Studio makes or fixes any fixture that isn't there.
+A 3D lighting visualizer. It reads your SoundSwitch rig, draws each fixture to its real size, and plays SoundSwitch's show live over Art-Net. A library of about 2,300 real fixtures (the Open Fixture Library, QLC+'s fixture library, Both Lighting, Betopper and Rockville) lets you add anything else, and the Fixture Studio makes or fixes any fixture that isn't there.
 
 *Works with SoundSwitch. SoundSwitch is a trademark of inMusic; Sound Visualizer is not affiliated with or endorsed by inMusic.*
 
@@ -75,6 +75,8 @@ The fixture types you use are saved inside the project, so a project opens the s
 
 **Both Lighting.** The library includes 24 Both Lighting fixtures (MH-150, Hybrid 300W, BPM-Spots and BPM-Beams, Mini Beam Mover, Splash Pro/X, Aura 1915, Spider Wash, the IR/S/SQ uplights, Chroma Cannon, SQ-BAR9, FX Pix Bar 1000, 360 Tubes, Retro bars and hexes, G-Pins), written from Both Lighting's own user manuals, with colour wheel orders from their SoundSwitch profiles. Search "both lighting". Where a manual leaves something out (a pan range, a colour name), the fixture's notes say what was assumed.
 
+**Betopper and Rockville.** Their PARs, washes, moving heads, bars, spiders, effects and fog machines that aren't already in the Open Fixture Library or QLC+ are written from the makers' own user manuals (betopperdj.com, support.rockvilleaudio.com), in `scripts/betopper.mjs` and `scripts/rockville.mjs`. Search "betopper" or "rockville". As with Both Lighting, each fixture's notes say what a manual left out.
+
 **QLC+ fixtures.** About 1,600 more fixtures come from the QLC+ project's fixture library (Apache 2.0, see `resources/library/LICENSE-QLCPLUS.txt`); ones already in the Open Fixture Library are left out. `node scripts/build-qlcplus.mjs` (optionally with a path to a QLC+ `resources/fixtures` folder) rebuilds `resources/library/qlcplus.json`.
 
 ## Fixture Studio: make or fix a fixture
@@ -91,6 +93,7 @@ The fixture types you use are saved inside the project, so a project opens the s
 - **Edit in batches**: select many channels to change them together, *Repeat* them for each cell, drag the lines between value ranges. **+ Add** finds any channel job by name (strobe, CTO, frost, endless pan, beam shaper, fog…) or adds an **LED ring** part. Anything not listed is *Other* with the manual's name, kept in saves and exports. **Problems** lists what still looks wrong, with one-click fixes. Each channel shows whether it was read for sure, guessed, or is missing.
 - **DMX modes**: the **DMX mode** menu lists the light's modes (the channel layouts it can be set to), and adds one as a copy, from a usual layout (e.g. the 3-channel mode of a bar, sharing its cells), or empty.
 - **✦ Ask Claude** (with Claude connected) changes the open fixture as you describe it: “add a 3-channel mode”, “channel 7 is the strobe”, “add the LED ring channels from the manual”. One Undo takes it back.
+- **Your own kinds of light**: under **Look**, **Save as a new kind of light…** keeps the fixture's parts, channels, modes and look as a kind (an LED flex stand, a long string of lights, anything the built-in kinds don't cover). It's listed under **Your kinds** when you start the next fixture. Kinds are kept on this Mac.
 - **Look**: shape, size, housing colour, cell layout and beam, from a template, a photo, or borrowed from a similar Library fixture.
 - **Save** keeps it in **My Fixtures** (Library); **Save & add to show** also makes it stand in for the fixture it fixes (SoundSwitch ones included; **Back to the original** undoes that). **← Fixtures** goes back to the Studio's start for another fixture, and **Back to show** closes the Studio; with unsaved changes, both ask whether to save or leave without saving. **Export** writes a `.svfixture` file to share: it holds an Open Fixture Library fixture plus the Studio's own details, so it opens in other tools and comes back here fully editable.
 
@@ -112,6 +115,8 @@ Click one to add it, or drag it into the view. **Click an object to edit it**: t
 **Moving heads: truss or totem mode.** The bar above a moving head has **⤓ Hang** / **⤒ Upright**: upright stands it on a totem, a stand, the top of the truss or the floor; hang puts it upside down under the truss (the nearest one, or the same bar it's on). The inspector's Mounting does the same.
 
 **It all obeys physics.** Nothing sinks into the floor or floats: an object stands on the floor, or on top of the stage, table or sub under it, and goes up and down with it. Flown line arrays hang at their height. The room grows to fit everything: the back wall moves back and the ceiling goes up if something wouldn't fit (Room ▾ says when).
+
+**Lights on speakers and inside totems.** Column PAs, speakers on poles, subs and sub stacks have a place on top for a light, and the ones with a pole have a bracket on it. A totem has two places inside: on the base plate pointing up, and under the top plate pointing down (as if held by magnets). The beam stops at the far plate; a white scrim glows with the colour, a black scrim hides it, and bare truss catches it on the metal. Pick these from a fixture's right-click menu or the inspector's **Attached to** list: a fixture never drops inside a totem by itself.
 
 **Fixtures snap onto objects.** Drag a fixture over a totem or stand and it snaps to the top plate; over a truss and it hangs from the bar; next to a totem's face and it clamps on (washes); along a booth facade, a bar front or near the top of a wall. A ring shows where it will go, and blue guides show every place a fixture can attach. You can also drop a fixture from the Library straight onto an object, or use the right-click menu or the inspector's **Attached to** list. Delete the object and the fixture falls to the floor.
 

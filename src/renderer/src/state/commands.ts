@@ -545,7 +545,7 @@ export function planMount(p: Project, list: Fixture[], structure: string, point:
   const s = structuresOf(p).find((x) => x.id === structure)
   if (!s || !list.length) return null
   const points = mountPoints(s)
-  const m = points.find((x) => x.id === point) ?? points.find((x) => x.kind === point)
+  const m = points.find((x) => x.id === point) ?? points.find((x) => x.kind === point && !x.inside) ?? points.find((x) => x.kind === point)
   if (!m) return null
   const chosen = m.to ? list : list.slice(0, 1)
   const length = m.to ? Math.hypot(m.to[0] - m.at[0], m.to[1] - m.at[1], m.to[2] - m.at[2]) : 0
@@ -562,7 +562,8 @@ export function planMount(p: Project, list: Fixture[], structure: string, point:
       {
         mounting: m.kind === 'under' ? ('hanging' as const) : ('floor' as const),
         mount: { structure: s.id, point: m.id, ...(m.to ? { t: Math.round(Math.max(0, Math.min(1, raw[i] + shift)) * 1e6) / 1e6 } : {}) },
-        ...(facing !== undefined ? { rotation: facing } : {})
+        ...(facing !== undefined ? { rotation: facing } : {}),
+        ...(m.aim !== undefined ? { aimTilt: m.aim } : {})
       }
     ])
   )
@@ -597,7 +598,7 @@ export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[]
     const on = f.mount && pieces.find((s) => s.id === f.mount!.structure)
     const wanted = to === 'hanging' ? 'under' : 'top'
     // Same structure, other side of the bar.
-    const twin = on && mountPoints(on).find((m) => m.kind === wanted && (!!m.to === !!mountPoints(on).find((x) => x.id === f.mount!.point)?.to))
+    const twin = on && mountPoints(on).find((m) => m.kind === wanted && !m.inside && (!!m.to === !!mountPoints(on).find((x) => x.id === f.mount!.point)?.to))
     if (on && twin) {
       const plan = planMount(p, [f], on.id, twin.id, f.mount!.t ?? 0.5)
       if (plan) changes.set(f.id, plan.get(f.id)!)

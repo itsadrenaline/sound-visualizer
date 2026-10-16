@@ -193,6 +193,7 @@ export function Viewport() {
     const rigs = new Map<string, FixtureRig>()
     const sync = (project: Project, selection: string[]) => {
       const seen = new Set<string>()
+      const pieces = new Map((project.structures ?? []).map((st) => [st.id, st]))
       for (const fixture of project.fixtures) {
         seen.add(fixture.id)
         let rig = rigs.get(fixture.id)
@@ -208,6 +209,9 @@ export function Viewport() {
           scene.add(rig.root)
         }
         rig.place(fixture)
+        // Inside a totem the beam stops at the plate at the other end.
+        const on = fixture.mount && pieces.get(fixture.mount.structure)
+        rig.setReach(on ? mountPoints(on).find((m) => m.id === fixture.mount!.point)?.reach : undefined)
         rig.setSelected(selection.includes(fixture.id))
       }
       for (const [id, rig] of rigs) {

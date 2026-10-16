@@ -159,7 +159,7 @@ export interface ModeDef {
   channels: ChannelDef[]
 }
 
-export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'bar' | 'tube' | 'panel' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight' | 'fog' | 'sfx' | 'dimmer' | 'other'
+export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'bar' | 'tube' | 'panel' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight' | 'string' | 'fog' | 'sfx' | 'dimmer' | 'other'
 
 export interface LookDef {
   shape: LookKind
@@ -333,6 +333,14 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
     explain: 'A small box on a kickstand that washes a wall with colour.',
     concepts: [{ title: 'Colour', text: 'Mix with red, green, blue, white, amber and UV.', fns: ['red', 'green', 'blue', 'white', 'amber', 'uv'] }]
   },
+  string: {
+    label: 'String / festoon lights', shape: 'string', mount: 'hanging',
+    explain: 'Bulbs along a cable that hangs between two points (festoon, bistro or party lights). Each bulb, or each group of bulbs, is a cell with its own channels.',
+    concepts: [
+      { title: 'Cells', text: 'Each bulb or group is a part: its channels drive only that bulb. Plain white strings often have one dimmer per bulb.', fns: ['dimmer', 'red', 'green', 'blue'] },
+      { title: 'Programs', text: 'Many strings have built-in chases and a speed channel.', fns: ['program', 'programSpeed'] }
+    ]
+  },
   fog: {
     label: 'Fog / haze machine', shape: 'fog', mount: 'floor',
     explain: 'Makes fog or haze so beams show in the air. Usually one channel for the output, sometimes a fan, a timer or LEDs that light the fog.',
@@ -368,7 +376,7 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
   }
 }
 
-export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'bar', 'tube', 'cluster', 'panel', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip', 'fog', 'sfx', 'dimmer', 'other']
+export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'bar', 'tube', 'cluster', 'panel', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip', 'string', 'fog', 'sfx', 'dimmer', 'other']
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -521,6 +529,11 @@ export function blankDef(kind: FixtureKind, name = 'New fixture', manufacturer =
       return single(['dimmer'])
     case 'dimmer': {
       const d = withLayout(cellsDef(base, 4, ['dimmer'], [], 'Light'), { kind: 'row' })
+      d.parts.forEach((p) => (p.tint = 'warm'))
+      return d
+    }
+    case 'string': {
+      const d = withLayout(cellsDef(base, 10, ['dimmer'], [], 'Bulb'), { kind: 'row' })
       d.parts.forEach((p) => (p.tint = 'warm'))
       return d
     }
@@ -737,6 +750,7 @@ function kindFromType(t: FixtureType): FixtureKind {
   if (look === 'tube') return 'tube'
   if (look === 'bar') return 'bar'
   if (look === 'strip') return 'strip'
+  if (look === 'string') return 'string'
   if (look === 'cluster') return 'cluster'
   if (look === 'panel') return 'panel'
   if (look === 'laser') return 'laser'

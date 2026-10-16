@@ -98,6 +98,15 @@ export interface MountPoint {
   /** Which way a clamped fixture faces, degrees around Y (0 = towards the audience, +z). */
   facing?: number
   label: string
+  /** Fixed aim a fixture gets when it's put here (degrees from straight up, or down when hanging). */
+  aim?: number
+  /**
+   * Inside a totem: how far the beam can go before it meets the plate at the
+   * other end, metres. The beam and the light it throws stop there.
+   */
+  reach?: number
+  /** Inside the structure (a totem's scrim): the fixture's beam lights the scrim from within. */
+  inside?: boolean
 }
 
 export interface ParamField {
@@ -653,8 +662,42 @@ export function mountPoints(s: Structure): MountPoint[] {
   const p = paramsOf(s)
   const t = p.truss
   switch (s.kind) {
-    case 'totem':
-      return [{ id: 'top', kind: 'top', at: [0, round(p.height + 0.012), 0], label: 'Top plate' }, leg('front', 'Front face', 0, t / 2 + 0.05, 0.35, Math.max(0.4, p.height - 0.15))]
+    case 'totem': {
+      // Inside: on the base plate pointing up, or fixed (magnets, a clamp) under the top plate pointing down.
+      // The beam stops at the plate at the far end (less the fixture's own height): none of it reaches the floor or ceiling.
+      const inner = round(Math.max(0.3, p.height - 0.3))
+      return [
+        { id: 'top', kind: 'top', at: [0, round(p.height + 0.012), 0], label: 'Top plate' },
+        leg('front', 'Front face', 0, t / 2 + 0.05, 0.35, Math.max(0.4, p.height - 0.15)),
+        { id: 'inBottom', kind: 'top', at: [0, 0.012, 0], label: 'Inside, at the bottom (pointing up)', aim: 0, reach: inner, inside: true },
+        { id: 'inTop', kind: 'under', at: [0, round(p.height), 0], label: 'Inside, at the top (pointing down)', aim: 0, reach: inner, inside: true }
+      ]
+    }
+    case 'speakerColumn': {
+      // Column PAs: a light bracket on the spacer pole, or something small on top of the column.
+      const columnBottom = p.height - 0.85
+      return [{ id: 'top', kind: 'top', at: [0, round(p.height), 0], label: 'On top of the column' }, leg('pole', 'Bracket on the pole', 0, 0.05, 0.68, Math.max(0.7, columnBottom - 0.05))]
+    }
+    case 'speakerOnPole': {
+      const ch = cabinetOf(p.size)[1]
+      return [{ id: 'top', kind: 'top', at: [0, round(p.height + ch / 2), 0], label: 'On top of the speaker' }, leg('pole', 'Bracket on the pole', 0, 0.05, 0.75, Math.max(0.8, p.height - ch / 2 - 0.08))]
+    }
+    case 'speakerOnSub': {
+      const ch = cabinetOf(p.size)[1]
+      return [
+        { id: 'top', kind: 'top', at: [0, round(p.height + ch / 2), 0], label: 'On top of the speaker' },
+        leg('pole', 'Bracket on the pole', 0, 0.05, SUB_18[1] + 0.1, Math.max(SUB_18[1] + 0.15, p.height - ch / 2 - 0.08)),
+        { id: 'subTop', kind: 'top', at: [0.17, round(SUB_18[1]), 0.12], label: 'On the sub, beside the pole' }
+      ]
+    }
+    case 'speakerBox':
+      return [{ id: 'top', kind: 'top', at: [0, round(cabinetOf(p.size)[1]), 0], label: 'On top of the speaker' }]
+    case 'sub':
+      return [{ id: 'top', kind: 'top', at: [0, round(p.height), 0], label: 'On top of the sub' }]
+    case 'subStack':
+      return [{ id: 'top', kind: 'top', at: [0, round((p.count ?? 2) * SUB_18[1]), 0], label: 'On top of the stack' }]
+    case 'groundStack':
+      return [{ id: 'top', kind: 'top', at: [0, round(heightOf(s)), 0], label: 'On top of the array' }]
     case 'flexstand':
       return [{ id: 'top', kind: 'top', at: [0, round(p.height + 0.012), 0], label: 'Top (M10)' }]
     case 'tubeStand':

@@ -356,3 +356,10 @@
 .studio-top .name-input { flex-shrink: 1; min-width: 60px; }
 .studio .studio-menu button.primary { background: var(--accent); color: #fff; justify-content: center; }
 .tile .claude-make textarea { font-family: inherit; font-size: 13.5px; min-height: 84px; }
+
+/* Your own kinds of light */
+.kind-list-sub { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #8a96a8; padding: 10px 10px 4px; }
+.kind-item.mine span, .kind.mine span { font-style: italic; }
+.studio .save-kind { margin: 8px 0 4px; width: 100%; justify-content: center; }
+.save-kind-form { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 10px; border: 1px solid var(--accent); border-radius: 8px; background: #141a24; }
+.save-kind-form .row-actions { display: flex; gap: 6px; }

@@ -109,5 +109,6 @@ jobs:
           file="release-notes/$tag.md"
           [ -f "$file" ] || exit 0
           body="$(gh release view "$tag" --json body -q .body)"
-          case "$body" in *"## What's new"*) exit 0 ;; esac
-          gh release edit "$tag" --notes "$(printf '%s\n\n%s\n' "$(cat "$file")" "$body")"
+          # Re-running for the same version replaces the old What's new section with the current file.
+          rest="$(printf '%s\n' "$body" | awk '/^## What.s new/ { skip = 1; next } skip && (/^## / || /^\*\*Full Changelog/) { skip = 0 } !skip' | sed '/./,$!d')"
+          gh release edit "$tag" --notes "$(printf '%s\n\n%s\n' "$(cat "$file")" "$rest")"

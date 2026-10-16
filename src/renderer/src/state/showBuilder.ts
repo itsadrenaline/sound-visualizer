@@ -373,8 +373,10 @@ export function runTool(lib: LibraryAccess | null, call: ToolCall): unknown {
         const s = structures().find((x) => x.id === on.structure_id)
         if (!s) throw new Error(`No object "${String(on.structure_id)}"`)
         const points = mountPoints(s)
-        const wanted = on.point ? String(on.point) : points.some((p) => p.kind === 'top') && type.body === 'movingHead' ? 'top' : points.some((p) => p.kind === 'under') ? 'under' : points[0]?.id
-        const mp = points.find((p) => p.id === wanted) ?? points.find((p) => p.kind === wanted)
+        // Inside a totem only when asked for by id.
+        const outside = points.filter((p) => !p.inside)
+        const wanted = on.point ? String(on.point) : outside.some((p) => p.kind === 'top') && type.body === 'movingHead' ? 'top' : outside.some((p) => p.kind === 'under') ? 'under' : outside[0]?.id
+        const mp = points.find((p) => p.id === wanted) ?? outside.find((p) => p.kind === wanted) ?? points.find((p) => p.kind === wanted)
         if (!mp) throw new Error(`${s.name} has no "${wanted}" point. It has: ${points.map((p) => p.id).join(', ') || 'none'}`)
         mount = { structure: s.id, point: mp.id }
       }

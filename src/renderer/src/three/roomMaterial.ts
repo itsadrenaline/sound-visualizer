@@ -26,6 +26,7 @@ const shared = {
   pRight: { value: Array.from({ length: N }, () => new THREE.Vector4()) },
   pColor: { value: Array.from({ length: N }, () => new THREE.Vector4()) },
   pPrism: { value: new Array<number>(N).fill(0) },
+  pReach: { value: new Array<number>(N).fill(1e6) },
   gobos: { value: null as THREE.Texture | null }
 }
 
@@ -46,18 +47,23 @@ export function setProjectors(list: Projector[], time: number): void {
     shared.pRight.value[i].set(p.right.x, p.right.y, p.right.z, p.goboTurn)
     shared.pColor.value[i].set(p.color[0], p.color[1], p.color[2], p.prismSpread)
     shared.pPrism.value[i] = p.prismTurn
+    shared.pReach.value[i] = p.reach ?? 1e6
   })
 }
 
 /**
  * `doubleSided`: for thin things seen from both sides (scrims, drapes, skirts);
  * either side is lit by the beams that reach it.
+ * `translucent`: how much light passing through shows on the other side (0-1):
+ * a white scrim glows when a light inside it is on; a black one barely does.
+ * `metallic`: bare metal (truss) that catches a bright glint where a beam
+ * reflects towards you, as well as the plain light.
  */
-export function createRoomMaterial(hex: number, options: { doubleSided?: boolean } = {}): THREE.ShaderMaterial {
+export function createRoomMaterial(hex: number, options: { doubleSided?: boolean; translucent?: number; metallic?: number } = {}): THREE.ShaderMaterial {
   shared.gobos.value ??= goboAtlas()
   const base = new THREE.Color(hex)
   return new THREE.ShaderMaterial({
-    uniforms: { ...THREE.UniformsLib.fog, ...shared, base: { value: base } },
+    uniforms: { ...THREE.UniformsLib.fog, ...shared, base: { value: base }, translucent: { value: options.translucent ?? 0 }, metallic: { value: options.metallic ?? 0 } },
     fog: true,
     side: options.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
     vertexShader: /* glsl */ `
@@ -84,6 +90,9 @@ export function createRoomMaterial(hex: number, options: { doubleSided?: boolean
       uniform vec4 pRight[N];
       uniform vec4 pColor[N];
       uniform float pPrism[N];
+      uniform float pReach[N];
+      uniform float translucent;
+      uniform float metallic;
       uniform sampler2D gobos;
       varying vec3 vWorld;
       varying vec3 vNormal;
@@ -105,6 +114,8 @@ export function createRoomMaterial(hex: number, options: { doubleSided?: boolean
         vec3 n = normalize(vNormal) * (gl_FrontFacing ? 1.0 : -1.0);
         // Ambient: a little brighter on surfaces facing up, like a room's own light.
         vec3 light = ambient * mix(0.6, 1.0, n.y * 0.5 + 0.5);
+        vec3 glint = vec3(0.0);
+        vec3 view = normalize(cameraPosition - vWorld);
         for (int i = 0; i < N; i++) {
           if (i >= count) break;
           vec3 toPoint = vWorld - pPos[i].xyz;
@@ -113,8 +124,14 @@ export function createRoomMaterial(hex: number, options: { doubleSided?: boolean
           vec3 dir = pDir[i].xyz;
           float along = dot(l, dir);
           if (along <= 0.05) continue;
+          // Stopped short (a light inside a totem meets the plate at the other end).
+          if (along * d > pReach[i] + 0.02) continue;
           float facing = dot(n, -l);
-          if (facing <= 0.0) continue;
+          if (facing <= 0.0) {
+            // Lit from behind: only a translucent cloth lets some of it through.
+            facing = -facing * translucent;
+            if (facing <= 0.0) continue;
+          }
           float tanHalf = pPos[i].w;
           vec3 right = pRight[i].xyz;
           vec3 up = cross(dir, right);
@@ -136,9 +153,11 @@ export function createRoomMaterial(hex: number, options: { doubleSided?: boolean
           // Same light through a wider beam covers more area, so each spot is dimmer;
           // and it falls off with the square of the distance, like real light.
           float spreadLoss = 0.05 / (tanHalf * tanHalf + 0.02);
-          light += pColor[i].rgb * amount * facing * spreadLoss * 110.0 / (1.0 + d * d);
+          vec3 lit = pColor[i].rgb * amount * spreadLoss * 110.0 / (1.0 + d * d);
+          light += lit * facing;
+          if (metallic > 0.0) glint += lit * metallic * pow(max(dot(reflect(l, n), view), 0.0), 18.0) * 1.6;
         }
-        gl_FragColor = vec4(base * light, 1.0);
+        gl_FragColor = vec4(base * light + glint, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>

@@ -32,16 +32,19 @@ const COVER_HEX: Record<Exclude<Cover, 'none'>, number> = { white: 0xe9e9ec, bla
 
 // Room materials are cheap to share: one per colour (and sidedness).
 const roomMats = new Map<string, THREE.ShaderMaterial>()
-function surface(hex: number, doubleSided = false): THREE.ShaderMaterial {
-  const key = `${hex}:${doubleSided}`
+function surface(hex: number, doubleSided = false, translucent = 0, metallic = 0): THREE.ShaderMaterial {
+  const key = `${hex}:${doubleSided}:${translucent}:${metallic}`
   let m = roomMats.get(key)
   if (!m) {
-    m = createRoomMaterial(hex, { doubleSided })
+    m = createRoomMaterial(hex, { doubleSided, translucent, metallic })
     roomMats.set(key, m)
   }
   return m
 }
-const cloth = (cover: Cover) => surface(COVER_HEX[cover === 'none' ? 'black' : cover], true)
+/** Scrims and drapes: white spandex lets a light inside glow through it; black hides it. */
+const cloth = (cover: Cover) => surface(COVER_HEX[cover === 'none' ? 'black' : cover], true, cover === 'white' ? 0.75 : 0.04)
+/** Bare aluminium truss: lit by the beams like any surface, with a glint where they reflect towards you. */
+const trussMetal = () => surface(0x9a9ea6, false, 0, 1)
 
 /** Geometry pieces for one structure, grouped by material, merged at the end. */
 class Parts {
@@ -97,6 +100,7 @@ function truss(parts: Parts, a: THREE.Vector3, b: THREE.Vector3, size: number): 
     const sw = i < 2 ? -1 : 1
     return a.clone().addScaledVector(dir, along).addScaledVector(u, su * half).addScaledVector(w, sw * half)
   }
+  const metal = trussMetal()
   for (let i = 0; i < 4; i++) parts.tube(metal, chordR, corner(i, 0), corner(i, length), 6)
   const bays = Math.max(1, Math.round(length / size))
   const bay = length / bays

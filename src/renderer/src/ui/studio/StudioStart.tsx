@@ -22,6 +22,8 @@ import { KindIcon } from './LookPanel'
 import { ChartTable } from './ChartTable'
 import { StartPicker } from './StartPicker'
 import { ConnectClaude, useClaude } from './ClaudeBox'
+import { MyKindPicker } from './MyKinds'
+import { useMyKinds } from '../../state/myKinds'
 
 const CLAUDE_EXAMPLES = ['Chauvet Intimidator Spot 360, 14-channel mode', 'ADJ Mega Hex Par', 'A 7-channel RGBW PAR with strobe and auto programs', 'A moving head wash with an RGB LED ring around the lens']
 
@@ -30,11 +32,15 @@ export function StudioStart() {
   const [open, setOpen] = useState<'chart' | 'claude' | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const { connected: claude } = useClaude()
-  const [kind, setKind] = useState<FixtureKind | null>(null)
+  const [kindPick, setKindPick] = useState<FixtureKind | `mine:${string}` | null>(null)
+  const myKinds = useMyKinds((s) => s.kinds)
+  const mine = typeof kindPick === 'string' && kindPick.startsWith('mine:') ? myKinds.find((k) => `mine:${k.id}` === kindPick) ?? null : null
+  const kind = mine || !kindPick || kindPick.startsWith('mine:') ? null : (kindPick as FixtureKind)
+  const setKind = setKindPick
   const [prompt, setPrompt] = useState('')
   const kindSection = useRef<HTMLDivElement>(null)
   // Picking a kind brings the whole kind-and-layouts section into view.
-  const kindOpen = kind !== null
+  const kindOpen = kind !== null || mine !== null
   useEffect(() => {
     if (kindOpen) kindSection.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
   }, [kindOpen])
@@ -237,9 +243,9 @@ export function StudioStart() {
         <div className="kind-section" ref={kindSection}>
           <div className="kind-section-head">
             <span className="tile-title">Start from a kind of light</span>
-            <span className="tile-text">{kind ? 'Pick how many channels it has, or switch to another kind on the left.' : 'Pick the kind, then how many channels it has: you get a working fixture to adjust.'}</span>
+            <span className="tile-text">{kindOpen ? 'Pick how many channels it has, or switch to another kind on the left.' : 'Pick the kind, then how many channels it has: you get a working fixture to adjust.'}</span>
           </div>
-          {kind ? (
+          {kindOpen ? (
             <div className="kind-split">
               <div className="kind-list" role="listbox" aria-label="Kinds of light">
                 {KIND_ORDER.map((k) => (
@@ -248,24 +254,50 @@ export function StudioStart() {
                     <span>{KINDS[k].label}</span>
                   </button>
                 ))}
+                {myKinds.length > 0 && <div className="kind-list-sub">Your kinds</div>}
+                {myKinds.map((k) => (
+                  <button key={k.id} role="option" aria-selected={mine?.id === k.id} className={`kind-item mine ${mine?.id === k.id ? 'active' : ''}`} title={k.explain || 'One of your own kinds of light'} onClick={() => setKind(`mine:${k.id}`)}>
+                    <KindIcon kind={k.template.kind} />
+                    <span>{k.label}</span>
+                  </button>
+                ))}
               </div>
-              <StartPicker
-                kind={kind}
-                name={model || query.trim() || undefined}
-                maker={model ? maker : undefined}
-                onClose={() => setKind(null)}
-                onPick={(def, note) => useStudio.getState().openDef(def, [note])}
-              />
+              {mine ? (
+                <MyKindPicker kind={mine} name={model || query.trim() || undefined} maker={model ? maker : undefined} onClose={() => setKind(null)} onPick={(def, note) => useStudio.getState().openDef(def, [note])} />
+              ) : (
+                <StartPicker
+                  kind={kind!}
+                  name={model || query.trim() || undefined}
+                  maker={model ? maker : undefined}
+                  onClose={() => setKind(null)}
+                  onPick={(def, note) => useStudio.getState().openDef(def, [note])}
+                />
+              )}
             </div>
           ) : (
-            <div className="kind-grid big">
-              {KIND_ORDER.map((k) => (
-                <button key={k} className="kind" title={KINDS[k].explain} onClick={() => setKind(k)}>
-                  <KindIcon kind={k} />
-                  <span>{KINDS[k].label}</span>
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="kind-grid big">
+                {KIND_ORDER.map((k) => (
+                  <button key={k} className="kind" title={KINDS[k].explain} onClick={() => setKind(k)}>
+                    <KindIcon kind={k} />
+                    <span>{KINDS[k].label}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="panel-sub">Your kinds</div>
+              {myKinds.length ? (
+                <div className="kind-grid big">
+                  {myKinds.map((k) => (
+                    <button key={k.id} className="kind mine" title={k.explain || 'One of your own kinds of light'} onClick={() => setKind(`mine:${k.id}`)}>
+                      <KindIcon kind={k.template.kind} />
+                      <span>{k.label}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="hint">Make your own: build any fixture (an LED-lit stand, a long string of lights, something none of these fit), then under Look choose “Save as a new kind of light”. It’s listed here as a starting point for the next one.</p>
+              )}
+            </>
           )}
         </div>
 

@@ -98,16 +98,20 @@ export function TwinView() {
       const moving = look === 'mover' || look === 'moverWash'
       const tube = look === 'tube'
       const gig = look === 'gigbar'
+      const string = look === 'string'
       const faceUp = ['par', 'uplight', 'flood', 'spider', 'cluster', 'panel', 'laser', 'derby', 'strobe'].includes(look)
-      const y = moving ? 3.25 : tube ? 0 : gig ? 2.2 : 1.3
-      truss.visible = moving
-      stand.visible = !moving && !tube && !gig
+      const hanging = moving || string
+      const y = hanging ? 3.25 : tube ? 0 : gig ? 2.2 : 1.3
+      truss.visible = hanging
+      // String lights hang along the truss: make it long enough for them.
+      truss.scale.x = string ? Math.max(1, (size[0] + 0.4) / 3) : 1
+      stand.visible = !hanging && !tube && !gig
       stand.scale.y = y
       stand.position.set(0, y / 2, 0)
-      center = new THREE.Vector3(0, moving ? y - size[1] / 2 : tube ? size[1] / 2 : y + (faceUp ? size[2] / 2 : size[1] / 2), 0)
+      center = new THREE.Vector3(0, string ? y - size[1] * 0.5 : moving ? y - size[1] / 2 : tube ? size[1] / 2 : y + (faceUp ? size[2] / 2 : size[1] / 2), 0)
       return {
         id: 'studio-twin', name: 'Twin', typeId: t.id, universe: 0, address: 1, position: [0, y, 0],
-        mounting: moving ? 'hanging' : 'floor',
+        mounting: hanging ? 'hanging' : 'floor',
         // Box and cell fixtures face the wall in front, with their face towards the camera.
         aimTilt: faceUp ? -78 : 0,
         rotation: 0

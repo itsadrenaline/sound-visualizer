@@ -242,11 +242,11 @@ function MountList({ structure }: { structure: Structure }) {
         {points.map((m) => (
           <li key={m.id}>
             <span className="name">{m.label}</span>
-            <span className="sub">{m.kind === 'under' ? 'hang' : m.kind === 'top' ? 'stand on top' : 'clamp'}</span>
+            <span className="sub">{m.inside ? 'inside' : m.kind === 'under' ? 'hang' : m.kind === 'top' ? 'stand on top' : 'clamp'}</span>
           </li>
         ))}
       </ul>
-      <p className="hint">Drag a fixture onto it with the Move tool (W), or drop one from the Library onto it.</p>
+      <p className="hint">Drag a fixture onto it with the Move tool (W), or drop one from the Library onto it.{points.some((m) => m.inside) ? ' Inside, a light glows through a white scrim; a black scrim hides it, and bare truss catches it on the metal.' : ''}</p>
     </Section>
   )
 }

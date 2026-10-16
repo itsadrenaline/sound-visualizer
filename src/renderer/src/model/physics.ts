@@ -95,13 +95,15 @@ export interface Attachment {
   distance: number
 }
 
-/** The closest mount point to a world position, of the given kinds, within `reach`. */
-export function nearestMount(structures: Structure[], world: Vec3, kinds: MountPoint['kind'][], reach: number): Attachment | null {
+/** The closest mount point to a world position, of the given kinds, within `reach` (inside a totem only if asked). */
+export function nearestMount(structures: Structure[], world: Vec3, kinds: MountPoint['kind'][], reach: number, inside = false): Attachment | null {
   let best: Attachment | null = null
   for (const s of structures) {
     const local = toLocal(s, world)
     for (const m of mountPoints(s)) {
       if (!kinds.includes(m.kind)) continue
+      // Inside a totem is a place you choose, never one a fixture falls into.
+      if (m.inside && !inside) continue
       const { t, distance } = nearestOn(m, local)
       if (distance > reach || (best && distance >= best.distance)) continue
       best = { structure: s, point: m, t, distance, position: toWorld(s, pointAt(m, t)) }

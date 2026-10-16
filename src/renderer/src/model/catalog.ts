@@ -18,6 +18,7 @@ export type LookKind =
   | 'tube' // vertical pixel tube, light all the way round
   | 'bar' // horizontal LED bar with pixel sections
   | 'strip' // thin LED strip
+  | 'string' // bulbs along a cable hanging between two points
   | 'uplight' // small box on a kickstand
   | 'flood' // rectangular LED flood on a yoke bracket
   | 'spider' // box with a face of separately coloured lenses
@@ -101,7 +102,8 @@ export const LOOK_DEFAULTS: Record<LookKind, { size: [number, number, number]; b
   laser: { size: [0.2, 0.1, 0.22], beam: [40, 40] },
   derby: { size: [0.3, 0.22, 0.25], beam: [15, 15] },
   strobe: { size: [0.35, 0.12, 0.12], beam: [110, 110] },
-  fog: { size: [0.25, 0.2, 0.5], beam: [30, 30] }
+  fog: { size: [0.25, 0.2, 0.5], beam: [30, 30] },
+  string: { size: [3.0, 0.3, 0.06], beam: [180, 180] }
 }
 
 export interface FixtureSpec {

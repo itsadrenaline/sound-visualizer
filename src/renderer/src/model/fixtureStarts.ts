@@ -31,7 +31,7 @@ export const CELL_COLOURS: Record<CellColours, { label: string; fns: ChannelFn[]
 }
 
 /** Kinds made of cells that repeat the same channels. */
-export const CELL_KINDS: FixtureKind[] = ['bar', 'tube', 'panel', 'cluster', 'strip']
+export const CELL_KINDS: FixtureKind[] = ['bar', 'tube', 'panel', 'cluster', 'strip', 'string']
 /** Kinds that often have an LED ring around the lens. */
 export const RING_KINDS: FixtureKind[] = ['wash', 'spot', 'beam', 'par']
 
@@ -231,6 +231,15 @@ const SPECS: Record<FixtureKind, Spec[]> = {
     { label: 'Flame or spark: safety, output, height, mode', fns: ['control', 'specialFx', 'zoom', 'control'] },
     { label: 'Bubbles with RGB LEDs', fns: ['specialFx', 'fan', D, ...RGB, S] }
   ],
+  string: [
+    { label: 'One dimmer (whole string)', fns: [D] },
+    { label: 'RGB (whole string)', fns: RGB },
+    { label: 'Dimmer, program, speed', fns: [D, 'program', 'programSpeed'], common: true },
+    { label: '10 bulbs, a dimmer each', cells: { n: 10, per: [D], layout: { kind: 'row' } }, common: true },
+    { label: '20 bulbs, a dimmer each', cells: { n: 20, per: [D], layout: { kind: 'row' } } },
+    { label: '10 RGB bulbs', cells: { n: 10, per: RGB, layout: { kind: 'row' } }, common: true },
+    { label: '16 RGB bulbs', cells: { n: 16, per: RGB, layout: { kind: 'row' } } }
+  ],
   dimmer: [
     { label: '1 light', cells: { n: 1, per: [D], layout: { kind: 'row' } } },
     { label: '2 lights', cells: { n: 2, per: [D], layout: { kind: 'row' } } },
@@ -311,7 +320,7 @@ function buildCells(base: FixtureDef, c: CellSpec): FixtureDef {
       for (const fn of c.per) channels.push(makeChannel(fn, whites.has(fn) ? centre.id : ring.id))
     } else {
       const lamp = c.per.length === 1 && c.per[0] === 'dimmer'
-      const p: PartDef = { id: newKey('p'), name: `${lamp ? 'Light' : 'Cell'} ${k + 1}`, role: 'pixel', cell: k, ...((c.per.includes('warmWhite') && !c.per.includes('coolWhite')) || lamp ? { tint: 'warm' as const } : {}) }
+      const p: PartDef = { id: newKey('p'), name: `${base.kind === 'string' ? 'Bulb' : lamp ? 'Light' : 'Cell'} ${k + 1}`, role: 'pixel', cell: k, ...((c.per.includes('warmWhite') && !c.per.includes('coolWhite')) || (lamp && base.kind !== 'string') || (base.kind === 'string' && c.per.every((f) => f === 'dimmer')) ? { tint: 'warm' as const } : {}) }
       parts.push(p)
       for (const fn of c.per) channels.push(makeChannel(fn, p.id))
     }
@@ -496,6 +505,7 @@ export function guessKind(def: FixtureDef): FixtureKind {
   const chs = def.modes.flatMap((m) => m.channels)
   const fns = new Set(chs.map((c) => c.fn))
   const cells = new Set(def.parts.filter((p) => p.role === 'pixel').map((p) => p.cell)).size
+  if (def.look.shape === 'string') return 'string'
   if (fns.has('fog')) return 'fog'
   if (fns.has('specialFx')) return 'sfx'
   if (cells > 1 && chs.filter((c) => c.part).every((c) => c.fn === 'dimmer')) return 'dimmer'

@@ -150,7 +150,7 @@ export function FixtureMenu() {
   // Where it could go: the nearest truss to hang from, and the closest stands, totems and bars.
   const first = info.chosen[0]
   const hangTarget = nearestMount(structures, first.position, ['under'], 1e3)
-  const attach = attachOptions(structures, first, 4).filter((o) => o.point.kind !== 'under' && !(first.mount?.structure === o.structure.id && first.mount.point === o.point.id))
+  const attach = attachOptions(structures, first, 6).filter((o) => (o.point.kind !== 'under' || o.point.inside) && !(first.mount?.structure === o.structure.id && first.mount.point === o.point.id))
 
   const all = useStore.getState().selection
   return (

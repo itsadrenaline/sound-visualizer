@@ -10,10 +10,11 @@ import { LOOK_DEFAULTS, type CellLayout, type LookKind } from '../../model/catal
 import { searchLibrary, useLibrary } from '../../state/library'
 import { setCellCount, useStudio } from '../../state/studio'
 import { notify } from '../../state/notices'
+import { SaveAsKind } from './MyKinds'
 
 const SHAPES: Array<[LookKind, string]> = [
   ['par', 'Round can (PAR)'], ['flood', 'Box flood'], ['uplight', 'Small uplight'], ['spider', 'Box of lenses'], ['cluster', 'Round cells on a frame'],
-  ['panel', 'Panel of square cells'], ['bar', 'Bar of cells'], ['tube', 'Tube / stick'], ['strip', 'Thin strip'], ['mover', 'Moving head (spot/beam)'],
+  ['panel', 'Panel of square cells'], ['bar', 'Bar of cells'], ['tube', 'Tube / stick'], ['strip', 'Thin strip'], ['string', 'String of bulbs'], ['mover', 'Moving head (spot/beam)'],
   ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar on a stand'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box'], ['fog', 'Machine with a nozzle (fog, effects)']
 ]
 
@@ -48,6 +49,8 @@ export function LookPanel({ def }: { def: FixtureDef }) {
           </button>
         ))}
       </div>
+
+      <SaveAsKind def={def} />
 
       <label className="field" title="The body drawn on the twin and in your show. The kind above picks one; change it if the light looks different.">
         <span className="label">Shape</span>
@@ -250,6 +253,8 @@ export function KindIcon({ kind }: { kind: FixtureKind }) {
       return <svg viewBox="0 0 32 32" className="kind-icon"><rect x="6" y="20" width="20" height="8" rx="2" {...common} /><circle cx="11" cy="12" r="3" {...common} /><circle cx="20" cy="9" r="4" {...common} /><circle cx="17" cy="16" r="1.8" {...common} /><circle cx="25" cy="15" r="1.5" {...common} /></svg>
     case 'dimmer':
       return <svg viewBox="0 0 32 32" className="kind-icon"><path d="M3 9h26M16 9v19M11 29h10" {...common} />{[5, 12, 20, 27].map((x) => <rect key={x} x={x - 2.5} y="10" width="5" height="6" rx="1.5" {...common} />)}</svg>
+    case 'string':
+      return <svg viewBox="0 0 32 32" className="kind-icon"><path d="M2 7c6 9 22 9 28 0" {...common} />{[[7, 11.5], [12, 13.4], [16, 14], [20, 13.4], [25, 11.5]].map(([x, y]) => <g key={x}><path d={`M${x} ${y}v3`} {...common} /><circle cx={x} cy={y + 5} r="2" {...common} /></g>)}</svg>
     case 'other':
       return <svg viewBox="0 0 32 32" className="kind-icon"><rect x="6" y="6" width="20" height="20" rx="4" {...common} /><path d="M13 13a3 3 0 116 0c0 2-3 2.5-3 5" {...common} /><circle cx="16" cy="22" r="1.2" fill={c} /></svg>
   }

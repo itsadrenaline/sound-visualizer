@@ -72,6 +72,8 @@ export function usualPlace(f: SoundSwitchFixture): Where {
     case 'bar':
     case 'strip':
       return 'booth'
+    case 'string':
+      return 'truss'
     case 'uplight':
     case 'par':
     case 'flood':

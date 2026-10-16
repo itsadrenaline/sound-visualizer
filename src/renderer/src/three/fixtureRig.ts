@@ -58,6 +58,8 @@ class BeamEmitter implements Emitter {
   private goboTurn = 0
   private prismTurn = 0
   private lastTime = 0
+  /** How far the beam goes before something stops it (inside a totem: the far plate). */
+  reach = BEAM_LENGTH
 
   constructor(parent: THREE.Object3D, private root: THREE.Object3D, lensRadius: number, offset: number, private candela: number, prismCopies = 0) {
     this.group.position.y = offset
@@ -94,7 +96,8 @@ class BeamEmitter implements Emitter {
     this.goboTurn = (this.goboTurn + dt * s.goboSpin * Math.PI * 2) % (Math.PI * 2)
     // A prism only turns when its rotation channel says so; otherwise the facets stay put.
     this.prismTurn = (this.prismTurn + dt * s.prismSpin * Math.PI * 2) % (Math.PI * 2)
-    const radius = BEAM_LENGTH * Math.tan((Math.max(1, s.beamAngle) / 2) * DEG)
+    const length = Math.max(0.05, Math.min(BEAM_LENGTH, this.reach))
+    const radius = length * Math.tan((Math.max(1, s.beamAngle) / 2) * DEG)
     const prism = s.prism && this.beams.length > 1
     this.beams.forEach((beam, i) => {
       const material = this.materials[i]
@@ -106,7 +109,7 @@ class BeamEmitter implements Emitter {
       material.uniforms.haze.value = haze
       material.uniforms.gobo.value = s.gobo
       material.uniforms.goboTurn.value = this.goboTurn
-      beam.scale.set(radius, BEAM_LENGTH, radius)
+      beam.scale.set(radius, length, radius)
       // Prism copies spread out around the main beam and turn slowly.
       if (i > 0) {
         const a = (i / (this.beams.length - 1)) * Math.PI * 2 + this.prismTurn
@@ -129,7 +132,8 @@ class BeamEmitter implements Emitter {
         goboCell: goboCell(s.gobo),
         goboTurn: this.goboTurn,
         prismSpread: prism ? Math.tan(Math.min(80, s.beamAngle * 1.2) * DEG) / Math.tan(half) : 0,
-        prismTurn: this.prismTurn
+        prismTurn: this.prismTurn,
+        reach: this.reach < BEAM_LENGTH ? this.reach : undefined
       })
     }
     if (this.light) {
@@ -140,6 +144,7 @@ class BeamEmitter implements Emitter {
       this.root.worldToLocal(this.light.target.position.copy(this.lensPos).addScaledVector(this.dir, 10))
       this.light.color.setRGB(...s.color)
       this.light.intensity = this.candela * on * 4
+      this.light.distance = this.reach < BEAM_LENGTH ? this.reach + 0.3 : 0
       this.light.angle = Math.min(Math.PI / 2.3, (Math.max(2, s.beamAngle) / 2) * DEG * (prism ? 2.2 : 1))
     }
   }
@@ -554,6 +559,41 @@ export class FixtureRig {
         break
       }
 
+      case 'string': {
+        // Bulbs along a cable that sags between its two ends. Built the right way up
+        // whether it hangs (from a truss) or stands (between two posts at its height).
+        const holder = new THREE.Group()
+        if (this.mounting === 'hanging') holder.rotation.z = Math.PI
+        this.mount.add(holder)
+        const top = this.mounting === 'hanging' ? 0 : h
+        const sag = Math.max(0.05, h * 0.6)
+        const at = (u: number) => new THREE.Vector3(-w / 2 + w * u, top - sag * 4 * u * (1 - u), 0)
+        const curve = new THREE.CatmullRomCurve3(Array.from({ length: 17 }, (_, k) => at(k / 16)))
+        holder.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.004, 5, false), this.body))
+        // One part per bulb when the bulbs have their own channels; otherwise the whole string is one light.
+        const each = this.headIndex((x) => x.role === 'pixel' || x.role === 'beam')
+        const bulbsOf = each.length > 1 ? each : []
+        const count = bulbsOf.length || Math.max(6, Math.round(w / 0.35))
+        const r = Math.max(0.015, Math.min(0.04, d * 0.5))
+        const meshes: THREE.Mesh[] = []
+        for (let k = 0; k < count; k++) {
+          const p = at((k + 0.5) / count)
+          const socket = cylinder(r * 0.45, r * 1.2, this.body, 10)
+          socket.position.set(p.x, p.y - r * 0.6, 0)
+          holder.add(socket)
+          const bulb = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), glowMaterial())
+          bulb.position.set(p.x, p.y - r * 1.9, 0)
+          holder.add(bulb)
+          meshes.push(bulb)
+        }
+        if (bulbsOf.length) bulbsOf.forEach((i, k) => (this.emitters[i] = new GlowEmitter([meshes[k]], 2.6)))
+        else {
+          const main = this.headIndex((x) => x.role !== 'master')[0] ?? 0
+          this.emitters[main] = new GlowEmitter(meshes, 2.6)
+        }
+        break
+      }
+
       case 'strip': {
         const strip = box(w, h, d, glowMaterial())
         strip.position.y = h / 2
@@ -790,6 +830,13 @@ export class FixtureRig {
     if (this.aimGroup) this.aimGroup.rotation.x = -fixture.aimTilt * DEG
     this.invertPan = !!fixture.invertPan
     this.invertTilt = !!fixture.invertTilt
+  }
+
+  /** Stop every beam this far out (a light inside a totem), or let them run (undefined). */
+  setReach(reach: number | undefined): void {
+    const r = reach ?? BEAM_LENGTH
+    const all = [...this.emitters, this.extraBeam?.emitter]
+    for (const e of all) if (e instanceof BeamEmitter) e.reach = r
   }
 
   /** The middle of the fixture's body in the world (for picking and box-select), not its mounting point. */

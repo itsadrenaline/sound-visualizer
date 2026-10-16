@@ -24,6 +24,8 @@ export interface Projector {
   prismSpread: number
   /** How far the prism has turned, radians. */
   prismTurn: number
+  /** Where the beam is stopped (inside a totem: the plate at the other end), metres along it. */
+  reach?: number
 }
 
 const frame: Projector[] = []
