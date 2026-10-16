@@ -548,6 +548,17 @@ select.where { width: 100%; }
 .small-dialog p { line-height: 1.5; margin: 0 0 10px; }
 .small-dialog .wizard-foot { margin: 6px -20px 0; }
 .fresh-list { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; font-size: 13px; }
+/* Browser version: Connect your SoundSwitch */
+.connect-card { position: fixed; left: calc(var(--left-w, 320px) + 16px); bottom: 300px; z-index: 30; width: 300px; padding: 12px 14px; border-radius: 12px; border: 1px solid #2c3a55; background: rgba(21, 24, 29, 0.96); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); font-size: 13px; }
+.connect-card .cc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.connect-card .cc-close { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.connect-card ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+.connect-card li { line-height: 1.4; }
+.connect-card li .cc-text { display: block; margin-bottom: 4px; }
+.connect-card li.done { color: var(--good); }
+.connect-card li.done::marker { content: '✓  '; }
+.connect-card .cc-hint { margin: 10px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
 /* Browser version: live DMX through the bridge */
 .bridge-help { width: min(560px, 100%); }
 .bridge-state { margin: 2px 0 12px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); font-size: 13px; color: var(--muted); }

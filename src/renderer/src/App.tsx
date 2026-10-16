@@ -15,6 +15,7 @@ import { FreshStartConfirm, useFirstLaunch, WelcomeBack } from './ui/FreshStart'
 import { SwitchProjectDialog } from './ui/SwitchProject'
 import { AboutDialog } from './ui/About'
 import { BridgeHelp } from './ui/BridgeHelp'
+import { ConnectCard } from './ui/ConnectCard'
 import { ToursDialog, TourOverlay } from './ui/Tour'
 import { Tooltips } from './ui/Tooltips'
 import { PanelResizer, usePanelWidths } from './ui/PanelResizer'
@@ -131,6 +132,7 @@ export function App() {
       <SwitchProjectDialog />
       <AboutDialog />
       {window.api?.platform === 'web' && <BridgeHelp />}
+      {window.api?.platform === 'web' && !fullView && <ConnectCard />}
       <ToursDialog />
       <TourOverlay />
       <Tooltips />
