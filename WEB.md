@@ -39,7 +39,8 @@ in (a `SoundSwitch` folder in Music or Documents), or your whole Music folder: e
 and Edge keep permission to read it; on a later visit they may ask again (click
 **Read the project again** in the pill).
 
-**2. Receive Art-Net.** Art-Net is UDP, and browsers can't open UDP sockets. The
+**2. Receive Art-Net.** Art-Net is UDP, and browsers can't open UDP sockets (Chrome's
+Direct Sockets API can, but only in installed "Isolated Web Apps", not on a website). The
 **Art-Net bridge** (`src/bridge`) is a tiny program that receives Art-Net exactly
 like the Mac app (and answers SoundSwitch's ArtPoll, so SoundSwitch lists "Sound
 Visualizer"), then passes each universe to the page over a WebSocket on
@@ -67,8 +68,10 @@ Source: GitHub Actions. The site is about 20 MB, most of it the fixture librarie
 ## Still to do for the browser
 
 1. **Wording**: a dozen places say "this Mac" or "the Mac app" (the welcome, fresh start).
-2. **The bridge as a download**: today it runs with Node (`npm run bridge`). For other
-   people it should be a double-click app for Mac and Windows (one small file, no Node).
+2. ~~The bridge as a download~~ Done: `.github/workflows/bridge.yml` builds it for Mac
+   (Apple Silicon, Intel), Windows and Linux (Node built in, nothing to install) onto the
+   `bridge-latest` release, and the Art-Net pill offers the right one. Next: sign the Mac
+   one (Developer ID) so it opens without the right-click step.
 3. **Install as an app** (a PWA): its own window and Dock/taskbar icon, works offline,
    and `.ssvis` files open in it.
 4. **Big shows**: the QLC+ list (14 MB) loads on first visit; load it only when the
