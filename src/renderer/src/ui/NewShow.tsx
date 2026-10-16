@@ -52,7 +52,7 @@ export function NewShow() {
   const [mirror, setMirror] = useState(true)
   const [standFt, setStandFt] = useState(6)
 
-  // Fresh every time it opens.
+  // Fresh every time it opens; opened with a project (from the toolbar), it goes straight to that project's fixtures.
   useEffect(() => {
     if (!open) return
     setStart(null)
@@ -63,6 +63,13 @@ export function NewShow() {
     setName('')
     setRoom('basic')
     window.api?.soundSwitchProfiles().then(setProfiles).catch(() => setProfiles([]))
+    const preset = useWizards.getState().newShowProject
+    if (preset) {
+      setStart('soundswitch')
+      setStep('profile')
+      void pickProfile({ path: preset.path, name: preset.name, fixtures: 0, modified: Date.now(), open: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   useEffect(() => {

@@ -202,7 +202,7 @@ function SoundSwitchIndicator() {
   if (linked && other) {
     text = `Show follows “${other}” · SoundSwitch has “${status.name}”`
     short = 'SoundSwitch: other project'
-    about = `This show follows the SoundSwitch project “${other}”. SoundSwitch has “${status.name}” open, so nothing is synced.`
+    about = `This show follows the SoundSwitch project “${other}”. SoundSwitch has “${status.name}” open, so nothing is synced. Switch this show to “${status.name}”, or make a new show from it.`
   } else if (linked && notUsed) {
     text = `SoundSwitch: ${status.name} · not used by this show`
     short = 'SoundSwitch: not used'
@@ -251,13 +251,30 @@ function SoundSwitchIndicator() {
             />
           )}
           {linked && !notUsed && !other && !autoSync && <MenuItem label="Sync now" title="Bring in SoundSwitch's patch changes once" onClick={run(syncNow)} />}
+          {linked && other && (
+            <MenuItem
+              label={`Switch this show to “${status.name}”`}
+              title={`This show follows “${status.name}” from now on: its fixtures replace the ones from “${other}”. Your trusses, stands and fixtures you added stay. Undo puts it back.`}
+              onClick={run(() => followSoundSwitch(status.name, status.fixtures))}
+            />
+          )}
+          {linked && other && (
+            <MenuItem label={`New show from “${status.name}”…`} title={`Make a separate show from “${status.name}”, choosing its fixtures (save this one first if you want to keep it)`} onClick={run(() => useWizards.getState().openNewShow({ path: status.project, name: status.name }))} />
+          )}
           {linked && notUsed && (
-            <MenuItem label={`Follow “${status.name}”`} title="Bring this SoundSwitch project's fixtures into this show and follow its patch" onClick={run(() => followSoundSwitch(status.name))} />
+            <MenuItem label={`Follow “${status.name}”`} title="Bring this SoundSwitch project's fixtures into this show and follow its patch" onClick={run(() => followSoundSwitch(status.name, status.fixtures))} />
           )}
           <MenuItem label="New show from SoundSwitch…" title="Make a show from a SoundSwitch project, choosing its fixtures" onClick={run(() => useWizards.getState().openNewShow())} />
           <hr />
           <MenuItem label="Find the open project again" title="Look again for the project SoundSwitch has open" onClick={run(() => window.api?.refreshSoundSwitch())} />
-          <MenuItem label="Choose a project…" title="Pick a SoundSwitch project (.ssproj) yourself" onClick={run(() => window.api?.chooseSoundSwitchProject())} />
+          <MenuItem
+            label="Open another SoundSwitch project…"
+            title="Pick any SoundSwitch project (.ssproj folder) and make a show from it, choosing its fixtures"
+            onClick={run(async () => {
+              const path = await window.api?.browseSoundSwitchProfile()
+              if (path) useWizards.getState().openNewShow({ path, name: path.split('/').pop()!.replace(/\.ssproj$/, '') })
+            })}
+          />
         </MenuShell>
       )}
     </>

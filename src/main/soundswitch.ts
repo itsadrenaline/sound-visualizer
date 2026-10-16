@@ -4,7 +4,7 @@
  * How we find "the open project", best first:
  *  1. The project folder SoundSwitch has open right now (via `lsof`, which lists
  *     files a running program is using).
- *  2. A project you picked with "Choose…" in the app.
+ *  2. The project you last made a show from (or picked) in the app.
  *  3. Any recent project in your usual folders (Music, Documents, Downloads, Desktop),
  *     newest first.
  * When the venue file changes (you edit the patch in SoundSwitch), it's read again
@@ -68,6 +68,12 @@ let current: string | null = null
 let watcher: FSWatcher | null = null
 let debounce: NodeJS.Timeout | null = null
 let lastHow: SoundSwitchStatus['how'] = 'most recent'
+/**
+ * The project SoundSwitch had open when we last looked. The app only switches to
+ * what SoundSwitch has open when that changes, so a project you picked yourself
+ * isn't swapped back a few seconds later.
+ */
+let lastRunning: string | null = null
 
 function loadChosen(): string | null {
   try {
@@ -128,6 +134,7 @@ function searchCommonFolders(): string[] {
 
 async function locateProject(): Promise<{ path: string; how: SoundSwitchStatus['how'] } | null> {
   const running = await openInSoundSwitch()
+  lastRunning = running
   if (running) return { path: running, how: 'open in SoundSwitch' }
   const chosen = loadChosen()
   if (chosen && hasVenue(chosen)) return { path: chosen, how: 'chosen' }
@@ -173,24 +180,6 @@ export async function refreshSoundSwitch(): Promise<void> {
   else send({ state: 'not found', project: '', name: '', how: 'most recent', fixtures: [], skipped: 0 })
 }
 
-export async function chooseSoundSwitchProject(): Promise<void> {
-  if (!window) return
-  const result = await dialog.showOpenDialog(window, {
-    title: 'Choose a SoundSwitch project',
-    message: 'Pick the .ssproj project folder SoundSwitch uses.',
-    properties: ['openDirectory', 'treatPackageAsDirectory'],
-    defaultPath: join(homedir(), 'Music')
-  })
-  const picked = result.filePaths[0]
-  if (!picked) return
-  if (!hasVenue(picked)) {
-    send({ state: 'error', project: picked, name: basename(picked), how: 'chosen', fixtures: [], skipped: 0, error: `No ${VENUE_FILE} in that folder.` })
-    return
-  }
-  saveChosen(picked)
-  follow(picked, 'chosen')
-}
-
 let polling = false
 
 export function startSoundSwitch(target: BrowserWindow): void {
@@ -200,6 +189,8 @@ export function startSoundSwitch(target: BrowserWindow): void {
   // Every 10 seconds, check whether SoundSwitch has switched to a different project.
   setInterval(async () => {
     const running = await openInSoundSwitch()
+    if (running === lastRunning) return
+    lastRunning = running
     if (running && running !== current) follow(running, 'open in SoundSwitch')
   }, 10_000)
 }
@@ -251,5 +242,11 @@ export async function browseProfile(): Promise<string | null> {
   const options = { title: 'Choose a SoundSwitch project', message: 'Pick a .ssproj project folder.', properties: ['openDirectory', 'treatPackageAsDirectory'] as Array<'openDirectory' | 'treatPackageAsDirectory'>, defaultPath: join(homedir(), 'Music') }
   const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options)
   const picked = result.filePaths[0]
-  return picked && hasVenue(picked) ? picked : null
+  if (!picked) return null
+  if (hasVenue(picked)) return picked
+  // Say why nothing happened, rather than nothing at all.
+  const message = { type: 'warning' as const, message: 'That isn’t a SoundSwitch project', detail: `There's no ${VENUE_FILE} in “${basename(picked)}”. Pick the .ssproj project folder (usually in Music ▸ SoundSwitch).` }
+  if (window) await dialog.showMessageBox(window, message)
+  else await dialog.showMessageBox(message)
+  return null
 }

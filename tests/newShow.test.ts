@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from '../src/renderer/src/state/store'
 import { chooseFromText, createShowFromSoundSwitch, rowsFor, planSummary } from '../src/renderer/src/state/newShow'
-import { syncFromSoundSwitch } from '../src/renderer/src/state/commands'
+import { followSoundSwitch, syncFromSoundSwitch } from '../src/renderer/src/state/commands'
+import { useSoundSwitch } from '../src/renderer/src/state/soundswitchLink'
 import { defaultProject } from '../src/renderer/src/model/project'
 import { settle } from '../src/renderer/src/model/physics'
 import type { SoundSwitchFixture } from '../src/shared/soundswitch'
@@ -91,5 +92,25 @@ describe('a new show from SoundSwitch', () => {
   it('a show from scratch ignores SoundSwitch', () => {
     syncFromSoundSwitch(venue, 'My Rig')
     expect(project().fixtures.every((f) => !f.soundswitchKey)).toBe(true)
+  })
+
+  it('switching the show to the project SoundSwitch has open replaces the old project\'s fixtures', () => {
+    const { rows } = chooseFromText('two copies of the movers', rowsFor(venue))
+    createShowFromSoundSwitch({ name: 'S', room: 'basic', profile: { name: 'My Rig', path: '/x' }, rows, mirrorPairs: false, standFt: 6 })
+    const other = [fixture('Other wash', 0, 200, 'wash'), fixture('Other wash', 0, 210, 'wash')]
+    useSoundSwitch.setState({ status: { state: 'linked', project: '/y/Club.ssproj', name: 'Club', how: 'open in SoundSwitch', fixtures: other, skipped: 0 } })
+    // Following "My Rig", the open "Club" project is left alone…
+    syncFromSoundSwitch(other, 'Club')
+    expect(project().fixtures.length).toBe(4)
+    // …until you switch: its fixtures replace My Rig's (copies included), in one undo step.
+    const steps = useStore.getState().past.length
+    followSoundSwitch('Club', other)
+    expect(useStore.getState().past.length).toBe(steps + 1)
+    expect(project().soundswitch).toMatchObject({ link: true, profile: 'Club' })
+    expect(project().fixtures.map((f) => f.name).sort()).toEqual(['Other wash 1', 'Other wash 2'])
+    expect(project().name).toBe('S')
+    useStore.getState().undo()
+    expect(project().soundswitch).toMatchObject({ profile: 'My Rig' })
+    expect(project().fixtures.length).toBe(4)
   })
 })

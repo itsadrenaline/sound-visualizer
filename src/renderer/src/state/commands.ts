@@ -625,9 +625,24 @@ export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[]
 }
 
 /** Make this show follow a SoundSwitch project (all its fixtures), and bring them in now. */
-export function followSoundSwitch(profile: string): void {
-  store().apply('Follow SoundSwitch', (p) => ({ ...p, soundswitch: { link: true, profile } }))
-  void import('./soundswitchLink').then(({ useSoundSwitch }) => useSoundSwitch.getState().syncNow())
+/**
+ * Follow a SoundSwitch project. Given its fixtures (what SoundSwitch has open),
+ * they come in straight away, and the whole switch is one undo step.
+ */
+export function followSoundSwitch(profile: string, fixtures?: SoundSwitchFixture[]): void {
+  const before = store().project.soundswitch?.profile
+  // Switching from another project: its fixtures (and copies of them) go; the new project's come in with the sync.
+  const switching = !!before && before !== profile
+  const label = switching ? `Switch to “${profile}”` : 'Follow SoundSwitch'
+  const mark = store().beginBatch()
+  store().apply(label, (p) => ({
+    ...p,
+    soundswitch: { link: true, profile },
+    ...(switching ? { fixtures: p.fixtures.filter((f) => !f.soundswitchKey && !f.copyOf) } : {})
+  }))
+  if (fixtures) syncFromSoundSwitch(fixtures, profile)
+  store().endBatch(mark, label)
+  if (!fixtures) void import('./soundswitchLink').then(({ useSoundSwitch }) => useSoundSwitch.getState().syncNow())
 }
 
 // ---------------------------------------------------------------------------

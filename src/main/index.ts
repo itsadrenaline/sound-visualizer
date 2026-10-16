@@ -15,7 +15,7 @@ import { buildMenu } from './menu'
 import { claudeRequest, claudeStatus, clearClaudeKey, setClaudeKey } from './claude'
 import { checkInstall, freshStart } from './install'
 import { openFile, saveFile } from './files'
-import { browseProfile, chooseSoundSwitchProject, excludeFixtures, listProfiles, readProfile, refreshSoundSwitch, startSoundSwitch, useProfile } from './soundswitch'
+import { browseProfile, excludeFixtures, listProfiles, readProfile, refreshSoundSwitch, startSoundSwitch, useProfile } from './soundswitch'
 import { createSocket, type Socket } from 'node:dgram'
 import { networkInterfaces } from 'node:os'
 import { join, dirname } from 'node:path'
@@ -264,7 +264,6 @@ function answerPoll(controller: string): void {
 // The page asks for the status once it's ready to listen (a message sent earlier would be missed).
 listen('artnet-status-request', () => window?.webContents.send('artnet-status', status))
 listen('soundswitch-refresh', () => refreshSoundSwitch())
-listen('soundswitch-choose', () => chooseSoundSwitchProject())
 listen('soundswitch-exclude', (_event, project: string, keys: string[]) => excludeFixtures(project, keys))
 handle('soundswitch-profiles', () => listProfiles())
 handle('soundswitch-profile-read', (_e, path: string) => {

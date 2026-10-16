@@ -54,7 +54,6 @@ export interface VisualizerApi {
   requestArtNetStatus(): void
   onSoundSwitch(callback: (status: SoundSwitchStatus) => void): () => void
   refreshSoundSwitch(): void
-  chooseSoundSwitchProject(): void
   /** Leave these fixtures out of future syncs (keys from exclusionKey). */
   excludeSoundSwitchFixtures(project: string, keys: string[]): void
   /** Every SoundSwitch project found on this Mac (the one open in SoundSwitch first). */

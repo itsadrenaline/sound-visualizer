@@ -35,6 +35,8 @@ export interface InstallInfo {
 
 interface Wizards {
   newShow: boolean
+  /** A SoundSwitch project to start the New Show wizard with (picked from the toolbar), skipping the first steps. */
+  newShowProject: { path: string; name: string } | null
   welcome: boolean
   /** Setting up for the first time: the welcome leads into New Show, then a tour. */
   firstRun: boolean
@@ -43,7 +45,7 @@ interface Wizards {
   welcomeBack: InstallInfo | null
   /** The "start fresh?" confirmation is open. */
   freshStart: boolean
-  openNewShow(): void
+  openNewShow(project?: { path: string; name: string }): void
   /** `created`: a show was made (true), or the tour to show next ('build' after describing). */
   closeNewShow(created?: boolean | string): void
   openWelcome(): void
@@ -58,15 +60,16 @@ interface Wizards {
 
 export const useWizards = create<Wizards>((set, get) => ({
   newShow: false,
+  newShowProject: null,
   welcome: false,
   firstRun: false,
   toursList: false,
   welcomeBack: null,
   freshStart: false,
-  openNewShow: () => set({ newShow: true, welcome: false }),
+  openNewShow: (project) => set({ newShow: true, newShowProject: project ?? null, welcome: false }),
   closeNewShow: (created = false) => {
     const first = get().firstRun
-    set({ newShow: false, firstRun: false })
+    set({ newShow: false, newShowProject: null, firstRun: false })
     // The first show is made: show where everything is (after the wizard has gone).
     if (first && created) setTimeout(() => useTour.getState().start(typeof created === 'string' ? created : 'basics'), 600)
   },

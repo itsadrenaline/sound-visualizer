@@ -18,7 +18,6 @@ const api: VisualizerApi = {
   requestArtNetStatus: () => ipcRenderer.send('artnet-status-request'),
   onSoundSwitch: (callback) => subscribe<SoundSwitchStatus>('soundswitch', callback),
   refreshSoundSwitch: () => ipcRenderer.send('soundswitch-refresh'),
-  chooseSoundSwitchProject: () => ipcRenderer.send('soundswitch-choose'),
   excludeSoundSwitchFixtures: (project, keys) => ipcRenderer.send('soundswitch-exclude', project, keys),
   soundSwitchProfiles: () => ipcRenderer.invoke('soundswitch-profiles'),
   readSoundSwitchProfile: (path) => ipcRenderer.invoke('soundswitch-profile-read', path),
