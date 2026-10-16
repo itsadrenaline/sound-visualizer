@@ -183,6 +183,14 @@ function ArtNetIndicator({ status }: { status: ArtNetStatus | null }) {
       ? 'Lighting data is arriving: the rig is following the show.'
       : 'Waiting for lighting data. In SoundSwitch: Preferences ▸ Hardware ▸ DMX & Art-Net, tick Enable Art-Net and Localhost Art-Net Node, and select Sound Visualizer.'
   }
+  // In the browser, the pill opens the steps to get live DMX (the bridge), connected or not.
+  if (window.api?.platform === 'web')
+    return (
+      <button className={`status pill ${tone}`} data-tour="artnet" title={`${text}\n${help}\nClick for live DMX from SoundSwitch.`} onClick={() => useWizards.getState().setBridgeHelp(true)}>
+        <span className="full">{text}</span>
+        <span className="short">{short}</span>
+      </button>
+    )
   return (
     <div className={`status ${tone}`} data-tour="artnet" title={`${text}\n${help}`}>
       <span className="full">{text}</span>

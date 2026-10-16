@@ -26,9 +26,9 @@ const WAITING: ArtNetStatus = {
   listening: false,
   address: '',
   note: {
-    text: 'Art-Net: start the bridge for live DMX',
-    short: 'Art-Net: no bridge',
-    help: "Browsers can't receive Art-Net from SoundSwitch by themselves. Run the Sound Visualizer bridge on this computer and the show plays here live (it connects by itself). Everything else works without it."
+    text: 'Art-Net: get live DMX ▸',
+    short: 'Live DMX ▸',
+    help: "Browsers can't receive Art-Net from SoundSwitch by themselves: a small helper on this computer does it. Click for the download and steps."
   }
 }
 let status: ArtNetStatus = WAITING

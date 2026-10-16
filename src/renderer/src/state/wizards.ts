@@ -49,6 +49,9 @@ interface Wizards {
   /** About Sound Visualizer: version, build and system, for support. */
   about: boolean
   setAbout(open: boolean): void
+  /** Browser version: the steps to get live DMX through the Art-Net bridge. */
+  bridgeHelp: boolean
+  setBridgeHelp(open: boolean): void
   /** Asking how to move this show to another SoundSwitch project (what happens to its fixtures). */
   switchProject: { name: string; path: string; fixtures: SoundSwitchFixture[] } | null
   askSwitchProject(project: { name: string; path: string; fixtures: SoundSwitchFixture[] }): void
@@ -76,6 +79,8 @@ export const useWizards = create<Wizards>((set, get) => ({
   freshStart: false,
   about: false,
   setAbout: (about) => set({ about }),
+  bridgeHelp: false,
+  setBridgeHelp: (bridgeHelp) => set({ bridgeHelp }),
   switchProject: null,
   askSwitchProject: (switchProject) => set({ switchProject }),
   closeSwitchProject: () => set({ switchProject: null }),
