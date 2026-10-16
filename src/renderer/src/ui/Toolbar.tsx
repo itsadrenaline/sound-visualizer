@@ -109,6 +109,17 @@ function ShowsMenu() {
           {TEMPLATES.map((t) => (
             <MenuItem key={t.id} label={t.name} title={t.description} onClick={run(`template:${t.id}`)} />
           ))}
+          {window.api?.platform === 'web' && (
+            <>
+              {/* No menu bar in the browser: what File has in the Mac app. */}
+              <hr />
+              <MenuItem label="Open a show file… (⌘O)" onClick={run('open')} />
+              <MenuItem label="Save as… (⇧⌘S)" onClick={run('saveAs')} />
+              <MenuItem label="Save view as image…" onClick={run('saveImage')} />
+              <MenuItem label="New fixture… (Fixture Studio)" onClick={run('newFixture')} />
+              <MenuItem label="Import fixture file…" onClick={run('importFixtures')} />
+            </>
+          )}
           {window.api && (
             <>
               <hr />
@@ -150,7 +161,11 @@ function ArtNetIndicator({ status }: { status: ArtNetStatus | null }) {
   let short = 'Art-Net'
   let tone = 'off'
   let help = 'Live lighting data (Art-Net) only arrives in the Mac app.'
-  if (status?.error) {
+  if (status?.note && !status.listening && !status.error) {
+    text = status.note.text
+    short = status.note.short
+    help = status.note.help
+  } else if (status?.error) {
     text = `Art-Net error: ${status.error}`
     short = 'Art-Net: error'
     tone = 'bad'
@@ -227,7 +242,9 @@ function SoundSwitchIndicator() {
   } else if (status?.state === 'not found') {
     text = 'SoundSwitch: no project found'
     short = 'SoundSwitch: none'
-    about = 'Open a project in SoundSwitch, or choose one.'
+    about = window.api.platform === 'web'
+      ? status.error ?? 'A browser can only read folders you pick: choose your SoundSwitch folder once with “Open another SoundSwitch project…” and every project in it is remembered.'
+      : 'Open a project in SoundSwitch, or choose one.'
   } else if (status?.state === 'error') {
     text = `SoundSwitch: ${status.error}`
     short = 'SoundSwitch: error'
@@ -288,7 +305,7 @@ function SoundSwitchIndicator() {
           )}
           <MenuItem label="New show from SoundSwitch…" title="Make a show from a SoundSwitch project, choosing its fixtures" onClick={run(() => useWizards.getState().openNewShow())} />
           <hr />
-          <MenuItem label="Find the open project again" title="Look again for the project SoundSwitch has open" onClick={run(() => window.api?.refreshSoundSwitch())} />
+          <MenuItem label={window.api.platform === 'web' ? 'Read the project again' : 'Find the open project again'} title={window.api.platform === 'web' ? 'Read the SoundSwitch project again (and allow the browser to, if it asks)' : 'Look again for the project SoundSwitch has open'} onClick={run(() => window.api?.refreshSoundSwitch())} />
           <MenuItem
             label="Open another SoundSwitch project…"
             title="Pick any SoundSwitch project (.ssproj folder) and make a show from it, choosing its fixtures"

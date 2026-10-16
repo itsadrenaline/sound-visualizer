@@ -40,5 +40,5 @@ export default defineConfig({
     // Sandboxed preload scripts must be CommonJS.
     build: { rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } } }
   },
-  renderer: { plugins: [react(), contentSecurityPolicy()] }
+  renderer: { plugins: [react(), contentSecurityPolicy()], define: { __WEB__: 'false' } }
 })

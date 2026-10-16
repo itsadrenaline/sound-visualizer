@@ -92,7 +92,7 @@ export function App() {
       // Fixture Studio has its own keys; only undo, redo and save reach it from here.
       if (useStudio.getState().open) {
         const command = commandForKey(e)
-        if (command && (command === 'undo' || command === 'redo' || command === 'save') && !(window.api && MENU_OWNED.has(command))) {
+        if (command && (command === 'undo' || command === 'redo' || command === 'save') && !(window.api?.platform === 'desktop' && MENU_OWNED.has(command))) {
           e.preventDefault()
           runCommand(command)
         }
@@ -106,7 +106,7 @@ export function App() {
       }
       if (key === 'escape') return select([])
       const command = commandForKey(e)
-      if (!command || (window.api && MENU_OWNED.has(command))) return
+      if (!command || (window.api?.platform === 'desktop' && MENU_OWNED.has(command))) return
       e.preventDefault()
       runCommand(command)
     }

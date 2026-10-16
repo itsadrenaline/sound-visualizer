@@ -13,6 +13,8 @@ export interface ArtNetStatus {
   /** Address and port we're bound to, e.g. "0.0.0.0:6454". */
   address: string
   error?: string
+  /** Not listening, and why (in the browser: the Art-Net bridge isn't running). */
+  note?: { text: string; short: string; help: string }
 }
 
 /** The SoundSwitch project the app is following, and its fixtures. */
@@ -49,6 +51,12 @@ export interface Notice {
 
 /** What the preload script exposes on `window.api`. */
 export interface VisualizerApi {
+  /**
+   * 'desktop': the Electron app (native menu bar, files, UDP).
+   * 'web': the browser version (src/renderer/src/web): no menu bar, so the page
+   * handles every shortcut itself and shows the menu items in its own menus.
+   */
+  platform?: 'desktop' | 'web'
   onDmx(callback: (message: DmxMessage) => void): () => void
   onArtNetStatus(callback: (status: ArtNetStatus) => void): () => void
   requestArtNetStatus(): void

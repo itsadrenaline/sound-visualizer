@@ -13,6 +13,7 @@ function subscribe<T>(channel: string, callback: (value: T) => void): () => void
 }
 
 const api: VisualizerApi = {
+  platform: 'desktop',
   onDmx: (callback) => subscribe<DmxMessage>('dmx', callback),
   onArtNetStatus: (callback) => subscribe<ArtNetStatus>('artnet-status', callback),
   requestArtNetStatus: () => ipcRenderer.send('artnet-status-request'),

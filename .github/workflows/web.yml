@@ -1,0 +1,35 @@
+# Publishes the browser version (npm run build:web) to GitHub Pages.
+# Run it by hand (Actions ▸ Publish the web version ▸ Run workflow); nothing publishes on push.
+# One-time: Settings ▸ Pages ▸ Source: GitHub Actions.
+name: Publish the web version
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build:web
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out/web
+      - id: deploy
+        uses: actions/deploy-pages@v4
