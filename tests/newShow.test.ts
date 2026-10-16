@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from '../src/renderer/src/state/store'
 import { chooseFromText, createShowFromSoundSwitch, rowsFor, planSummary } from '../src/renderer/src/state/newShow'
-import { switchPlan, switchSoundSwitchProject, syncFromSoundSwitch } from '../src/renderer/src/state/commands'
+import { fixturesNotInProject, someNames, switchPlan, switchSoundSwitchProject, syncFromSoundSwitch } from '../src/renderer/src/state/commands'
 import { defaultProject } from '../src/renderer/src/model/project'
 import { settle } from '../src/renderer/src/model/physics'
 import type { SoundSwitchFixture } from '../src/shared/soundswitch'
@@ -109,6 +109,18 @@ describe('a new show from SoundSwitch', () => {
     it('counts what matches before anything changes', () => {
       setup()
       expect(switchPlan(project(), club)).toEqual({ same: 3, onlyHere: 3, onlyThere: 1, own: 2 })
+    })
+
+    it('names the show\'s fixtures the new project doesn\'t patch (they would stay dark)', () => {
+      setup()
+      const missing = fixturesNotInProject(project(), club)
+      // The three IR4s at 70, 80 and 90 aren't in Club; the movers, their copies and the IR4 at 60 are.
+      expect(missing.map((f) => f.address).sort()).toEqual([70, 80, 90])
+      expect(someNames(missing, 2)).toMatch(/^IR4 Uplight \d, IR4 Uplight \d and 1 more$/)
+      expect(fixturesNotInProject(project(), venue)).toEqual([])
+      // Kept in the show after switching, and still reported.
+      switchSoundSwitchProject('Club', club, 'keep')
+      expect(fixturesNotInProject(project(), club).length).toBe(3)
     })
 
     it('keep: nothing is added or removed, and hand-placed fixtures stay put', () => {

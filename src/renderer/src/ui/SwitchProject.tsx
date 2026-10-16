@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../state/store'
 import { useWizards } from '../state/wizards'
-import { switchPlan, switchSoundSwitchProject, type SwitchHow } from '../state/commands'
+import { fixturesNotInProject, someNames, switchPlan, switchSoundSwitchProject, type SwitchHow } from '../state/commands'
 import { isEdited, saveDocument } from '../state/document'
 import { notify } from '../state/notices'
 
@@ -34,26 +34,30 @@ export function SwitchProjectDialog() {
   if (!ask) return null
   const plan = switchPlan(project, ask.fixtures)
   const from = project.soundswitch?.profile ?? 'the old project'
+  // Fixtures the new project doesn't patch: SoundSwitch sends them nothing, so they'd stay dark.
+  const missing = fixturesNotInProject(project, ask.fixtures)
+  const missingOwn = missing.filter((f) => !f.soundswitchKey && !f.copyOf).length
+  const dark = (k: number) => (k ? ` ${n(k, 'fixture')} not in “${ask.name}” stay${k === 1 ? 's' : ''} in the show but stay${k === 1 ? 's' : ''} dark when it plays.` : '')
   const options: Array<{ id: Choice; title: string; text: string; result: string }> = [
     {
       id: 'keep',
       title: 'Keep my show as it is',
       text: `Every fixture stays where it is. The show follows “${ask.name}” from now on, so its programs play on your fixtures. Use this when it's the same rig with different programs.`,
       result: plan.same
-        ? `${n(plan.same, 'fixture')} on the same patch carry on as they are; nothing is added or removed.`
-        : `None of this show's fixtures are on the same patch in “${ask.name}”, so its programs may not reach them. Nothing is added or removed.`
+        ? `${n(plan.same, 'fixture')} on the same patch carry on as they are; nothing is added or removed.${dark(missing.length)}`
+        : `None of this show's fixtures are on the same patch in “${ask.name}”, so its programs won't reach them: the show stays dark. Nothing is added or removed.`
     },
     {
       id: 'add',
       title: `Add “${ask.name}” to my show`,
       text: `Keep everything, and bring in the fixtures from “${ask.name}” this show doesn't have yet.`,
-      result: plan.onlyThere ? `${n(plan.onlyThere, 'fixture')} added; nothing removed.` : 'Nothing to add: the show already has every fixture in it.'
+      result: (plan.onlyThere ? `${n(plan.onlyThere, 'fixture')} added; nothing removed.` : 'Nothing to add: the show already has every fixture in it.') + dark(missing.length)
     },
     {
       id: 'match',
       title: `Update my show to match “${ask.name}”`,
       text: `Fixtures on the same patch keep their place and settings. Ones only in “${from}” are removed, and new ones come in.`,
-      result: `${n(plan.same, 'fixture')} kept, ${plan.onlyHere} removed, ${plan.onlyThere} added.`
+      result: `${n(plan.same, 'fixture')} kept, ${plan.onlyHere} removed, ${plan.onlyThere} added.${missingOwn ? ` Your own ${n(missingOwn, 'fixture')} not in “${ask.name}” stay${missingOwn === 1 ? 's' : ''} but stay${missingOwn === 1 ? 's' : ''} dark.` : ''}`
     },
     {
       id: 'fresh',
@@ -91,6 +95,16 @@ export function SwitchProjectDialog() {
           This show follows “{from}”. What should happen to its fixtures?
           {fixed}
         </p>
+        {missing.length > 0 && (
+          <div className="switch-missing" role="note">
+            <strong>
+              {missing.length === project.fixtures.length ? `None of this show's ${n(missing.length, 'fixture')} are` : `${n(missing.length, 'fixture')} in this show ${missing.length === 1 ? 'isn’t' : 'aren’t'}`} in “{ask.name}”
+            </strong>
+            <span>
+              {someNames(missing)}. {ask.name} doesn't use {missing.length === 1 ? 'its DMX channels' : 'their DMX channels'}, so SoundSwitch sends {missing.length === 1 ? 'it' : 'them'} nothing: when the show plays, {missing.length === 1 ? 'it stays' : 'they stay'} dark. Add {missing.length === 1 ? 'it' : 'them'} to the project in SoundSwitch (same universe and address) to light {missing.length === 1 ? 'it' : 'them'}.
+            </span>
+          </div>
+        )}
         <div className="switch-options" role="radiogroup">
           {options.map((o) => (
             <button key={o.id} role="radio" aria-checked={choice === o.id} className={`switch-option ${choice === o.id ? 'on' : ''}`} onClick={() => setChoice(o.id)}>

@@ -91,6 +91,7 @@ input[type='range'] { padding: 0; accent-color: var(--accent); }
 .status.good { color: var(--good); border-color: #2c5a43; }
 .status.idle { color: var(--text); }
 .status.bad { color: var(--bad); border-color: #5c2e2e; }
+.status.warn { color: var(--warn); border-color: #5c4a26; }
 .status { max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .auto { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
 .auto input { width: auto; }
@@ -549,7 +550,11 @@ select.where { width: 100%; }
 .fresh-list { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; font-size: 13px; }
 /* Switching a show to another SoundSwitch project: what happens to its fixtures */
 .switch-project { width: min(560px, 100%); }
-.switch-options { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; }
+.switch-missing { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 10px; padding: 9px 12px; border: 1px solid rgba(240, 180, 76, 0.45); border-radius: 8px; background: rgba(240, 180, 76, 0.08); font-size: 13px; line-height: 1.45; }
+.switch-missing strong { color: var(--warn); }
+.switch-missing span { color: #c9cfd8; }
+.switch-project > * { flex: none; }
+.switch-project > .switch-options { display: flex; flex-direction: column; gap: 6px; margin: 4px -6px 12px 0; padding-right: 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .switch-option { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: inherit; cursor: pointer; font: inherit; }
 .switch-option:hover { border-color: #3a4352; }
 .switch-option.on { border-color: var(--accent); background: rgba(77, 141, 255, 0.1); }

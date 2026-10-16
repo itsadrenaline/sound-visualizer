@@ -667,6 +667,29 @@ export function switchPlan(p: Project, fixtures: SoundSwitchFixture[]): SwitchPl
   return { same, onlyHere: ss.length - same, onlyThere: fixtures.filter((f) => !here.has(keyOfNew(f))).length, own: p.fixtures.length - ss.length }
 }
 
+/**
+ * Fixtures in the show that the SoundSwitch project doesn't patch: none of their
+ * channels are used by any fixture in it. SoundSwitch sends them nothing, so when
+ * the show plays they stay dark (unless something else drives their channels).
+ */
+export function fixturesNotInProject(p: Project, fixtures: SoundSwitchFixture[]): Fixture[] {
+  const types = new Map((p.fixtureTypes ?? []).map((t) => [t.id, t]))
+  const width = (f: Fixture) => Math.max(1, (types.get(f.typeId) ?? getFixtureType(f.typeId)).channels.length)
+  return p.fixtures.filter((f) => {
+    const lo = f.address
+    const hi = f.address + width(f) - 1
+    return !fixtures.some((s) => s.universe === f.universe && s.address <= hi && s.address + Math.max(1, s.mode.channels) - 1 >= lo)
+  })
+}
+
+/** "BPM-Spots 1, BPM-Spots 2 and 3 more". */
+export function someNames(list: Array<{ name: string }>, max = 4): string {
+  const names = list.slice(0, max).map((f) => f.name)
+  const rest = list.length - names.length
+  if (rest > 0) return `${names.join(', ')} and ${rest} more`
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] ?? ''
+}
+
 export function switchSoundSwitchProject(profile: string, fixtures: SoundSwitchFixture[], how: SwitchHow): void {
   const there = new Set(fixtures.map(keyOfNew))
   const label = how === 'match' ? `Switch to “${profile}”` : how === 'add' ? `Add “${profile}” to the show` : `Follow “${profile}”, keeping the show`

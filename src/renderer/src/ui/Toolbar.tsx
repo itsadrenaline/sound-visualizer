@@ -6,7 +6,7 @@ import { useViewSettings } from '../state/viewSettings'
 import { dmxBus } from '../state/dmxBus'
 import { runCommand } from '../state/menuCommands'
 import { useWizards } from '../state/wizards'
-import { followSoundSwitch } from '../state/commands'
+import { fixturesNotInProject, followSoundSwitch, someNames } from '../state/commands'
 import { TEMPLATES } from '../state/shows'
 import { saveDocument, useDocument } from '../state/document'
 import type { ArtNetStatus } from '../../../shared/ipc'
@@ -187,6 +187,7 @@ function SoundSwitchIndicator() {
   const syncNow = useSoundSwitch((s) => s.syncNow)
   const link = useStore((s) => s.project.soundswitch)
   const inShow = useStore((s) => s.project.fixtures.filter((f) => f.soundswitchKey).length)
+  const project = useStore((s) => s.project)
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   if (!window.api) return null
   const close = () => setAt(null)
@@ -199,6 +200,7 @@ function SoundSwitchIndicator() {
   let short = 'SoundSwitch…'
   let tone = 'off'
   let about = 'Looking for the project SoundSwitch has open.'
+  let missing: ReturnType<typeof fixturesNotInProject> = []
   if (linked && other) {
     text = `Show follows “${other}” · SoundSwitch has “${status.name}”`
     short = 'SoundSwitch: other project'
@@ -208,10 +210,17 @@ function SoundSwitchIndicator() {
     short = 'SoundSwitch: not used'
     about = 'This show was made without SoundSwitch, so SoundSwitch patch changes are not brought in.'
   } else if (linked) {
+    missing = fixturesNotInProject(project, status.fixtures)
     text = link?.include ? `SoundSwitch: ${status.name} · ${inShow} of ${status.fixtures.length} fixtures` : `SoundSwitch: ${status.name} · ${status.fixtures.length} fixtures`
     short = `SoundSwitch: ${status.fixtures.length}`
     tone = 'good'
     about = `${status.project}\nFound because it is ${status.how}.${status.hidden ? `\n${status.hidden} fixture(s) left out of the show.` : ''}`
+    if (missing.length) {
+      tone = 'warn'
+      text += ` · ${missing.length} not in project`
+      short = `SoundSwitch: ${missing.length} not in project`
+      about += `\n${missing.length === 1 ? '1 fixture in this show isn’t' : `${missing.length} fixtures in this show aren’t`} in “${status.name}” (${someNames(missing, 3)}). SoundSwitch sends ${missing.length === 1 ? 'it' : 'them'} nothing, so ${missing.length === 1 ? 'it stays' : 'they stay'} dark when the show plays. Add ${missing.length === 1 ? 'it' : 'them'} to the project in SoundSwitch on the same universe and address to light ${missing.length === 1 ? 'it' : 'them'}.`
+    }
   } else if (status?.state === 'not found') {
     text = 'SoundSwitch: no project found'
     short = 'SoundSwitch: none'
@@ -248,6 +257,13 @@ function SoundSwitchIndicator() {
               check={autoSync ? '✓' : ''}
               title="Keep this show's patch in step with SoundSwitch whenever it changes there"
               onClick={() => setAutoSync(!autoSync)}
+            />
+          )}
+          {missing.length > 0 && (
+            <MenuItem
+              label={`Select the ${missing.length === 1 ? 'fixture' : `${missing.length} fixtures`} not in “${status!.name}”`}
+              title="Select them in the list and the 3D view, to move them to another patch, add them in SoundSwitch, or delete them"
+              onClick={run(() => useStore.getState().select(missing.map((f) => f.id)))}
             />
           )}
           {linked && !notUsed && !other && !autoSync && <MenuItem label="Sync now" title="Bring in SoundSwitch's patch changes once" onClick={run(syncNow)} />}
