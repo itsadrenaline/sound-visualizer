@@ -30,7 +30,8 @@ export function AboutDialog() {
   useEffect(() => {
     if (!open) return
     setCopied(false)
-    void aboutInfo().then(setInfo)
+    // Fresh each time it opens (the browser version's details include whether the bridge is connected).
+    void (window.api?.aboutInfo ? window.api.aboutInfo().catch(() => null) : aboutInfo()).then(setInfo)
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
