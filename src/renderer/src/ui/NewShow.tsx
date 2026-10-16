@@ -117,7 +117,14 @@ export function NewShow() {
   const finish = () => {
     const showName = name.trim() || 'New show'
     if (start === 'soundswitch' && profile) {
-      createShowFromSoundSwitch({ name: showName, room, profile: { name: profile.name, path: profile.path }, rows, mirrorPairs: mirror, standFt })
+      try {
+        createShowFromSoundSwitch({ name: showName, room, profile: { name: profile.name, path: profile.path }, rows, mirrorPairs: mirror, standFt })
+      } catch (error) {
+        // Never leave the wizard stuck on a button that does nothing: say what went wrong.
+        window.api?.log('error', 'Making a show from SoundSwitch failed', String((error as Error)?.stack ?? error))
+        setError(`Couldn't make the show: ${(error as Error).message}. Please send the log (Help ▸ Open Log Folder) so it can be fixed.`)
+        return
+      }
       // From now on this Mac follows that SoundSwitch project.
       window.api?.useSoundSwitchProfile(profile.path)
       const s = planSummary(rows)
@@ -162,6 +169,7 @@ export function NewShow() {
           {step === 'profile' && <ProfileStep profiles={profiles} loading={loading} error={error} onPick={pickProfile} onBrowse={browse} />}
           {step === 'fixtures' && profile && <FixturesStep profile={profile} rows={rows} setRows={setRows} mirror={mirror} setMirror={setMirror} standFt={standFt} setStandFt={setStandFt} />}
           {step === 'finish' && <FinishStep name={name} setName={setName} room={room} setRoom={setRoom} start={start!} summary={start === 'soundswitch' ? planSummary(rows) : null} />}
+          {step === 'finish' && error && <p className="problem">{error}</p>}
         </div>
 
         {step !== 'start' && (

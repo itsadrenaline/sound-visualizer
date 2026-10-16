@@ -45,6 +45,13 @@ export function autoLayout<T>(items: T[], typeOf: (item: T) => FixtureType): Map
   // GigBars on stands either side of the stage, further out if there are more.
   stands.forEach((f, i) => out.set(f, { position: [(i % 2 ? 1 : -1) * (5.5 + Math.floor(i / 2) * 1.4), 2.2, 2.0], mounting: 'floor', aimTilt: 0 }))
   floor.forEach((f, i) => out.set(f, { position: [spread(i, floor.length, 12), 0.1, FLOOR_FRONT_Z], mounting: 'floor', aimTilt: 30 }))
+  // Every other kind (lasers, derbies, strobes, panels, retro cells, string lights, and any kind
+  // added later) still gets a place: effects hang from the truss in front of the movers,
+  // fog machines sit at the back. Nothing may be left without a position.
+  const fog = items.filter((f) => !out.has(f) && lookOf(f) === 'fog')
+  fog.forEach((f, i) => out.set(f, { position: [spread(i, fog.length, 6), 0.1, FLOOR_BACK_Z + 0.6], mounting: 'floor', aimTilt: 0 }))
+  const rest = items.filter((f) => !out.has(f))
+  rest.forEach((f, i) => out.set(f, { position: [spread(i, rest.length, TRUSS.width - 1), TRUSS.y, TRUSS.z + 0.35], mounting: 'hanging', aimTilt: 20 }))
   return out
 }
 

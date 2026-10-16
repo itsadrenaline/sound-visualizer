@@ -120,6 +120,8 @@ function placeMounted(f: Fixture, s: Structure, m: MountPoint, t: number): Fixtu
 }
 
 function settleFixture(f: Fixture, structures: Structure[], byId: Map<string, Structure>, prev?: Fixture): Fixture {
+  // A fixture with no (or a broken) position goes to the middle of the floor rather than breaking the show.
+  if (!Array.isArray(f.position) || f.position.length !== 3 || f.position.some((v) => !Number.isFinite(v))) f = { ...f, position: [0, 0.1, 0] }
   // Moved by hand since last time: it comes off what it was attached to, then finds its footing again.
   if (f.mount && prev && !same(prev.position, f.position)) f = { ...f, mount: undefined }
   // Attached: follow the structure.

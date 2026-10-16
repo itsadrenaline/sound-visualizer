@@ -27,6 +27,8 @@ export interface SoundSwitchStatus {
   /** Fixtures left out because they're listed in soundswitch-exclude.json. */
   hidden?: number
   error?: string
+  /** Other projects SoundSwitch has open (or had open), to switch to if the wrong one was picked. */
+  alsoOpen?: Array<{ path: string; name: string }>
 }
 
 export interface SoundSwitchProfile {
