@@ -120,10 +120,6 @@ export function FixtureHud() {
           </button>
         </>
       )}
-      <span className="hud-sep" />
-      <button className="hud-btn" title="Edit this fixture in Fixture Studio: its channels, look and modes" onClick={() => editFixtureType(info.chosen[0].typeId)}>
-        ✎ Edit
-      </button>
       <button
         className="hud-btn"
         title="More actions (or right-click the fixture)"

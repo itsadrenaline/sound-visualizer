@@ -55,6 +55,10 @@ mac:
   extendInfo:
     # Art-Net arrives over the local network; macOS asks once for permission.
     NSLocalNetworkUsageDescription: Sound Visualizer listens for Art-Net lighting data from SoundSwitch on your network.
+    # Only asked if your SoundSwitch project is in one of these folders (the app looks in Music on its own).
+    NSDocumentsFolderUsageDescription: Sound Visualizer reads the SoundSwitch project you use, which is in your Documents folder.
+    NSDownloadsFolderUsageDescription: Sound Visualizer reads the SoundSwitch project you use, which is in your Downloads folder.
+    NSDesktopFolderUsageDescription: Sound Visualizer reads the SoundSwitch project you use, which is on your Desktop.
     NSHumanReadableCopyright: © 2026 the Sound Visualizer contributors. Works with SoundSwitch; not affiliated with or endorsed by inMusic.
     LSApplicationCategoryType: public.app-category.music
 dmg:

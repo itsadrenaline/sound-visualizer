@@ -252,7 +252,7 @@ function ProfileStep({ profiles, loading, error, onPick, onBrowse }: { profiles:
             {p.open && <em>Open in SoundSwitch</em>}
           </button>
         ))}
-        {profiles?.length === 0 && <p className="hint">No SoundSwitch projects in Music, Documents, Downloads or Desktop. Browse for the .ssproj folder, or open the project in SoundSwitch and come back.</p>}
+        {profiles?.length === 0 && <p className="hint">No SoundSwitch projects in your Music folder. Open the project in SoundSwitch and come back, or Browse for its .ssproj folder (the app only looks in Music by itself, so macOS doesn't ask for permission to your other folders).</p>}
       </div>
       <button className="quiet" onClick={onBrowse}>
         Browse for another project…

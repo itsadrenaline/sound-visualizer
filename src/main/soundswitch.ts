@@ -5,8 +5,11 @@
  *  1. The project folder SoundSwitch has open right now (via `lsof`, which lists
  *     files a running program is using).
  *  2. The project you last made a show from (or picked) in the app.
- *  3. Any recent project in your usual folders (Music, Documents, Downloads, Desktop),
- *     newest first.
+ *  3. Projects found before (anywhere), and the newest in Music ▸ SoundSwitch, where
+ *     SoundSwitch keeps them. Only the Music folder is looked through on its own:
+ *     macOS asks permission for Documents, Downloads and Desktop, and nobody should
+ *     get three prompts for a visualizer. A project somewhere else is found when
+ *     SoundSwitch opens it, or when you pick it (a pick needs no permission).
  * When the venue file changes (you edit the patch in SoundSwitch), it's read again
  * and the new fixture list is sent to the window.
  */
@@ -77,23 +80,53 @@ let lastRunning: string | null = null
 /** Other projects SoundSwitch has files open in (see openInSoundSwitch). */
 let alsoOpen: string[] = []
 
-function loadChosen(): string | null {
+interface Settings {
+  /** The project you picked (or last made a show from). */
+  project?: string
+  /** Every project the app has followed: listed again without searching protected folders. */
+  known?: string[]
+}
+
+function loadSettings(): Settings {
   try {
-    return (JSON.parse(readFileSync(settingsPath(), 'utf8')) as { project?: string }).project ?? null
+    return JSON.parse(readFileSync(settingsPath(), 'utf8')) as Settings
   } catch {
-    return null
+    return {}
   }
 }
 
-function saveChosen(project: string): void {
+function saveSettings(settings: Settings): void {
   try {
-    writeFileSync(settingsPath(), JSON.stringify({ project }))
+    writeFileSync(settingsPath(), JSON.stringify(settings))
   } catch {
     // Not fatal: we'll just search again next time.
   }
 }
 
+const loadChosen = (): string | null => loadSettings().project ?? null
+
+function saveChosen(project: string): void {
+  saveSettings({ ...loadSettings(), project })
+  remember(project)
+}
+
+/** Remember a project's folder, so it's listed next time without looking around the disk. */
+function remember(project: string): void {
+  const settings = loadSettings()
+  if (settings.known?.includes(project)) return
+  saveSettings({ ...settings, known: [project, ...(settings.known ?? [])].slice(0, 50) })
+}
+
+const knownProjects = (): string[] => (loadSettings().known ?? []).filter((p) => hasVenue(p))
+
 const hasVenue = (dir: string) => existsSync(join(dir, VENUE_FILE))
+function venueTime(dir: string): number {
+  try {
+    return statSync(join(dir, VENUE_FILE)).mtimeMs
+  } catch {
+    return 0
+  }
+}
 
 /**
  * The .ssproj folder the running SoundSwitch has open, if any.
@@ -133,7 +166,8 @@ function openInSoundSwitch(): Promise<Running | null> {
 /** .ssproj folders in the usual places, newest venue file first. */
 function searchCommonFolders(): string[] {
   const home = homedir()
-  const roots = ['Music/SoundSwitch', 'Music', 'Documents/SoundSwitch', 'Documents', 'Downloads', 'Desktop'].map((r) => join(home, r))
+  // Music only: SoundSwitch's own folder is Music ▸ SoundSwitch, and Music needs no permission.
+  const roots = ['Music/SoundSwitch', 'Music'].map((r) => join(home, r))
   const found: Array<{ dir: string; time: number }> = []
   const visit = (dir: string, depth: number) => {
     let entries: string[] = []
@@ -166,7 +200,7 @@ async function locateProject(): Promise<{ path: string; how: SoundSwitchStatus['
   if (running) return { path: running.path, how: 'open in SoundSwitch' }
   const chosen = loadChosen()
   if (chosen && hasVenue(chosen)) return { path: chosen, how: 'chosen' }
-  const recent = searchCommonFolders()[0]
+  const recent = [...knownProjects(), ...searchCommonFolders()].sort((a, b) => venueTime(b) - venueTime(a))[0]
   return recent ? { path: recent, how: 'most recent' } : null
 }
 
@@ -189,6 +223,7 @@ function readAndSend(project: string, how: SoundSwitchStatus['how']): void {
 }
 
 function follow(project: string, how: SoundSwitchStatus['how']): void {
+  remember(project)
   if (project !== current) {
     watcher?.close()
     current = project
@@ -240,7 +275,7 @@ export interface SoundSwitchProfile {
 export async function listProfiles(): Promise<SoundSwitchProfile[]> {
   const running = (await openInSoundSwitch())?.path ?? null
   const chosen = loadChosen()
-  const paths = [...new Set([running, chosen, ...searchCommonFolders()].filter((p): p is string => !!p && hasVenue(p)))]
+  const paths = [...new Set([running, chosen, ...knownProjects(), ...searchCommonFolders()].filter((p): p is string => !!p && hasVenue(p)))]
   return paths.map((path) => {
     let fixtures = 0
     try {
