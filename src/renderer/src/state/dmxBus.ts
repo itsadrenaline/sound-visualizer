@@ -84,6 +84,24 @@ export const dmxBus = {
   },
 
   /**
+   * Forget the levels the app set on its own (the demo, pointing heads down), keeping
+   * faders a person moved. Stopping the demo calls this: before, the demo's last frame
+   * stayed in the test levels and showed up as soon as the show stopped arriving
+   * (colours and positions nobody sent).
+   */
+  clearAuto(): void {
+    for (const [u, f] of faders) {
+      const hand = manual.get(u)
+      for (let i = 0; i < 512; i++) if (!hand?.[i]) f[i] = 0
+    }
+  },
+
+  /** The last levels that arrived over Art-Net for a project universe (null if none). */
+  lastShow(projectUniverse: number): Uint8Array | null {
+    return artnet.get(projectUniverse + offset) ?? null
+  },
+
+  /**
    * Some controllers count universes from 1 instead of 0. If none of the universes
    * arriving match the project's, line them up by their lowest numbers. The project
    * universe `u` then reads Art-Net universe `u + offset`.
@@ -93,7 +111,13 @@ export const dmxBus = {
     const incoming = [...lastSeen].filter(([, t]) => now - t < 2000).map(([u]) => u)
     if (incoming.length === 0 || projectUniverses.length === 0) return offset
     if (incoming.some((u) => projectUniverses.includes(u))) offset = 0
-    else offset = Math.min(...incoming) - Math.min(...projectUniverses)
+    else {
+      // Only the "counts from 1" case: one universe apart. Anything further is another
+      // show (another console or computer on the network), not this one: before, it was
+      // shifted onto this rig and moved and coloured fixtures SoundSwitch never sent to.
+      const shift = Math.min(...incoming) - Math.min(...projectUniverses)
+      offset = Math.abs(shift) === 1 ? shift : 0
+    }
     return offset
   },
 

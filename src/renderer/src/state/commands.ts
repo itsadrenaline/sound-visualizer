@@ -4,6 +4,7 @@
  */
 import { useStore } from './store'
 import { useMix } from './mix'
+import { hasOwnStand } from '../model/catalog'
 import { getFixtureType, plainName, type FixtureType } from '../model/fixtureTypes'
 import { defaultProject, footprint, newId, nextFreeAddress, planPatch, roomOf, type Fixture, type Project, type RoomSettings, type Vec3 } from '../model/project'
 import { defaultName, footprint as structureFootprint, mountPoints, STRUCTURE_KINDS, type Structure, type StructureKind, type StructureParams } from '../model/structures'
@@ -148,7 +149,7 @@ export function addLibraryFixtures(
   const width = type.spec?.size[0] ?? 0.3
   const gap = Math.max(0.4, width + 0.25)
   // GigBars and the like sit on a stand at about head height.
-  const onStand = type.spec?.mount === 'stand' && type.spec.look === 'gigbar'
+  const onStand = type.spec?.mount === 'stand' && hasOwnStand(type.spec)
   const dropped: Vec3 = options.at ?? [0, hanging ? 6.3 : 0.1, hanging ? -1 : 0.5]
   const at: Vec3 = onStand ? [dropped[0], 2.2, dropped[2]] : dropped
   const base = shortName(type.name)

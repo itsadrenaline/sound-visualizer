@@ -11,6 +11,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useStore } from '../state/store'
 import { useMix } from '../state/mix'
 import { useFixtureMenu } from '../state/fixtureMenu'
+import { editFixtureType } from './FixtureActions'
 import { renameGroup, updateFixtures } from '../state/commands'
 import { footprint, type Fixture } from '../model/project'
 import { ProblemsBanner, useProblemIndex } from './PatchProblems'
@@ -236,6 +237,11 @@ export function FixtureList() {
                         </button>
                       )}
                       <span className="section-tools">
+                        {new Set(section.fixtures.map((f) => f.typeId)).size === 1 && (
+                          <button className="tog edit" title="Edit this fixture in Fixture Studio (all of them in the show follow)" onClick={() => editFixtureType(section.fixtures[0].typeId)}>
+                            ✎
+                          </button>
+                        )}
                         <button className={`tog ${state('muted') ? 'on-mute' : ''}`} title="Mute the whole group" onClick={() => mix.toggle('muted', ids)}>
                           M
                         </button>
@@ -287,6 +293,16 @@ export function FixtureList() {
                           </span>
                         )}
                         <InlineEdit value={f.name} onCommit={(v) => rename(f, v, targets(f.id))} />
+                        <button
+                          className="row-edit"
+                          title="Edit this fixture in Fixture Studio"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            editFixtureType(f.typeId)
+                          }}
+                        >
+                          ✎ Edit
+                        </button>
                         {listView.groupBy !== 'type' && (
                           <div className="sub">
                             {f.group && listView.groupBy !== 'group' ? <span className="group-tag">G{f.group}</span> : null}

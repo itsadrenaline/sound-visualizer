@@ -25,7 +25,7 @@ import { Notices } from '../ui/Notices'
 import { useStore } from '../state/store'
 import { useViewSettings } from '../state/viewSettings'
 import { dmxBus } from '../state/dmxBus'
-import { runDemo } from '../state/demo'
+import { holdPositions, runDemo } from '../state/demo'
 import { decodeHeads } from '../model/heads'
 import { useMix } from '../state/mix'
 import { getFixtureType } from '../model/fixtureTypes'
@@ -828,6 +828,7 @@ export function Viewport() {
     // --- The frame loop: DMX in, mechanics, draw ---
     const timer = new THREE.Timer()
     let frameId = 0
+    let wasLive = false
     const tick = (now?: number) => {
       frameId = requestAnimationFrame(tick)
       // Fixture Studio covers the show and has its own view: don't draw this one meanwhile.
@@ -838,6 +839,10 @@ export function Viewport() {
       const { project } = useStore.getState()
       const { haze, demo } = useViewSettings.getState()
       if (demo) runDemo(project, time)
+      // The show just stopped arriving: heads stay where it left them, the rest goes dark.
+      const live = dmxBus.artNetActive()
+      if (wasLive && !live && !demo) holdPositions(project)
+      wasLive = live
 
       projectors.begin()
       dmxBus.alignUniverses([...new Set(project.fixtures.map((f) => f.universe))])

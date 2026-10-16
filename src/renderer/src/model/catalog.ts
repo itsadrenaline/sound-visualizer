@@ -129,7 +129,17 @@ export interface FixtureSpec {
   halo?: boolean
   /** How it's usually rigged. */
   mount: 'hanging' | 'floor' | 'stand'
+  /**
+   * Drawn with its own stand (a GigBar's 2.2 m pole). Missing means the old default:
+   * GigBars have one, nothing else does. Fixture Studio sets it (off for new fixtures).
+   */
+  stand?: boolean
   note: string
+}
+
+/** Does this kind of fixture come with its own stand (see FixtureSpec.stand)? */
+export function hasOwnStand(spec: Pick<FixtureSpec, 'look' | 'stand'> | undefined): boolean {
+  return !!spec && spec.look === 'gigbar' && spec.stand !== false
 }
 
 interface Entry {

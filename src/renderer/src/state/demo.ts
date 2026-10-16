@@ -31,6 +31,25 @@ export function homeFixtures(project: Project): void {
 }
 
 /**
+ * The show stopped arriving (SoundSwitch closed, or stopped sending): keep every moving
+ * head where the show left it, and let everything else go dark. Before, the rig fell back
+ * to the test levels: heads swung back to centre, as if something was still sending.
+ */
+export function holdPositions(project: Project): void {
+  for (const f of project.fixtures) {
+    const last = dmxBus.lastShow(f.universe)
+    if (!last) continue
+    for (const h of headsOf(getFixtureType(f.typeId))) {
+      for (const ref of [h.ch.pan, h.ch.tilt]) {
+        if (!ref) continue
+        dmxBus.setFader(f.universe, f.address + ref.coarse, last[f.address - 1 + ref.coarse] ?? 0, false)
+        if (ref.fine !== undefined) dmxBus.setFader(f.universe, f.address + ref.fine, last[f.address - 1 + ref.fine] ?? 0, false)
+      }
+    }
+  }
+}
+
+/**
  * A simple looping "show": sweeping heads, colour chases across pixel cells.
  * Works head by head, so it opens each fixture's shutter with a value that
  * really means "open" for that model.

@@ -11,7 +11,7 @@
  */
 import type { FixtureType } from './fixtureTypes'
 import { channelListFromHeads, type ChannelRef, type HeadDef, type HeadFunction, type HeadRole, type ProgramPattern } from './heads'
-import { LOOK_DEFAULTS, type CellLayout, type FixtureSpec, type LookKind } from './catalog'
+import { hasOwnStand, LOOK_DEFAULTS, type CellLayout, type FixtureSpec, type LookKind } from './catalog'
 
 // ---------------------------------------------------------------------------
 // What a channel can do
@@ -173,6 +173,8 @@ export interface LookDef {
   /** Brightness relative to a 100 W LED spot. */
   output: number
   mount: 'hanging' | 'floor' | 'stand'
+  /** Drawn with its own stand under it (GigBar shape only). Off unless you tick it. */
+  stand?: boolean
   /** A photo of the real light, shown beside the twin (data URL). */
   photo?: string
 }
@@ -710,6 +712,7 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
     leds: pixels > 1 ? pixels : undefined,
     halo: heads.some((h) => h.role === 'halo') || undefined,
     mount: look.mount,
+    stand: look.shape === 'gigbar' ? !!look.stand : undefined,
     note: `${def.manufacturer} ${def.name}, from Fixture Studio.`
   }
   return {
@@ -829,7 +832,9 @@ export function defFromTypes(types: FixtureType[], meta: { name: string; manufac
       pan: first.panRange || undefined,
       tilt: first.tiltRange || undefined,
       output: spec?.output ?? Math.max(0.2, first.candela / 1200),
-      mount: spec?.mount ?? KINDS[kind].mount
+      mount: spec?.mount ?? KINDS[kind].mount,
+      // An existing fixture keeps the stand it's drawn with until you untick it.
+      stand: spec?.look === 'gigbar' ? hasOwnStand(spec) : undefined
     },
     parts,
     modes,

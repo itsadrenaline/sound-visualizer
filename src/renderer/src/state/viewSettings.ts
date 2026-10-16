@@ -39,6 +39,8 @@ export const useViewSettings = create<ViewSettings>((set) => ({
     set((s) => {
       // Starting the demo begins from clean test levels (a stray fader can't hold a head still).
       if (demo && !s.demo) dmxBus.clearFaders()
+      // Stopping it, however it's stopped, takes its levels away too (faders moved by hand stay).
+      if (!demo && s.demo) dmxBus.clearAuto()
       dmxBus.setPreview(demo)
       return { demo }
     }),
