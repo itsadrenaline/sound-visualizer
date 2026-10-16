@@ -50,6 +50,8 @@ export function runCommand(command: string): void {
       return useWizards.getState().setToursList(true)
     case 'freshStart':
       return useWizards.getState().askFreshStart()
+    case 'about':
+      return useWizards.getState().setAbout(true)
     case 'open':
       return void openDocument()
     case 'save':

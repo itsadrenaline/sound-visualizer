@@ -14,13 +14,31 @@ export type MenuCommand =
   | 'viewPerspective' | 'viewTop' | 'viewFront' | 'viewLeft' | 'viewRight' | 'viewUp' | 'focusSelection' | 'focusAll' | 'toggleFullView'
   | 'showLibrary' | 'showFixtures' | 'toolSelect' | 'toolMove' | 'toolOrbit'
   | 'welcome' | 'builder' | 'importShow' | 'openMvr' | 'exportMvr' | 'exportCsv' | `template:${string}`
-  | 'freshStart' | 'tours' | `tour:${string}`
+  | 'freshStart' | 'tours' | `tour:${string}` | 'about'
 
 export function buildMenu(getWindow: () => BrowserWindow | null): void {
   const send = (command: MenuCommand) => () => getWindow()?.webContents.send('menu', command)
   const isMac = process.platform === 'darwin'
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    // The app menu, with About opening the app's own About box (version, build, system: what support needs).
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { label: `About ${app.name}`, click: send('about') },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          }
+        ]
+      : []),
     {
       label: 'File',
       submenu: [
@@ -118,6 +136,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
         },
         { type: 'separator' },
         { label: 'Start Fresh as a New User…', click: send('freshStart') },
+        { label: `About ${app.name} (version ${app.getVersion()})`, click: send('about') },
         { type: 'separator' },
         { label: 'Open Fixture Library Website', click: () => shell.openExternal('https://open-fixture-library.org') },
         { label: 'Open Log Folder', click: () => shell.openPath(logFolder()) }

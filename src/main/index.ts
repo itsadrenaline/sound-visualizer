@@ -21,7 +21,11 @@ import { networkInterfaces } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ARTNET_PORT, buildArtPollReply, isArtPoll, parseArtDmx } from '../shared/artnet'
-import type { ArtNetStatus, DmxMessage } from '../shared/ipc'
+import type { AboutInfo, ArtNetStatus, DmxMessage } from '../shared/ipc'
+
+/** The commit and date this copy was built from (electron.vite.config.ts). */
+declare const __BUILD__: string
+const BUILD = typeof __BUILD__ === 'string' ? __BUILD__ : 'development'
 
 // The app used to be called "SoundSwitch Visualizer": bring its settings, shows and
 // imported fixtures over the first time the renamed app starts.
@@ -138,6 +142,13 @@ handle('my-fixture-delete', (_e, id: string) => deleteMyFixture(String(id)))
 
 // --- First launch, reinstalls and starting fresh ---------------------------------------
 handle('install-info', () => checkInstall())
+handle('about-info', (): AboutInfo => ({
+  version: app.getVersion(),
+  build: BUILD,
+  kind: 'Mac app',
+  system: `${process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux'} ${process.getSystemVersion()} (${process.arch === 'arm64' ? 'Apple Silicon' : process.arch === 'x64' ? 'Intel' : process.arch}${app.runningUnderARM64Translation ? ', under Rosetta' : ''})`,
+  engine: `Electron ${process.versions.electron} · Chrome ${process.versions.chrome}`
+}))
 handle('fresh-start', (_e, options: { claudeKey?: boolean; importedFixtures?: boolean }) => {
   freshStart(options ?? {})
   refreshSoundSwitch()
@@ -278,7 +289,7 @@ listen('soundswitch-profile-use', (_e, path: string) => useProfile(path))
 
 catchCrashes()
 app.whenReady().then(() => {
-  log('info', `Starting Sound Visualizer ${app.getVersion()} (${process.arch})`)
+  log('info', `Starting Sound Visualizer ${app.getVersion()}, build ${BUILD} (${process.arch}, macOS ${process.getSystemVersion()})`)
   hardenApp()
   app.setAboutPanelOptions({
     applicationName: 'Sound Visualizer',

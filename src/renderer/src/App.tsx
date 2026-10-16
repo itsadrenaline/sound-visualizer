@@ -13,6 +13,7 @@ import { NewShow } from './ui/NewShow'
 import { Welcome } from './ui/Welcome'
 import { FreshStartConfirm, useFirstLaunch, WelcomeBack } from './ui/FreshStart'
 import { SwitchProjectDialog } from './ui/SwitchProject'
+import { AboutDialog } from './ui/About'
 import { ToursDialog, TourOverlay } from './ui/Tour'
 import { Tooltips } from './ui/Tooltips'
 import { PanelResizer, usePanelWidths } from './ui/PanelResizer'
@@ -127,6 +128,7 @@ export function App() {
       <WelcomeBack />
       <FreshStartConfirm />
       <SwitchProjectDialog />
+      <AboutDialog />
       <ToursDialog />
       <TourOverlay />
       <Tooltips />
