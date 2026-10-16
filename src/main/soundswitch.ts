@@ -74,6 +74,8 @@ let lastHow: SoundSwitchStatus['how'] = 'most recent'
  * isn't swapped back a few seconds later.
  */
 let lastRunning: string | null = null
+/** Other projects SoundSwitch has files open in (see openInSoundSwitch). */
+let alsoOpen: string[] = []
 
 function loadChosen(): string | null {
   try {
@@ -93,12 +95,37 @@ function saveChosen(project: string): void {
 
 const hasVenue = (dir: string) => existsSync(join(dir, VENUE_FILE))
 
-/** The .ssproj folder the running SoundSwitch has files open in, if any. */
-function openInSoundSwitch(): Promise<string | null> {
+/**
+ * The .ssproj folder the running SoundSwitch has open, if any.
+ *
+ * SoundSwitch can hold files in more than one project at once (one it had open
+ * earlier can stay in the list), so every project it has files in is counted:
+ * the one with the most open files is the one on screen; on a tie, the one opened
+ * last (highest file number). The others are reported too, so you can pick.
+ */
+export interface Running {
+  path: string
+  /** Other projects SoundSwitch also has files open in. */
+  others: string[]
+}
+
+function openInSoundSwitch(): Promise<Running | null> {
   return new Promise((resolve) => {
     execFile('lsof', ['-c', 'SoundSwitch', '-Fn'], { timeout: 4000, maxBuffer: 8 * 1024 * 1024 }, (_err, stdout) => {
-      const match = (stdout ?? '').split('\n').map((l) => /^n(.*\.ssproj)(\/|$)/.exec(l)?.[1]).find((p) => p && hasVenue(p))
-      resolve(match ?? null)
+      const seen = new Map<string, { files: number; lastFd: number }>()
+      let fd = 0
+      for (const line of (stdout ?? '').split('\n')) {
+        if (line.startsWith('f')) fd = Number(line.slice(1)) || fd
+        const path = /^n(.*?\.ssproj)(\/|$)/.exec(line)?.[1]
+        if (!path) continue
+        const entry = seen.get(path) ?? { files: 0, lastFd: 0 }
+        entry.files++
+        entry.lastFd = Math.max(entry.lastFd, fd)
+        seen.set(path, entry)
+      }
+      const ranked = [...seen].filter(([p]) => hasVenue(p)).sort((a, b) => b[1].files - a[1].files || b[1].lastFd - a[1].lastFd)
+      if (ranked.length > 1) log('info', 'SoundSwitch has files open in several projects', ranked.map(([p, e]) => `${basename(p)}: ${e.files} files, fd ${e.lastFd}`))
+      resolve(ranked.length ? { path: ranked[0][0], others: ranked.slice(1).map(([p]) => p) } : null)
     })
   })
 }
@@ -134,8 +161,9 @@ function searchCommonFolders(): string[] {
 
 async function locateProject(): Promise<{ path: string; how: SoundSwitchStatus['how'] } | null> {
   const running = await openInSoundSwitch()
-  lastRunning = running
-  if (running) return { path: running, how: 'open in SoundSwitch' }
+  lastRunning = running?.path ?? null
+  alsoOpen = running?.others ?? []
+  if (running) return { path: running.path, how: 'open in SoundSwitch' }
   const chosen = loadChosen()
   if (chosen && hasVenue(chosen)) return { path: chosen, how: 'chosen' }
   const recent = searchCommonFolders()[0]
@@ -153,7 +181,8 @@ function readAndSend(project: string, how: SoundSwitchStatus['how']): void {
     const venue = parseSoundSwitchVenue(new Uint8Array(readFileSync(join(project, VENUE_FILE))))
     const excluded = new Set(loadExclusions()[name] ?? [])
     const fixtures = venue.fixtures.filter((f) => !excluded.has(exclusionKey(f)))
-    send({ state: 'linked', project, name, how, fixtures, skipped: venue.skipped, hidden: venue.fixtures.length - fixtures.length })
+    const others = [...new Set([lastRunning, ...alsoOpen].filter((p): p is string => !!p && p !== project))]
+    send({ state: 'linked', project, name, how, fixtures, skipped: venue.skipped, hidden: venue.fixtures.length - fixtures.length, alsoOpen: others.map((path) => ({ path, name: basename(path).replace(/\.ssproj$/, '') })) })
   } catch (error) {
     send({ state: 'error', project, name, how, fixtures: [], skipped: 0, error: (error as Error).message })
   }
@@ -188,7 +217,9 @@ export function startSoundSwitch(target: BrowserWindow): void {
   polling = true
   // Every 10 seconds, check whether SoundSwitch has switched to a different project.
   setInterval(async () => {
-    const running = await openInSoundSwitch()
+    const found = await openInSoundSwitch()
+    const running = found?.path ?? null
+    alsoOpen = found?.others ?? []
     if (running === lastRunning) return
     lastRunning = running
     if (running && running !== current) follow(running, 'open in SoundSwitch')
@@ -207,7 +238,7 @@ export interface SoundSwitchProfile {
 }
 
 export async function listProfiles(): Promise<SoundSwitchProfile[]> {
-  const running = await openInSoundSwitch()
+  const running = (await openInSoundSwitch())?.path ?? null
   const chosen = loadChosen()
   const paths = [...new Set([running, chosen, ...searchCommonFolders()].filter((p): p is string => !!p && hasVenue(p)))]
   return paths.map((path) => {

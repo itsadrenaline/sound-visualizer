@@ -303,6 +303,15 @@ function SoundSwitchIndicator() {
           {linked && notUsed && (
             <MenuItem label={`Follow “${status.name}”`} title="Bring this SoundSwitch project's fixtures into this show and follow its patch" onClick={run(() => followSoundSwitch(status.name, status.fixtures))} />
           )}
+          {linked && (status.alsoOpen?.length ?? 0) > 0 && (
+            <>
+              <div className="menu-title">Not the project on screen in SoundSwitch? It also has open:</div>
+              {status.alsoOpen!.map((o) => (
+                <MenuItem key={o.path} label={`Use “${o.name}”`} title={`Follow “${o.name}” instead: ${o.path}`} onClick={run(() => window.api?.useSoundSwitchProfile(o.path))} />
+              ))}
+              <hr />
+            </>
+          )}
           <MenuItem label="New show from SoundSwitch…" title="Make a show from a SoundSwitch project, choosing its fixtures" onClick={run(() => useWizards.getState().openNewShow())} />
           <hr />
           <MenuItem label={window.api.platform === 'web' ? 'Read the project again' : 'Find the open project again'} title={window.api.platform === 'web' ? 'Read the SoundSwitch project again (and allow the browser to, if it asks)' : 'Look again for the project SoundSwitch has open'} onClick={run(() => window.api?.refreshSoundSwitch())} />
