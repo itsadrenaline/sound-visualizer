@@ -41,6 +41,7 @@ const api: VisualizerApi = {
   log: (level, message, detail) => ipcRenderer.send('log', level, message, detail),
   openLogs: () => ipcRenderer.send('open-logs'),
   installInfo: () => ipcRenderer.invoke('install-info'),
+  aboutInfo: () => ipcRenderer.invoke('about-info'),
   freshStart: (options) => ipcRenderer.invoke('fresh-start', options),
   claudeStatus: () => ipcRenderer.invoke('claude-status'),
   setClaudeKey: (key) => ipcRenderer.invoke('claude-set-key', key),

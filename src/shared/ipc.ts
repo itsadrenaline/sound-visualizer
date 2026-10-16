@@ -44,6 +44,19 @@ export interface OpenedProject {
   project: unknown
 }
 
+/** For About and support: exactly which build is running, and where. */
+export interface AboutInfo {
+  version: string
+  /** The commit and date it was built from, e.g. "eac7f34 · 2026-10-16". */
+  build: string
+  /** 'Mac app' or 'Browser'. */
+  kind: string
+  /** e.g. "macOS 15.1 (Apple Silicon)" or "Chrome 141 on Windows". */
+  system: string
+  /** Engine versions, e.g. "Electron 44.0.0 · Chrome 140.0". */
+  engine: string
+}
+
 export interface Notice {
   kind: 'info' | 'error'
   text: string
@@ -95,6 +108,8 @@ export interface VisualizerApi {
   openLogs(): void
 
   /** Is this a new copy of the app (reinstalled or updated) on a Mac that has used it before? */
+  /** Version, build and system, for the About box. */
+  aboutInfo?(): Promise<AboutInfo>
   installInfo(): Promise<{ changed: boolean; firstEver: boolean; version: string; previousVersion: string | null }>
   /** Forget this Mac's SoundSwitch choices (and optionally the Claude key and imported fixtures). */
   freshStart(options: { claudeKey?: boolean; importedFixtures?: boolean }): Promise<void>

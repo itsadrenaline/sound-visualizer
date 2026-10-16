@@ -548,6 +548,14 @@ select.where { width: 100%; }
 .small-dialog p { line-height: 1.5; margin: 0 0 10px; }
 .small-dialog .wizard-foot { margin: 6px -20px 0; }
 .fresh-list { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; font-size: 13px; }
+/* About */
+.about-dialog .about-version { font-size: 14px; color: var(--accent); margin: -4px 0 6px; }
+.about-rows { margin: 4px 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); font-size: 12.5px; user-select: text; }
+.about-rows > div { display: flex; gap: 12px; padding: 2px 0; }
+.about-rows dt { flex: none; width: 82px; color: var(--muted); }
+.about-rows dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-word; }
+.about-dialog .small { font-size: 12px; }
+
 /* Switching a show to another SoundSwitch project: what happens to its fixtures */
 .switch-project { width: min(560px, 100%); }
 .switch-missing { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 10px; padding: 9px 12px; border: 1px solid rgba(240, 180, 76, 0.45); border-radius: 8px; background: rgba(240, 180, 76, 0.08); font-size: 13px; line-height: 1.45; }

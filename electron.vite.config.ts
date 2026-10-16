@@ -1,6 +1,20 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
+import { execSync } from 'node:child_process'
+
+/** The commit and date this copy is built from, shown in About (for support). */
+function buildStamp(): string {
+  const date = new Date().toISOString().slice(0, 10)
+  try {
+    const commit = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    const dirty = execSync('git status --porcelain --untracked-files=no', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() ? '+' : ''
+    return `${commit}${dirty} · ${date}`
+  } catch {
+    return date
+  }
+}
+const BUILD = JSON.stringify(buildStamp())
 
 /**
  * The built page only runs its own scripts: a Content-Security-Policy that
@@ -34,7 +48,7 @@ function contentSecurityPolicy(): Plugin {
 //  - preload:  the small, safe bridge between Node and the page
 //  - renderer: the web page itself (React + three.js)
 export default defineConfig({
-  main: { plugins: [externalizeDepsPlugin()] },
+  main: { plugins: [externalizeDepsPlugin()], define: { __BUILD__: BUILD } },
   preload: {
     plugins: [externalizeDepsPlugin()],
     // Sandboxed preload scripts must be CommonJS.

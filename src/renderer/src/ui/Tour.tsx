@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { TOURS, useTour } from '../state/tours'
 import { useWizards } from '../state/wizards'
 import { MenuItem, MenuShell } from './Menu'
+import { useAppVersion } from './About'
 
 type Box = { left: number; top: number; width: number; height: number }
 const PAD = 6
@@ -126,6 +127,7 @@ export function LearnMenu() {
   const done = useTour((s) => s.done)
   const start = useTour((s) => s.start)
   const close = () => setAt(null)
+  const version = useAppVersion()
   return (
     <>
       <button
@@ -150,6 +152,8 @@ export function LearnMenu() {
           <hr />
           <MenuItem label="Welcome tour" onClick={() => (close(), useWizards.getState().openWelcome())} />
           <MenuItem label="Start fresh as a new user…" onClick={() => (close(), useWizards.getState().askFreshStart())} />
+          <hr />
+          <MenuItem label={`About Sound Visualizer${version ? ` · version ${version}` : ''}`} title="Version, build and system: send these when you report a problem" onClick={() => (close(), useWizards.getState().setAbout(true))} />
         </MenuShell>
       )}
     </>
