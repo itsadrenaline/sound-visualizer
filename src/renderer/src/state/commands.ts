@@ -3,6 +3,7 @@
  * Each one is a single undoable step; the label is what Undo would show.
  */
 import { useStore } from './store'
+import { useMix } from './mix'
 import { getFixtureType, plainName, type FixtureType } from '../model/fixtureTypes'
 import { defaultProject, footprint, newId, nextFreeAddress, planPatch, roomOf, type Fixture, type Project, type RoomSettings, type Vec3 } from '../model/project'
 import { defaultName, footprint as structureFootprint, mountPoints, STRUCTURE_KINDS, type Structure, type StructureKind, type StructureParams } from '../model/structures'
@@ -680,6 +681,37 @@ export function fixturesNotInProject(p: Project, fixtures: SoundSwitchFixture[])
     const hi = f.address + width(f) - 1
     return !fixtures.some((s) => s.universe === f.universe && s.address <= hi && s.address + Math.max(1, s.mode.channels) - 1 >= lo)
   })
+}
+
+/** What to do with fixtures the SoundSwitch project doesn't patch. */
+export type OutsideAction = 'leave' | 'mute' | 'hide' | 'remove'
+
+export const OUTSIDE_ACTIONS: Array<{ id: OutsideAction; label: string; text: string }> = [
+  { id: 'leave', label: 'Leave them as they are', text: 'They stay in the show and can be lit by the demo, the faders or another console; with SoundSwitch they stay dark.' },
+  { id: 'mute', label: 'Mute them', text: 'Still drawn, but never lit or moved, whatever drives their channels. Unmute any time in the fixture list.' },
+  { id: 'hide', label: 'Hide them', text: 'Not drawn in the 3D view. They stay in the show; show them again with the ● in the fixture list.' },
+  { id: 'remove', label: 'Remove them from the show', text: 'Deleted from this show. Edit ▸ Undo brings them back.' }
+]
+
+/**
+ * The fixtures not in the project that still need a decision: not muted,
+ * not hidden, and not ones you chose to leave as they are.
+ */
+export function outsideToReview(p: Project, fixtures: SoundSwitchFixture[], mix: { muted: string[]; hidden: string[] }): Fixture[] {
+  const settled = new Set([...(p.soundswitch?.keepOutside ?? []), ...mix.muted, ...mix.hidden])
+  return fixturesNotInProject(p, fixtures).filter((f) => !settled.has(f.id))
+}
+
+export function handleOutside(ids: string[], action: OutsideAction): void {
+  if (!ids.length) return
+  if (action === 'leave') {
+    store().apply(ids.length === 1 ? 'Leave a fixture not in the project' : `Leave ${ids.length} fixtures not in the project`, (p) => ({
+      ...p,
+      soundswitch: { ...(p.soundswitch ?? { link: true }), keepOutside: [...new Set([...(p.soundswitch?.keepOutside ?? []), ...ids])] }
+    }))
+  } else if (action === 'mute') useMix.getState().add('muted', ids)
+  else if (action === 'hide') useMix.getState().add('hidden', ids)
+  else deleteFixtures(ids)
 }
 
 /** "BPM-Spots 1, BPM-Spots 2 and 3 more". */

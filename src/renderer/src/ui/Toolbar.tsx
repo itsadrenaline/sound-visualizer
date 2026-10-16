@@ -6,7 +6,8 @@ import { useViewSettings } from '../state/viewSettings'
 import { dmxBus } from '../state/dmxBus'
 import { runCommand } from '../state/menuCommands'
 import { useWizards } from '../state/wizards'
-import { fixturesNotInProject, followSoundSwitch, someNames } from '../state/commands'
+import { followSoundSwitch, handleOutside, OUTSIDE_ACTIONS, outsideToReview, someNames } from '../state/commands'
+import { useMix } from '../state/mix'
 import { TEMPLATES } from '../state/shows'
 import { saveDocument, useDocument } from '../state/document'
 import type { ArtNetStatus } from '../../../shared/ipc'
@@ -188,6 +189,8 @@ function SoundSwitchIndicator() {
   const link = useStore((s) => s.project.soundswitch)
   const inShow = useStore((s) => s.project.fixtures.filter((f) => f.soundswitchKey).length)
   const project = useStore((s) => s.project)
+  const mutedIds = useMix((s) => s.muted)
+  const hiddenIds = useMix((s) => s.hidden)
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   if (!window.api) return null
   const close = () => setAt(null)
@@ -200,7 +203,7 @@ function SoundSwitchIndicator() {
   let short = 'SoundSwitch…'
   let tone = 'off'
   let about = 'Looking for the project SoundSwitch has open.'
-  let missing: ReturnType<typeof fixturesNotInProject> = []
+  let missing: ReturnType<typeof outsideToReview> = []
   if (linked && other) {
     text = `Show follows “${other}” · SoundSwitch has “${status.name}”`
     short = 'SoundSwitch: other project'
@@ -210,7 +213,7 @@ function SoundSwitchIndicator() {
     short = 'SoundSwitch: not used'
     about = 'This show was made without SoundSwitch, so SoundSwitch patch changes are not brought in.'
   } else if (linked) {
-    missing = fixturesNotInProject(project, status.fixtures)
+    missing = outsideToReview(project, status.fixtures, { muted: mutedIds, hidden: hiddenIds })
     text = link?.include ? `SoundSwitch: ${status.name} · ${inShow} of ${status.fixtures.length} fixtures` : `SoundSwitch: ${status.name} · ${status.fixtures.length} fixtures`
     short = `SoundSwitch: ${status.fixtures.length}`
     tone = 'good'
@@ -219,7 +222,7 @@ function SoundSwitchIndicator() {
       tone = 'warn'
       text += ` · ${missing.length} not in project`
       short = `SoundSwitch: ${missing.length} not in project`
-      about += `\n${missing.length === 1 ? '1 fixture in this show isn’t' : `${missing.length} fixtures in this show aren’t`} in “${status.name}” (${someNames(missing, 3)}). SoundSwitch sends ${missing.length === 1 ? 'it' : 'them'} nothing, so ${missing.length === 1 ? 'it stays' : 'they stay'} dark when the show plays. Add ${missing.length === 1 ? 'it' : 'them'} to the project in SoundSwitch on the same universe and address to light ${missing.length === 1 ? 'it' : 'them'}.`
+      about += `\n${missing.length === 1 ? '1 fixture in this show isn’t' : `${missing.length} fixtures in this show aren’t`} in “${status.name}” (${someNames(missing, 3)}). SoundSwitch sends ${missing.length === 1 ? 'it' : 'them'} nothing, so ${missing.length === 1 ? 'it stays' : 'they stay'} dark when the show plays. Add ${missing.length === 1 ? 'it' : 'them'} to the project in SoundSwitch on the same universe and address to light ${missing.length === 1 ? 'it' : 'them'}, or choose below what to do with ${missing.length === 1 ? 'it' : 'them'}.`
     }
   } else if (status?.state === 'not found') {
     text = 'SoundSwitch: no project found'
@@ -260,11 +263,14 @@ function SoundSwitchIndicator() {
             />
           )}
           {missing.length > 0 && (
-            <MenuItem
-              label={`Select the ${missing.length === 1 ? 'fixture' : `${missing.length} fixtures`} not in “${status!.name}”`}
-              title="Select them in the list and the 3D view, to move them to another patch, add them in SoundSwitch, or delete them"
-              onClick={run(() => useStore.getState().select(missing.map((f) => f.id)))}
-            />
+            <>
+              <div className="menu-title">{missing.length === 1 ? 'The fixture' : `The ${missing.length} fixtures`} not in “{status!.name}”:</div>
+              <MenuItem label="Select them" title="Select them in the list and the 3D view, to look at them or move them to another patch" onClick={run(() => useStore.getState().select(missing.map((f) => f.id)))} />
+              {OUTSIDE_ACTIONS.map((a) => (
+                <MenuItem key={a.id} label={a.label} title={a.text} onClick={run(() => handleOutside(missing.map((f) => f.id), a.id))} />
+              ))}
+              <hr />
+            </>
           )}
           {linked && !notUsed && !other && !autoSync && <MenuItem label="Sync now" title="Bring in SoundSwitch's patch changes once" onClick={run(syncNow)} />}
           {linked && other && (

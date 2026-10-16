@@ -58,6 +58,11 @@ export interface SoundSwitchLinkSettings {
   profile?: string
   /** soundswitchKeys of the fixtures to bring in. Missing: all of them. */
   include?: string[]
+  /**
+   * Fixtures (ids) you chose to leave in the show although the SoundSwitch project
+   * doesn't patch them: they aren't flagged as "not in project" any more.
+   */
+  keepOutside?: string[]
 }
 
 export interface Project {

@@ -551,6 +551,12 @@ select.where { width: 100%; }
 /* Switching a show to another SoundSwitch project: what happens to its fixtures */
 .switch-project { width: min(560px, 100%); }
 .switch-missing { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 10px; padding: 9px 12px; border: 1px solid rgba(240, 180, 76, 0.45); border-radius: 8px; background: rgba(240, 180, 76, 0.08); font-size: 13px; line-height: 1.45; }
+.switch-outside { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; font-size: 13px; }
+.switch-outside .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.switch-outside .seg button { flex: 1; padding: 7px 8px; border: 0; border-right: 1px solid var(--line); background: var(--panel-2); color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
+.switch-outside .seg button:last-child { border-right: 0; }
+.switch-outside .seg button.on { background: rgba(77, 141, 255, 0.18); color: #cfe0ff; }
+.switch-outside .hint { color: var(--muted); font-size: 12px; }
 .switch-missing strong { color: var(--warn); }
 .switch-missing span { color: #c9cfd8; }
 .switch-project > * { flex: none; }

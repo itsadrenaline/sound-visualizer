@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from '../src/renderer/src/state/store'
+import { useMix } from '../src/renderer/src/state/mix'
 import { chooseFromText, createShowFromSoundSwitch, rowsFor, planSummary } from '../src/renderer/src/state/newShow'
-import { fixturesNotInProject, someNames, switchPlan, switchSoundSwitchProject, syncFromSoundSwitch } from '../src/renderer/src/state/commands'
+import { fixturesNotInProject, handleOutside, outsideToReview, someNames, switchPlan, switchSoundSwitchProject, syncFromSoundSwitch } from '../src/renderer/src/state/commands'
 import { defaultProject } from '../src/renderer/src/model/project'
 import { settle } from '../src/renderer/src/model/physics'
 import type { SoundSwitchFixture } from '../src/shared/soundswitch'
@@ -121,6 +122,23 @@ describe('a new show from SoundSwitch', () => {
       // Kept in the show after switching, and still reported.
       switchSoundSwitchProject('Club', club, 'keep')
       expect(fixturesNotInProject(project(), club).length).toBe(3)
+    })
+
+    it('fixtures not in the project: leave, mute, hide or remove them, and they stop being flagged', () => {
+      setup()
+      switchSoundSwitchProject('Club', club, 'keep')
+      const none = { muted: [], hidden: [] }
+      const [a, b, c] = outsideToReview(project(), club, none).map((f) => f.id)
+      handleOutside([a], 'leave')
+      expect(project().soundswitch?.keepOutside).toEqual([a])
+      handleOutside([b], 'mute')
+      handleOutside([c], 'hide')
+      expect(outsideToReview(project(), club, useMix.getState())).toEqual([])
+      useMix.setState({ muted: [], hidden: [] })
+      const count = project().fixtures.length
+      handleOutside([b, c], 'remove')
+      expect(project().fixtures.length).toBe(count - 2)
+      expect(outsideToReview(project(), club, none).map((f) => f.id)).toEqual([])
     })
 
     it('keep: nothing is added or removed, and hand-placed fixtures stay put', () => {

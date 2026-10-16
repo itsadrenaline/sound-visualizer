@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../state/store'
 import { useWizards } from '../state/wizards'
-import { fixturesNotInProject, someNames, switchPlan, switchSoundSwitchProject, type SwitchHow } from '../state/commands'
+import { fixturesNotInProject, handleOutside, OUTSIDE_ACTIONS, someNames, switchPlan, switchSoundSwitchProject, type OutsideAction, type SwitchHow } from '../state/commands'
 import { isEdited, saveDocument } from '../state/document'
 import { notify } from '../state/notices'
 
@@ -21,11 +21,13 @@ export function SwitchProjectDialog() {
   const project = useStore((s) => s.project)
   const [choice, setChoice] = useState<Choice>('keep')
   const [busy, setBusy] = useState(false)
+  const [outside, setOutside] = useState<OutsideAction>('leave')
 
   useEffect(() => {
     if (!ask) return
     // A project mapped the same way: keeping the show is the safe first choice.
     setChoice('keep')
+    setOutside('leave')
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -67,6 +69,8 @@ export function SwitchProjectDialog() {
     }
   ]
 
+  // Fixtures still in the show after this choice that the project doesn't patch.
+  const leftOver = choice === 'fresh' ? 0 : choice === 'match' ? missingOwn : missing.length
   const go = async () => {
     if (choice === 'fresh') {
       if (isEdited()) {
@@ -80,7 +84,12 @@ export function SwitchProjectDialog() {
       useWizards.getState().openNewShow({ path: ask.path, name: ask.name })
       return
     }
+    // The switch and what happens to the fixtures it doesn't patch: one undo step.
+    const mark = useStore.getState().beginBatch()
     switchSoundSwitchProject(ask.name, ask.fixtures, choice)
+    const after = fixturesNotInProject(useStore.getState().project, ask.fixtures).map((f) => f.id)
+    handleOutside(after, outside)
+    useStore.getState().endBatch(mark, `Switch to “${ask.name}”`)
     close()
     const kept = choice === 'keep' ? 'kept as it is' : choice === 'add' ? 'with the new fixtures added' : 'updated to match'
     notify('info', `This show follows “${ask.name}” now, ${kept}. Edit ▸ Undo puts it back.`)
@@ -101,7 +110,7 @@ export function SwitchProjectDialog() {
               {missing.length === project.fixtures.length ? `None of this show's ${n(missing.length, 'fixture')} are` : `${n(missing.length, 'fixture')} in this show ${missing.length === 1 ? 'isn’t' : 'aren’t'}`} in “{ask.name}”
             </strong>
             <span>
-              {someNames(missing)}. {ask.name} doesn't use {missing.length === 1 ? 'its DMX channels' : 'their DMX channels'}, so SoundSwitch sends {missing.length === 1 ? 'it' : 'them'} nothing: when the show plays, {missing.length === 1 ? 'it stays' : 'they stay'} dark. Add {missing.length === 1 ? 'it' : 'them'} to the project in SoundSwitch (same universe and address) to light {missing.length === 1 ? 'it' : 'them'}.
+              {someNames(missing)}. {ask.name} doesn't use {missing.length === 1 ? 'its DMX channels' : 'their DMX channels'}, so SoundSwitch sends {missing.length === 1 ? 'it' : 'them'} nothing: when the show plays, {missing.length === 1 ? 'it stays' : 'they stay'} dark. Add {missing.length === 1 ? 'it' : 'them'} to the project in SoundSwitch (same universe and address) to light {missing.length === 1 ? 'it' : 'them'}, or choose below what happens to {missing.length === 1 ? 'it' : 'them'} here.
             </span>
           </div>
         )}
@@ -117,6 +126,21 @@ export function SwitchProjectDialog() {
             </button>
           ))}
         </div>
+        {leftOver > 0 && (
+          <div className="switch-outside">
+            <span className="label">
+              And the {leftOver === 1 ? 'fixture' : `${leftOver} fixtures`} not in “{ask.name}”:
+            </span>
+            <div className="seg" role="radiogroup">
+              {OUTSIDE_ACTIONS.map((a) => (
+                <button key={a.id} role="radio" aria-checked={outside === a.id} className={outside === a.id ? 'on' : ''} title={a.text} onClick={() => setOutside(a.id)}>
+                  {a.id === 'leave' ? 'Leave as they are' : a.id === 'remove' ? 'Remove' : a.label.replace(' them', '')}
+                </button>
+              ))}
+            </div>
+            <span className="hint">{OUTSIDE_ACTIONS.find((a) => a.id === outside)!.text}</span>
+          </div>
+        )}
         <div className="wizard-foot">
           <button onClick={close}>Cancel</button>
           <span className="spacer" />

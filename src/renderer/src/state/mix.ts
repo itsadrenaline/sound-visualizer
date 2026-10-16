@@ -16,6 +16,8 @@ interface Mix {
   hidden: string[]
   toggle(list: 'muted' | 'solo' | 'hidden', ids: string[]): void
   clear(list: 'muted' | 'solo' | 'hidden'): void
+  /** Turn it on for these fixtures (whatever they had before). */
+  add(list: 'muted' | 'solo' | 'hidden', ids: string[]): void
   /** Should this fixture produce light and movement right now? */
   isLive(id: string): boolean
 }
@@ -43,6 +45,9 @@ export const useMix = create<Mix>((set, get) => ({
   },
   clear(list) {
     set({ [list]: [] } as Partial<Mix>)
+  },
+  add(list, ids) {
+    set({ [list]: [...new Set([...get()[list], ...ids])] } as Partial<Mix>)
   },
   isLive(id) {
     const { muted, solo } = get()
