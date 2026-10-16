@@ -6,9 +6,9 @@
  *     files a running program is using).
  *  2. The project you last made a show from (or picked) in the app.
  *  3. Projects found before (anywhere), and the newest in Music ▸ SoundSwitch, where
- *     SoundSwitch keeps them. Only the Music folder is looked through on its own:
- *     macOS asks permission for Documents, Downloads and Desktop, and nobody should
- *     get three prompts for a visualizer. A project somewhere else is found when
+ *     SoundSwitch keeps them. Only that one folder is looked through on its own:
+ *     macOS asks permission for Documents, Downloads and Desktop, and for Apple Music
+ *     when an app looks through the rest of the Music folder. A project somewhere else is found when
  *     SoundSwitch opens it, or when you pick it (a pick needs no permission).
  * When the venue file changes (you edit the patch in SoundSwitch), it's read again
  * and the new fixture list is sent to the window.
@@ -166,8 +166,9 @@ function openInSoundSwitch(): Promise<Running | null> {
 /** .ssproj folders in the usual places, newest venue file first. */
 function searchCommonFolders(): string[] {
   const home = homedir()
-  // Music only: SoundSwitch's own folder is Music ▸ SoundSwitch, and Music needs no permission.
-  const roots = ['Music/SoundSwitch', 'Music'].map((r) => join(home, r))
+  // Only SoundSwitch's own folder (Music ▸ SoundSwitch). Looking through the rest of Music
+  // reaches the Apple Music library folder, and macOS then asks for access to Apple Music.
+  const roots = [join(home, 'Music', 'SoundSwitch')]
   const found: Array<{ dir: string; time: number }> = []
   const visit = (dir: string, depth: number) => {
     let entries: string[] = []
@@ -305,7 +306,7 @@ export function useProfile(path: string): void {
 
 /** Pick a project folder anywhere, for the wizard. */
 export async function browseProfile(): Promise<string | null> {
-  const options = { title: 'Choose a SoundSwitch project', message: 'Pick a .ssproj project folder.', properties: ['openDirectory', 'treatPackageAsDirectory'] as Array<'openDirectory' | 'treatPackageAsDirectory'>, defaultPath: join(homedir(), 'Music') }
+  const options = { title: 'Choose a SoundSwitch project', message: 'Pick a .ssproj project folder.', properties: ['openDirectory', 'treatPackageAsDirectory'] as Array<'openDirectory' | 'treatPackageAsDirectory'>, defaultPath: existsSync(join(homedir(), 'Music', 'SoundSwitch')) ? join(homedir(), 'Music', 'SoundSwitch') : homedir() }
   const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options)
   const picked = result.filePaths[0]
   if (!picked) return null
