@@ -11,6 +11,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
+
+function buildStamp(): string {
+  const date = new Date().toISOString().slice(0, 10)
+  try {
+    return `${execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()} · ${date}`
+  } catch {
+    return date
+  }
+}
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
 
@@ -20,7 +30,7 @@ export default defineConfig({
   // Relative paths, so the site works from any folder (e.g. username.github.io/sound-visualizer/).
   base: './',
   plugins: [react()],
-  define: { __WEB__: 'true', __APP_VERSION__: JSON.stringify(version) },
+  define: { __WEB__: 'true', __APP_VERSION__: JSON.stringify(version), __BUILD__: JSON.stringify(buildStamp()) },
   server: { port: 5173, strictPort: false },
   build: { outDir: '../../out/web', emptyOutDir: true, chunkSizeWarningLimit: 4000 }
 })

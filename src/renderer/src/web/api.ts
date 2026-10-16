@@ -12,6 +12,7 @@
  */
 import type { Notice, OpenedProject, VisualizerApi } from '../../../shared/ipc'
 import * as bridge from './bridge'
+import { connected as bridgeConnected } from './bridge'
 import * as soundswitch from './soundswitch'
 import { canSaveInPlace, pickFiles, safeName, saveData, type FileHandle } from './files'
 import { idb } from './store'
@@ -156,6 +157,18 @@ export const webApi: VisualizerApi = {
   },
   openLogs: () => notice({ kind: 'info', text: 'In the browser, messages go to the developer console (View ▸ Developer ▸ JavaScript Console).' }),
 
+  async aboutInfo() {
+    const ua = navigator.userAgent
+    const browser = /Edg\/([\d]+)/.exec(ua) ? `Edge ${/Edg\/([\d]+)/.exec(ua)![1]}` : /Chrome\/([\d]+)/.exec(ua) ? `Chrome ${/Chrome\/([\d]+)/.exec(ua)![1]}` : /Firefox\/([\d]+)/.exec(ua) ? `Firefox ${/Firefox\/([\d]+)/.exec(ua)![1]}` : /Version\/([\d.]+).*Safari/.exec(ua) ? `Safari ${/Version\/([\d.]+)/.exec(ua)![1]}` : 'a browser'
+    const os = /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : 'unknown system'
+    return {
+      version: VERSION,
+      build: typeof __BUILD__ === 'string' ? __BUILD__ : 'development',
+      kind: 'Browser',
+      system: `${browser} on ${os}`,
+      engine: `${location.origin}${bridgeConnected() ? ' · Art-Net bridge connected' : ' · no Art-Net bridge'}`
+    }
+  },
   async installInfo() {
     let previous: string | null = null
     try {

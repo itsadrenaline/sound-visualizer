@@ -83,6 +83,8 @@ export function onStatus(listener: StatusListener): () => void {
   return () => statusListeners.delete(listener)
 }
 
+export const connected = () => status.listening
+
 export function requestStatus(): void {
   statusListeners.forEach((l) => l(status))
 }
