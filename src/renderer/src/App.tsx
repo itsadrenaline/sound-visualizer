@@ -12,6 +12,7 @@ import { ObjectsPanel } from './ui/ObjectsPanel'
 import { NewShow } from './ui/NewShow'
 import { Welcome } from './ui/Welcome'
 import { FreshStartConfirm, useFirstLaunch, WelcomeBack } from './ui/FreshStart'
+import { SwitchProjectDialog } from './ui/SwitchProject'
 import { ToursDialog, TourOverlay } from './ui/Tour'
 import { Tooltips } from './ui/Tooltips'
 import { PanelResizer, usePanelWidths } from './ui/PanelResizer'
@@ -125,6 +126,7 @@ export function App() {
       <Welcome />
       <WelcomeBack />
       <FreshStartConfirm />
+      <SwitchProjectDialog />
       <ToursDialog />
       <TourOverlay />
       <Tooltips />

@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { getFixtureType, plainName, type FixtureType } from '../model/fixtureTypes'
 import { defaultProject, footprint, newId, nextFreeAddress, planPatch, roomOf, type Fixture, type Project, type RoomSettings, type Vec3 } from '../model/project'
 import { defaultName, footprint as structureFootprint, mountPoints, STRUCTURE_KINDS, type Structure, type StructureKind, type StructureParams } from '../model/structures'
-import { projectFromSoundSwitch, soundswitchKeyOf } from '../model/soundswitchImport'
+import { projectFromSoundSwitch, soundswitchKeyOf, syncKey, typeIdFor } from '../model/soundswitchImport'
 import { autoLayout, distribute, type Shape, type Where } from '../model/layout'
 import { nearestMount } from '../model/physics'
 import { fixFor, patchProblems, type PatchProblem } from '../model/patchCheck'
@@ -625,24 +625,78 @@ export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[]
 }
 
 /** Make this show follow a SoundSwitch project (all its fixtures), and bring them in now. */
-/**
- * Follow a SoundSwitch project. Given its fixtures (what SoundSwitch has open),
- * they come in straight away, and the whole switch is one undo step.
- */
+/** Follow a SoundSwitch project (a show that didn't follow one yet): its fixtures come in with the sync. */
 export function followSoundSwitch(profile: string, fixtures?: SoundSwitchFixture[]): void {
-  const before = store().project.soundswitch?.profile
-  // Switching from another project: its fixtures (and copies of them) go; the new project's come in with the sync.
-  const switching = !!before && before !== profile
-  const label = switching ? `Switch to “${profile}”` : 'Follow SoundSwitch'
   const mark = store().beginBatch()
-  store().apply(label, (p) => ({
-    ...p,
-    soundswitch: { link: true, profile },
-    ...(switching ? { fixtures: p.fixtures.filter((f) => !f.soundswitchKey && !f.copyOf) } : {})
-  }))
+  store().apply('Follow SoundSwitch', (p) => ({ ...p, soundswitch: { link: true, profile } }))
   if (fixtures) syncFromSoundSwitch(fixtures, profile)
-  store().endBatch(mark, label)
+  store().endBatch(mark, 'Follow SoundSwitch')
   if (!fixtures) void import('./soundswitchLink').then(({ useSoundSwitch }) => useSoundSwitch.getState().syncNow())
+}
+
+/**
+ * Moving a show to another SoundSwitch project. Fixtures are matched by patch
+ * (universe, address and fixture type), so a project mapped the same way keeps
+ * every fixture where you put it.
+ *  - match: the show's SoundSwitch fixtures become the new project's. Matching ones keep
+ *    their place and settings, ones it doesn't have go, new ones come in.
+ *  - add: everything stays; the new project's other fixtures are added.
+ *  - keep: the show stays exactly as it is; it just follows the new project.
+ * Trusses, stands, cameras and fixtures you added yourself always stay. One undo step.
+ */
+export type SwitchHow = 'match' | 'add' | 'keep'
+
+const keyOfNew = (f: SoundSwitchFixture) => syncKey({ universe: f.universe, address: f.address, typeId: typeIdFor(f) })
+
+export interface SwitchPlan {
+  /** SoundSwitch fixtures in the show that are on the same patch in the new project. */
+  same: number
+  /** SoundSwitch fixtures in the show the new project doesn't have. */
+  onlyHere: number
+  /** Fixtures in the new project the show doesn't have. */
+  onlyThere: number
+  /** Fixtures you added yourself (copies, library fixtures). */
+  own: number
+}
+
+export function switchPlan(p: Project, fixtures: SoundSwitchFixture[]): SwitchPlan {
+  const there = new Set(fixtures.map(keyOfNew))
+  const ss = p.fixtures.filter((f) => f.soundswitchKey)
+  const here = new Set(ss.map((f) => syncKey(f)))
+  const same = ss.filter((f) => there.has(syncKey(f))).length
+  return { same, onlyHere: ss.length - same, onlyThere: fixtures.filter((f) => !here.has(keyOfNew(f))).length, own: p.fixtures.length - ss.length }
+}
+
+export function switchSoundSwitchProject(profile: string, fixtures: SoundSwitchFixture[], how: SwitchHow): void {
+  const there = new Set(fixtures.map(keyOfNew))
+  const label = how === 'match' ? `Switch to “${profile}”` : how === 'add' ? `Add “${profile}” to the show` : `Follow “${profile}”, keeping the show`
+  const mark = store().beginBatch()
+  store().apply(label, (p) => {
+    const gone = new Set(p.fixtures.filter((f) => f.soundswitchKey && !there.has(syncKey(f))).map((f) => f.soundswitchKey!))
+    let list: Fixture[]
+    if (how === 'match') {
+      // The old project's fixtures the new one doesn't have go, with their copies.
+      list = p.fixtures.filter((f) => !(f.soundswitchKey && gone.has(f.soundswitchKey)) && !(f.copyOf && gone.has(f.copyOf)))
+    } else {
+      // Kept as your own fixtures: they stay where they are, on the patch they have.
+      list = p.fixtures.map((f) => {
+        if (f.soundswitchKey && gone.has(f.soundswitchKey)) {
+          const { soundswitchKey: _key, ...own } = f
+          return own
+        }
+        if (f.copyOf && gone.has(f.copyOf)) {
+          const { copyOf: _copy, ...own } = f
+          return own
+        }
+        return f
+      })
+    }
+    // Keeping the show as it is: only the fixtures it already has follow the new project.
+    const include = how === 'keep' ? fixtures.filter((f) => p.fixtures.some((x) => x.soundswitchKey && syncKey(x) === keyOfNew(f))).map(soundswitchKeyOf) : undefined
+    return { ...p, fixtures: list, soundswitch: { link: true, profile, ...(include ? { include } : {}) } }
+  })
+  syncFromSoundSwitch(fixtures, profile)
+  store().endBatch(mark, label)
 }
 
 // ---------------------------------------------------------------------------

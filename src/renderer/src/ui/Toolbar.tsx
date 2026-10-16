@@ -253,9 +253,9 @@ function SoundSwitchIndicator() {
           {linked && !notUsed && !other && !autoSync && <MenuItem label="Sync now" title="Bring in SoundSwitch's patch changes once" onClick={run(syncNow)} />}
           {linked && other && (
             <MenuItem
-              label={`Switch this show to “${status.name}”`}
-              title={`This show follows “${status.name}” from now on: its fixtures replace the ones from “${other}”. Your trusses, stands and fixtures you added stay. Undo puts it back.`}
-              onClick={run(() => followSoundSwitch(status.name, status.fixtures))}
+              label={`Switch this show to “${status.name}”…`}
+              title={`Follow “${status.name}” from now on. You choose what happens to this show's fixtures: keep them as they are, add the new project's, update to match, or start a new show.`}
+              onClick={run(() => useWizards.getState().askSwitchProject({ name: status.name, path: status.project, fixtures: status.fixtures }))}
             />
           )}
           {linked && other && (

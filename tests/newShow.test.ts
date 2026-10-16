@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from '../src/renderer/src/state/store'
 import { chooseFromText, createShowFromSoundSwitch, rowsFor, planSummary } from '../src/renderer/src/state/newShow'
-import { followSoundSwitch, syncFromSoundSwitch } from '../src/renderer/src/state/commands'
-import { useSoundSwitch } from '../src/renderer/src/state/soundswitchLink'
+import { switchPlan, switchSoundSwitchProject, syncFromSoundSwitch } from '../src/renderer/src/state/commands'
 import { defaultProject } from '../src/renderer/src/model/project'
 import { settle } from '../src/renderer/src/model/physics'
 import type { SoundSwitchFixture } from '../src/shared/soundswitch'
@@ -94,23 +93,54 @@ describe('a new show from SoundSwitch', () => {
     expect(project().fixtures.every((f) => !f.soundswitchKey)).toBe(true)
   })
 
-  it('switching the show to the project SoundSwitch has open replaces the old project\'s fixtures', () => {
-    const { rows } = chooseFromText('two copies of the movers', rowsFor(venue))
-    createShowFromSoundSwitch({ name: 'S', room: 'basic', profile: { name: 'My Rig', path: '/x' }, rows, mirrorPairs: false, standFt: 6 })
-    const other = [fixture('Other wash', 0, 200, 'wash'), fixture('Other wash', 0, 210, 'wash')]
-    useSoundSwitch.setState({ status: { state: 'linked', project: '/y/Club.ssproj', name: 'Club', how: 'open in SoundSwitch', fixtures: other, skipped: 0 } })
-    // Following "My Rig", the open "Club" project is left alone…
-    syncFromSoundSwitch(other, 'Club')
-    expect(project().fixtures.length).toBe(4)
-    // …until you switch: its fixtures replace My Rig's (copies included), in one undo step.
-    const steps = useStore.getState().past.length
-    followSoundSwitch('Club', other)
-    expect(useStore.getState().past.length).toBe(steps + 1)
-    expect(project().soundswitch).toMatchObject({ link: true, profile: 'Club' })
-    expect(project().fixtures.map((f) => f.name).sort()).toEqual(['Other wash 1', 'Other wash 2'])
-    expect(project().name).toBe('S')
-    useStore.getState().undo()
-    expect(project().soundswitch).toMatchObject({ profile: 'My Rig' })
-    expect(project().fixtures.length).toBe(4)
+  describe('moving a show to another SoundSwitch project', () => {
+    // My Rig: two movers (each copied once) and four IR4s. "Club" has the same movers on the
+    // same patch, one of the IR4s, and a new wash.
+    const club = [venue[0], venue[1], venue[2], fixture('Club wash', 0, 200, 'wash')]
+    const setup = () => {
+      const { rows } = chooseFromText('two copies of the movers, the ir4s', rowsFor(venue))
+      createShowFromSoundSwitch({ name: 'S', room: 'basic', profile: { name: 'My Rig', path: '/x' }, rows, mirrorPairs: false, standFt: 6 })
+      // Some work on the stage: a mover moved by hand.
+      const mover = project().fixtures.find((f) => f.soundswitchKey && f.name.startsWith('BPM'))!
+      useStore.getState().apply('move', (p) => ({ ...p, fixtures: p.fixtures.map((f) => (f.id === mover.id ? { ...f, position: [9, 0, 9] } : f)) }))
+      return { mover: mover.id, count: project().fixtures.length }
+    }
+
+    it('counts what matches before anything changes', () => {
+      setup()
+      expect(switchPlan(project(), club)).toEqual({ same: 3, onlyHere: 3, onlyThere: 1, own: 2 })
+    })
+
+    it('keep: nothing is added or removed, and hand-placed fixtures stay put', () => {
+      const { mover, count } = setup()
+      switchSoundSwitchProject('Club', club, 'keep')
+      expect(project().soundswitch).toMatchObject({ link: true, profile: 'Club' })
+      expect(project().fixtures.length).toBe(count)
+      expect(project().fixtures.find((f) => f.id === mover)!.position).toEqual([9, 0, 9])
+      // Later syncs from Club don't bring the new wash in either.
+      syncFromSoundSwitch(club, 'Club')
+      expect(project().fixtures.length).toBe(count)
+    })
+
+    it('add: everything stays and the new project\'s other fixtures come in', () => {
+      const { mover, count } = setup()
+      switchSoundSwitchProject('Club', club, 'add')
+      expect(project().fixtures.length).toBe(count + 1)
+      expect(project().fixtures.some((f) => f.name.startsWith('Club wash'))).toBe(true)
+      expect(project().fixtures.find((f) => f.id === mover)!.position).toEqual([9, 0, 9])
+    })
+
+    it('match: same patch kept in place, the rest removed or added, in one undo step', () => {
+      const { mover, count } = setup()
+      const steps = useStore.getState().past.length
+      switchSoundSwitchProject('Club', club, 'match')
+      expect(useStore.getState().past.length).toBe(steps + 1)
+      // 2 movers + their 2 copies + 1 IR4 + the new wash.
+      expect(project().fixtures.length).toBe(6)
+      expect(project().fixtures.find((f) => f.id === mover)!.position).toEqual([9, 0, 9])
+      useStore.getState().undo()
+      expect(project().soundswitch).toMatchObject({ profile: 'My Rig' })
+      expect(project().fixtures.length).toBe(count)
+    })
   })
 })

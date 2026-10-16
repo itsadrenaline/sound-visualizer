@@ -6,6 +6,7 @@
  * then the New Show wizard, then a short tour of the screen. See onboarding.ts.
  */
 import { create } from 'zustand'
+import type { SoundSwitchFixture } from '../../../shared/soundswitch'
 import { useTour } from './tours'
 
 const SEEN_KEY = 'sound-visualizer:welcome-seen'
@@ -45,6 +46,10 @@ interface Wizards {
   welcomeBack: InstallInfo | null
   /** The "start fresh?" confirmation is open. */
   freshStart: boolean
+  /** Asking how to move this show to another SoundSwitch project (what happens to its fixtures). */
+  switchProject: { name: string; path: string; fixtures: SoundSwitchFixture[] } | null
+  askSwitchProject(project: { name: string; path: string; fixtures: SoundSwitchFixture[] }): void
+  closeSwitchProject(): void
   openNewShow(project?: { path: string; name: string }): void
   /** `created`: a show was made (true), or the tour to show next ('build' after describing). */
   closeNewShow(created?: boolean | string): void
@@ -66,6 +71,9 @@ export const useWizards = create<Wizards>((set, get) => ({
   toursList: false,
   welcomeBack: null,
   freshStart: false,
+  switchProject: null,
+  askSwitchProject: (switchProject) => set({ switchProject }),
+  closeSwitchProject: () => set({ switchProject: null }),
   openNewShow: (project) => set({ newShow: true, newShowProject: project ?? null, welcome: false }),
   closeNewShow: (created = false) => {
     const first = get().firstRun
