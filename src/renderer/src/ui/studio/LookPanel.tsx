@@ -15,7 +15,7 @@ import { SaveAsKind } from './MyKinds'
 const SHAPES: Array<[LookKind, string]> = [
   ['par', 'Round can (PAR)'], ['flood', 'Box flood'], ['uplight', 'Small uplight'], ['spider', 'Box of lenses'], ['cluster', 'Round cells on a frame'],
   ['panel', 'Panel of square cells'], ['bar', 'Bar of cells'], ['tube', 'Tube / stick'], ['strip', 'Thin strip'], ['string', 'String of bulbs'], ['mover', 'Moving head (spot/beam)'],
-  ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar on a stand'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box'], ['fog', 'Machine with a nozzle (fog, effects)']
+  ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar / multi-effect bar'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box'], ['fog', 'Machine with a nozzle (fog, effects)']
 ]
 
 const LAYOUTS: Array<[CellLayout['kind'], string]> = [['row', 'In a row'], ['column', 'In a column'], ['grid', 'In a grid'], ['ring', 'In a ring'], ['ringCentre', 'A ring and a centre one'], ['hex', 'Packed (honeycomb)']]
@@ -62,6 +62,11 @@ export function LookPanel({ def }: { def: FixtureDef }) {
           ))}
         </select>
       </label>
+      {look.shape === 'gigbar' && (
+        <label className="check" title="Draw a 2.2 m stand under it, like the stand some multi-effect bars come with. Leave it off when it goes on a totem, the booth or a T-bar stand from Objects.">
+          <input type="checkbox" checked={!!look.stand} onChange={(e) => setLook({ stand: e.target.checked })} /> Comes with its own stand
+        </label>
+      )}
 
       <div className="panel-sub">Size (mm)</div>
       <div className="row-3">

@@ -7,6 +7,7 @@
  * of beams, a strobe panel, a laser fan or a halo ring. Moving heads travel at
  * the fixture's top speed instead of jumping.
  */
+import { hasOwnStand } from '../model/catalog'
 import * as THREE from 'three'
 import type { Fixture } from '../model/project'
 import type { FixtureType } from '../model/fixtureTypes'
@@ -233,7 +234,9 @@ class DerbyEmitter implements Emitter {
     }
   }
   update(s: HeadState, haze: number): void {
-    this.turn += (0.002 + s.rotation * 0.05)
+    // Turns only when its motor channel says so (or, without one, while it's lit): an
+    // unlit derby with nothing sent used to keep turning slowly.
+    this.turn += s.rotation * 0.05 + (s.intensity > 0.02 ? 0.002 : 0)
     this.group.rotation.y = this.turn
     this.group.visible = s.intensity > 0.002
     for (const m of this.materials) {
@@ -324,6 +327,8 @@ interface Mover {
 }
 
 export class FixtureRig {
+  /** The stand drawn under it, if its kind has one (a GigBar's pole). */
+  private stand: THREE.Object3D | null = null
   readonly root = new THREE.Group()
   readonly fixtureId: string
   readonly typeId: string
@@ -445,9 +450,13 @@ export class FixtureRig {
         const bar = box(w, 0.06, d * 0.8, this.body)
         bar.position.y = 0.03
         this.mount.add(bar)
-        const pole = cylinder(0.02, 2.2, this.body, 10)
-        pole.position.y = -1.1
-        this.mount.add(pole)
+        // Its own stand, unless it has none (Fixture Studio) or this one is left off it (hideStand).
+        if (hasOwnStand(this.spec)) {
+          const pole = cylinder(0.02, 2.2, this.body, 10)
+          pole.position.y = -1.1
+          this.mount.add(pole)
+          this.stand = pole
+        }
         // Like the real bar: movers at the ends, then derbies, then pars, strobes and laser
         // in the middle. Works from the heads' roles, so any GigBar layout fits.
         const leftFirst = (list: number[]) =>
@@ -823,6 +832,7 @@ export class FixtureRig {
 
   /** Move or re-aim the fixture after its document properties change. */
   place(fixture: Fixture): void {
+    if (this.stand) this.stand.visible = !fixture.hideStand
     this.root.position.set(...fixture.position)
     this.root.rotation.set(0, (fixture.rotation ?? 0) * DEG, 0)
     // Hanging fixtures are mounted upside down.
@@ -844,7 +854,7 @@ export class FixtureRig {
     const h = this.spec.size[1]
     const look = this.spec.look
     // Gigbars sit on their stand; everything else stands up from (or hangs down from) its position.
-    const up = look === 'gigbar' ? 0.08 : look === 'tube' ? h / 2 : h * 0.45
+    const up = look === 'gigbar' && this.stand?.visible ? 0.08 : look === 'tube' ? h / 2 : h * 0.45
     return out.copy(this.root.position).add(new THREE.Vector3(0, this.mounting === 'hanging' ? -up : up, 0))
   }
 

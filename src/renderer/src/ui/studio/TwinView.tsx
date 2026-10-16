@@ -5,6 +5,7 @@
  * see on stage. It's driven by the channel sliders, a running test, or live
  * Art-Net from SoundSwitch.
  */
+import { hasOwnStand } from '../../model/catalog'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -105,7 +106,8 @@ export function TwinView() {
       truss.visible = hanging
       // String lights hang along the truss: make it long enough for them.
       truss.scale.x = string ? Math.max(1, (size[0] + 0.4) / 3) : 1
-      stand.visible = !hanging && !tube && !gig
+      // The test room's stand holds it up, unless it brings its own (a GigBar with its stand).
+      stand.visible = !hanging && !tube && !(gig && hasOwnStand(t.spec))
       stand.scale.y = y
       stand.position.set(0, y / 2, 0)
       center = new THREE.Vector3(0, string ? y - size[1] * 0.5 : moving ? y - size[1] / 2 : tube ? size[1] / 2 : y + (faceUp ? size[2] / 2 : size[1] / 2), 0)

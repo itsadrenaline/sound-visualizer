@@ -29,6 +29,8 @@ export interface Fixture {
   /** Mirror the movement: same DMX, opposite direction (for symmetrical pairs). */
   invertPan?: boolean
   invertTilt?: boolean
+  /** Leave off the stand this kind of fixture comes with (a GigBar's pole): it's on a totem, the booth, a T-bar… */
+  hideStand?: boolean
   /**
    * What it's attached to: a structure and one of its mount points (a totem's
    * top plate, a truss bar; `t` is how far along a bar, 0..1). Its position then

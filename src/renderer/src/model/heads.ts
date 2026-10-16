@@ -242,6 +242,12 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
   const master = heads.find((h) => h.role === 'master')
   const masterDim = master ? (read(levels, address, master.ch.dimmer) ?? 1) * shutterFactor(read(levels, address, master.ch.shutter), master.shutter, time) : 1
   const [narrow, wide] = type.zoomRange
+  // Nothing sent to this fixture at all (every channel 0): it's dark. Without this, parts
+  // that light up "by default" (a strobe whose 0 means open, a wheel whose first slot is a
+  // colour) glowed with nothing sent.
+  const width = Math.max(1, type.channels.length)
+  let sent = false
+  for (let i = 0; i < width && !sent; i++) sent = (levels[address - 1 + i] ?? 0) > 0
 
   return heads.map((head, index) => {
     const r = (fn: HeadFunction) => read(levels, address, head.ch[fn])
@@ -305,6 +311,7 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const prism = (r('prism') ?? 0) * 255 > 20
     const rotation = r('rotation') ?? r('laser') ?? 0
     const fog = r('fog') ?? 0
+    if (!sent) intensity = 0
     return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation, fog }
   })
 }
@@ -327,6 +334,9 @@ function hue(h: number): [number, number, number] {
 function runProgram(head: HeadDef, heads: HeadDef[], index: number, levels: Uint8Array, address: number, time: number): { level: number; color?: [number, number, number] } | null {
   const p = head.program!
   const v = Math.round((read(levels, address, p.ref) ?? 0) * 255)
+  // 0 is "no program" on every light: a fixture file whose first program starts at 0
+  // made lights run a chase in colour with nothing sent at all.
+  if (v === 0) return null
   const range = p.ranges.find((x) => v >= x.lo && v <= x.hi)
   if (!range || range.pattern === 'none') return null
   const group = heads.map((h, i) => (h.program?.group === p.group ? i : -1)).filter((i) => i >= 0)

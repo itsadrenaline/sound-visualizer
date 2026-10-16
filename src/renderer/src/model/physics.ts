@@ -11,6 +11,7 @@
  *
  * It also works out how big the room needs to be to hold everything.
  */
+import { hasOwnStand } from './catalog'
 import type { Fixture, Project, Vec3 } from './project'
 import { getFixtureType } from './fixtureTypes'
 import { covers, footprint, heightOf, mountPoints, nearestOn, pointAt, STRUCTURE_KINDS, surfaceHeight, toLocal, toWorld, type MountPoint, type Structure } from './structures'
@@ -140,7 +141,7 @@ function settleFixture(f: Fixture, structures: Structure[], byId: Map<string, St
     f = { ...f, mounting: 'floor' }
   }
   const ground = surfaceAt(structures, f.position[0], f.position[2])
-  const ownStand = type.spec?.look === 'gigbar' ? OWN_STAND : 0
+  const ownStand = hasOwnStand(type.spec) && !f.hideStand ? OWN_STAND : 0
   const resting = round(ground + ownStand)
   if (!ownStand && f.position[1] - resting > ATTACH_REACH * 0.33) {
     // Held up in the air: if it's next to a clamp or a facade edge, that's what holds it.

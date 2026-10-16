@@ -36,13 +36,20 @@ export function Faders() {
   const channels = first ? getFixtureType(first.typeId).channels : []
 
   const setLevel = (index: number, level: number) => {
-    setDemo(false)
+    if (demo) {
+      // Stopping the demo clears its levels: point the heads down again before taking over.
+      setDemo(false)
+      homeFixtures(useStore.getState().project)
+    }
     for (const f of targets) dmxBus.setFader(f.universe, f.address + index, level)
     redraw((n) => n + 1)
   }
 
   const setAll = (fn: ChannelFunction, level: number) => {
-    setDemo(false)
+    if (demo) {
+      setDemo(false)
+      homeFixtures(useStore.getState().project)
+    }
     for (const f of fixtures) {
       const index = getFixtureType(f.typeId).channels.indexOf(fn)
       if (index >= 0) dmxBus.setFader(f.universe, f.address + index, level)
