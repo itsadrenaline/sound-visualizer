@@ -1,0 +1,78 @@
+# Builds the Art-Net bridge (src/bridge) as a single program for Mac, Windows and Linux:
+# Node.js with the bridge built in (Node's "single executable application"), so nobody
+# needs to install Node. Run by hand (Actions ▸ Build the Art-Net bridge ▸ Run workflow);
+# the downloads go on the "bridge-latest" release, where the browser version links to them.
+name: Build the Art-Net bridge
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { os: macos-14, target: mac, node: darwin-arm64, file: Sound-Visualizer-Bridge-Mac-Apple-Silicon }
+          - { os: macos-14, target: mac, node: darwin-x64, file: Sound-Visualizer-Bridge-Mac-Intel }
+          - { os: windows-latest, target: windows, node: win-x64, file: Sound-Visualizer-Bridge-Windows }
+          - { os: ubuntu-latest, target: linux, node: linux-x64, file: Sound-Visualizer-Bridge-Linux }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Bundle the bridge into one script
+        run: |
+          npx --yes esbuild@0.25 src/bridge/index.ts --bundle --platform=node --format=cjs --outfile=build/bridge.cjs
+          echo '{"main":"build/bridge.cjs","output":"build/sea.blob","disableExperimentalSEAWarning":true}' > build/sea.json
+          node --experimental-sea-config build/sea.json
+      - name: Get the Node.js program for ${{ matrix.node }}
+        run: |
+          v=$(node -v)
+          mkdir -p out
+          if [ "${{ matrix.target }}" = windows ]; then
+            curl -sSLo out/${{ matrix.file }}.exe "https://nodejs.org/dist/$v/win-x64/node.exe"
+          else
+            curl -sSL "https://nodejs.org/dist/$v/node-$v-${{ matrix.node }}.tar.gz" | tar -xz -C build
+            cp "build/node-$v-${{ matrix.node }}/bin/node" out/${{ matrix.file }}
+          fi
+      - name: Build the bridge into it
+        run: |
+          exe=out/${{ matrix.file }}; [ "${{ matrix.target }}" = windows ] && exe=$exe.exe
+          [ "${{ matrix.target }}" = mac ] && codesign --remove-signature "$exe"
+          npx --yes postject@1.0.0-alpha.6 "$exe" NODE_SEA_BLOB build/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 $([ "${{ matrix.target }}" = mac ] && echo --macho-segment-name NODE_SEA)
+          [ "${{ matrix.target }}" = mac ] && codesign --sign - "$exe" || true
+      - name: Check it starts (where it can run here)
+        if: matrix.node != 'darwin-x64'
+        run: |
+          exe=out/${{ matrix.file }}; [ "${{ matrix.target }}" = windows ] && exe=$exe.exe
+          ("$exe" > build/run.log 2>&1 &) ; sleep 4; cat build/run.log; grep -q "Pages connect" build/run.log
+      - name: Pack it
+        run: |
+          cd out
+          if [ "${{ matrix.target }}" = mac ]; then ditto -c -k --sequesterRsrc ${{ matrix.file }} ../${{ matrix.file }}.zip
+          elif [ "${{ matrix.target }}" = windows ]; then 7z a ../${{ matrix.file }}.zip ${{ matrix.file }}.exe > /dev/null
+          else tar -czf ../${{ matrix.file }}.tar.gz ${{ matrix.file }}; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.file }}
+          path: ${{ matrix.file }}.*
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Put them on the bridge-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view bridge-latest > /dev/null 2>&1 || gh release create bridge-latest --prerelease --title "Art-Net bridge (for the browser version)" --notes "Live DMX from SoundSwitch for the browser version of Sound Visualizer. Download the one for your computer, open it, and leave it running: the page connects by itself. Mac: the first time, right-click it ▸ Open. Windows: if SmartScreen warns, More info ▸ Run anyway."
+          gh release upload bridge-latest files/* --clobber
