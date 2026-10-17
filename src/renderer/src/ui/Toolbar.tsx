@@ -156,6 +156,14 @@ function ArtNetIndicator({ status }: { status: ArtNetStatus | null }) {
     const id = setInterval(() => setTick((t) => t + 1), 500)
     return () => clearInterval(id)
   }, [])
+  // Browser version, no live DMX yet: the pill asks to be pressed. It pulses gently for the
+  // first 30 seconds, and again for 15 when a SoundSwitch project is linked (that's when live
+  // DMX matters), then stays highlighted without moving, so it never nags.
+  const [pulseUntil, setPulseUntil] = useState(() => performance.now() + 30_000)
+  const linked = useSoundSwitch((s) => s.status?.state === 'linked')
+  useEffect(() => {
+    if (linked) setPulseUntil((t) => Math.max(t, performance.now() + 15_000))
+  }, [linked])
 
   let text = 'Art-Net: browser only'
   let short = 'Art-Net'
@@ -186,7 +194,15 @@ function ArtNetIndicator({ status }: { status: ArtNetStatus | null }) {
   // In the browser, the pill opens the steps to get live DMX (the bridge), connected or not.
   if (window.api?.platform === 'web')
     return (
-      <button className={`status pill ${tone}`} data-tour="artnet" title={`${text}\n${help}\nClick for live DMX from SoundSwitch.`} onClick={() => useWizards.getState().setBridgeHelp(true)}>
+      <button
+        className={`status pill ${tone} ${status?.note && !status.listening ? `cta ${performance.now() < pulseUntil ? 'pulsing' : ''}` : ''}`}
+        data-tour="artnet"
+        title={`${text}\n${help}\nClick for live DMX from SoundSwitch.`}
+        onClick={() => {
+          setPulseUntil(0)
+          useWizards.getState().setBridgeHelp(true)
+        }}
+      >
         <span className="full">{text}</span>
         <span className="short">{short}</span>
       </button>

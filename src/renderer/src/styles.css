@@ -548,6 +548,16 @@ select.where { width: 100%; }
 .small-dialog p { line-height: 1.5; margin: 0 0 10px; }
 .small-dialog .wizard-foot { margin: 6px -20px 0; }
 .fresh-list { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; font-size: 13px; }
+/* Browser version: the Art-Net pill asks to be pressed until live DMX is connected */
+.status.pill.cta { color: #fff; background: #1f4fa8; border-color: #4d8dff; font-weight: 600; }
+.status.pill.cta:hover { background: #2a60c4; }
+.status.pill.cta.pulsing { animation: cta-pulse 2.4s ease-in-out infinite; }
+@keyframes cta-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(77, 141, 255, 0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(77, 141, 255, 0); background: #2a60c4; }
+}
+@media (prefers-reduced-motion: reduce) { .status.pill.cta.pulsing { animation: none; } }
+
 /* Browser version: Connect your SoundSwitch */
 .connect-card { position: fixed; left: calc(var(--left-w, 320px) + 16px); bottom: 300px; z-index: 30; width: 300px; padding: 12px 14px; border-radius: 12px; border: 1px solid #2c3a55; background: rgba(21, 24, 29, 0.96); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); font-size: 13px; }
 .connect-card .cc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
