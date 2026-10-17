@@ -548,15 +548,18 @@ select.where { width: 100%; }
 .small-dialog p { line-height: 1.5; margin: 0 0 10px; }
 .small-dialog .wizard-foot { margin: 6px -20px 0; }
 .fresh-list { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; font-size: 13px; }
-/* Browser version: the Art-Net pill asks to be pressed until live DMX is connected */
-.status.pill.cta { color: #fff; background: #1f4fa8; border-color: #4d8dff; font-weight: 600; }
-.status.pill.cta:hover { background: #2a60c4; }
-.status.pill.cta.pulsing { animation: cta-pulse 2.4s ease-in-out infinite; }
+/* Browser version: the Art-Net pill asks to be pressed until live DMX is connected (amber: "needs you") */
+.status.pill.cta { position: relative; overflow: visible; color: #1b1405; background: #f0b44c; border-color: #ffd27a; font-weight: 700; padding: 5px 13px; }
+.status.pill.cta:hover { background: #ffc35e; }
+.status.pill.cta.pulsing { animation: cta-pulse 2.2s ease-in-out infinite; }
 @keyframes cta-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(77, 141, 255, 0.55); }
-  50% { box-shadow: 0 0 0 7px rgba(77, 141, 255, 0); background: #2a60c4; }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.7), 0 0 10px 1px rgba(255, 180, 60, 0.35); }
+  50% { box-shadow: 0 0 0 10px rgba(255, 190, 80, 0), 0 0 22px 6px rgba(255, 180, 60, 0.45); background: #ffc35e; }
 }
-@media (prefers-reduced-motion: reduce) { .status.pill.cta.pulsing { animation: none; } }
+/* While it pulses, a small note under it says why it matters. */
+.status.pill.cta .cta-note { position: fixed; z-index: 60; white-space: nowrap; padding: 6px 10px; border-radius: 8px; background: #2a2416; border: 1px solid #f0b44c; color: #ffe2a8; font-size: 12px; font-weight: 500; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
+.status.pill.cta .cta-note::before { content: ''; position: absolute; top: -6px; right: 22px; width: 10px; height: 10px; background: #2a2416; border-left: 1px solid #f0b44c; border-top: 1px solid #f0b44c; transform: rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .status.pill.cta.pulsing { animation: none; box-shadow: 0 0 14px 3px rgba(255, 180, 60, 0.45); } }
 
 /* Browser version: Connect your SoundSwitch */
 .connect-card { position: fixed; left: calc(var(--left-w, 320px) + 16px); bottom: 300px; z-index: 30; width: 300px; padding: 12px 14px; border-radius: 12px; border: 1px solid #2c3a55; background: rgba(21, 24, 29, 0.96); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); font-size: 13px; }

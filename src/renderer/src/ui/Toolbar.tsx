@@ -1,6 +1,6 @@
 import { MenuItem, MenuShell } from './Menu'
 import { LearnMenu } from './Tour'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../state/store'
 import { useViewSettings } from '../state/viewSettings'
 import { dmxBus } from '../state/dmxBus'
@@ -161,6 +161,7 @@ function ArtNetIndicator({ status }: { status: ArtNetStatus | null }) {
   // DMX matters), then stays highlighted without moving, so it never nags.
   const [pulseUntil, setPulseUntil] = useState(() => performance.now() + 30_000)
   const linked = useSoundSwitch((s) => s.status?.state === 'linked')
+  const pill = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (linked) setPulseUntil((t) => Math.max(t, performance.now() + 15_000))
   }, [linked])
@@ -195,6 +196,7 @@ function ArtNetIndicator({ status }: { status: ArtNetStatus | null }) {
   if (window.api?.platform === 'web')
     return (
       <button
+        ref={pill}
         className={`status pill ${tone} ${status?.note && !status.listening ? `cta ${performance.now() < pulseUntil ? 'pulsing' : ''}` : ''}`}
         data-tour="artnet"
         title={`${text}\n${help}\nClick for live DMX from SoundSwitch.`}
@@ -205,6 +207,12 @@ function ArtNetIndicator({ status }: { status: ArtNetStatus | null }) {
       >
         <span className="full">{text}</span>
         <span className="short">{short}</span>
+        {status?.note && !status.listening && performance.now() < pulseUntil && pill.current && (
+          // Fixed to the window: the toolbar clips anything that hangs below it.
+          <span className="cta-note" style={{ top: pill.current.getBoundingClientRect().bottom + 9, right: window.innerWidth - pill.current.getBoundingClientRect().right }}>
+            Press to see your SoundSwitch show play here live
+          </span>
+        )}
       </button>
     )
   return (
