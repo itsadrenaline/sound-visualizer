@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useStore } from '../state/store'
-import { orientFixtures, updateFixtures } from '../state/commands'
+import { isAcrylicPanel, joinPanels, orientFixtures, panelSize, setPanel, updateFixtures } from '../state/commands'
 import { notify } from '../state/notices'
 import { FIXTURE_PROPERTIES, type PropertyDescriptor } from '../state/properties'
 import { footprint, type Fixture } from '../model/project'
@@ -14,7 +14,7 @@ import { getFixtureType, isOverridden } from '../model/fixtureTypes'
 import { useStudio } from '../state/studio'
 import { ArrangePanel } from './ArrangePanel'
 import { ArrangeButtons } from './ArrangeMenu'
-import { FixtureMount, StructureInspector } from './StructureActions'
+import { FixtureMount, NumberField, StructureInspector } from './StructureActions'
 import { Section } from './Section'
 
 export function Inspector() {
@@ -50,6 +50,7 @@ export function Inspector() {
       {selected.length === 1 && <TypeInfo fixture={selected[0]} />}
       <FixtureMount fixtures={selected} />
       <ArrangeButtons ids={selection} />
+      <PanelSection fixtures={selected} />
       {FIXTURE_PROPERTIES.map(({ section, properties }) => (
         <Section key={section} id={`fixture:${section}`} title={section}>
           {properties.map((p) => (
@@ -160,5 +161,40 @@ function TypeInfo({ fixture }: { fixture: Fixture }) {
         Open in Fixture Studio
       </button>
     </div>
+  )
+}
+
+const INCH = 0.0254
+
+/** An LED acrylic panel's size and frame colour, and joining panels into a row. */
+function PanelSection({ fixtures }: { fixtures: Fixture[] }) {
+  const panels = fixtures.filter(isAcrylicPanel)
+  if (!panels.length) return null
+  const ids = panels.map((f) => f.id)
+  const same = <T,>(values: T[]): T | null => (values.every((v) => v === values[0]) ? values[0] : null)
+  const inches = (m: number) => Math.round(m / INCH)
+  const width = same(panels.map((f) => inches(panelSize(f)[0])))
+  const height = same(panels.map((f) => inches(panelSize(f)[1])))
+  const border = same(panels.map((f) => f.panel?.border ?? 'white'))
+  const clamp = (n: number) => Math.max(4, Math.min(120, n)) * INCH
+  return (
+    <Section id="fixture:panel" title="Panel" hint="Each panel's own size and frame. The RGBW strip inside lights it from the edges.">
+      <NumberField label="Width (in)" step={1} value={width} onCommit={(v) => setPanel(ids, { width: clamp(v) })} />
+      <NumberField label="Height (in)" step={1} value={height} onCommit={(v) => setPanel(ids, { height: clamp(v) })} />
+      <label className="field">
+        <span className="label">Frame</span>
+        <select value={border ?? ''} onChange={(e) => setPanel(ids, { border: e.target.value as 'white' | 'black' | 'silver' })}>
+          {border === null && <option value="">Mixed</option>}
+          <option value="white">White</option>
+          <option value="black">Black</option>
+          <option value="silver">Silver</option>
+        </select>
+      </label>
+      {panels.length > 1 && (
+        <button onClick={() => joinPanels(ids)} title="Line the panels up edge to edge in a row, from the leftmost one">
+          Join side by side
+        </button>
+      )}
+    </Section>
   )
 }

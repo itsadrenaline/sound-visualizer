@@ -4,7 +4,7 @@
  */
 import { useStore } from './store'
 import { useMix } from './mix'
-import { hasOwnStand } from '../model/catalog'
+import { hasOwnStand, specFor } from '../model/catalog'
 import { getFixtureType, plainName, type FixtureType } from '../model/fixtureTypes'
 import { defaultProject, footprint, newId, nextFreeAddress, planPatch, roomOf, type Fixture, type Project, type RoomSettings, type Vec3 } from '../model/project'
 import { defaultName, footprint as structureFootprint, mountPoints, STRUCTURE_KINDS, type Structure, type StructureKind, type StructureParams } from '../model/structures'
@@ -826,4 +826,55 @@ export function fixAllPatchProblems(): number {
   }
   store().endBatch(mark, fixed === 1 ? 'Fix a patch problem' : `Fix ${fixed} patch problems`)
   return fixed
+}
+
+// ---------------------------------------------------------------------------
+// LED acrylic panels
+// ---------------------------------------------------------------------------
+
+/** Whether a fixture is an LED acrylic panel. */
+export function isAcrylicPanel(f: Fixture): boolean {
+  const type = getFixtureType(f.typeId)
+  return !!type && (type.spec ?? specFor(type.name, type.body === 'movingHead')).look === 'acrylic'
+}
+
+/** An acrylic panel's width and height (metres): its own, or its type's. */
+export function panelSize(f: Fixture): [number, number] {
+  const type = getFixtureType(f.typeId)
+  const size = type ? (type.spec ?? specFor(type.name, type.body === 'movingHead')).size : [0.5, 1.2, 0.04]
+  return [f.panel?.width ?? size[0], f.panel?.height ?? size[1]]
+}
+
+/**
+ * Join acrylic panels side by side, edge to edge in a straight row: from the leftmost
+ * one, keeping its height and the way it faces. They then make one wall of panels,
+ * like the front of a DJ booth.
+ */
+export function joinPanels(ids: string[]): boolean {
+  const list = selected(ids).filter(isAcrylicPanel)
+  if (list.length < 2) return false
+  const first = list.reduce((a, b) => (b.position[0] < a.position[0] ? b : a))
+  const turn = ((first.rotation ?? 0) * Math.PI) / 180
+  const along: [number, number] = [Math.cos(turn), -Math.sin(turn)]
+  const ordered = [...list].sort((a, b) => a.position[0] * along[0] + a.position[2] * along[1] - (b.position[0] * along[0] + b.position[2] * along[1]))
+  const start = ordered[0]
+  const at = new Map<string, Vec3>()
+  let offset = 0
+  ordered.forEach((f, i) => {
+    const w = panelSize(f)[0]
+    if (i > 0) offset += w / 2
+    at.set(f.id, [round(start.position[0] + along[0] * offset), start.position[1], round(start.position[2] + along[1] * offset)])
+    offset += w / 2
+  })
+  updateFixtures(
+    ordered.map((f) => f.id),
+    `Join ${ordered.length} panels`,
+    (f) => ({ ...f, position: at.get(f.id)!, rotation: start.rotation, mounting: start.mounting, onCeiling: start.onCeiling, mount: undefined, faceOut: undefined })
+  )
+  return true
+}
+
+/** Set acrylic panels' size or frame colour. */
+export function setPanel(ids: string[], change: NonNullable<Fixture['panel']>): void {
+  updateFixtures(ids, 'Change panel', (f) => ({ ...f, panel: { ...f.panel, ...change } }))
 }

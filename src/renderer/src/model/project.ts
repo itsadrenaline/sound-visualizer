@@ -10,6 +10,10 @@ import { defaultStructures } from './physics'
 
 export type Vec3 = [number, number, number]
 
+/** An LED acrylic panel's frame colour. */
+export type PanelBorder = 'white' | 'black' | 'silver'
+export const PANEL_BORDERS: Record<PanelBorder, string> = { white: '#ececee', black: '#141416', silver: '#c4c8ce' }
+
 export interface Fixture {
   id: string
   name: string
@@ -44,6 +48,8 @@ export interface Fixture {
   faceOut?: boolean
   /** Hung upside down from the ceiling (not a truss), right above its position. */
   onCeiling?: boolean
+  /** LED acrylic panels: this panel's own size (metres) and frame colour, over its type's. */
+  panel?: { width?: number; height?: number; border?: PanelBorder }
   /** Fixture group, as in SoundSwitch (1 = Group 1). Missing or 0 = no group. */
   group?: number
   /** For fixtures imported from SoundSwitch: how to recognise it there, e.g. "U2.160 Modern Consoles DJ Booth LED Strip". */

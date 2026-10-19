@@ -159,7 +159,7 @@ export interface ModeDef {
   channels: ChannelDef[]
 }
 
-export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'bar' | 'tube' | 'panel' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight' | 'string' | 'fog' | 'sfx' | 'dimmer' | 'other'
+export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'bar' | 'tube' | 'panel' | 'acrylic' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight' | 'string' | 'fog' | 'sfx' | 'dimmer' | 'other'
 
 export interface LookDef {
   shape: LookKind
@@ -287,6 +287,14 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
       { title: 'Master', text: 'A master dimmer and strobe for the whole panel.', fns: ['dimmer', 'shutter'] }
     ]
   },
+  acrylic: {
+    label: 'LED acrylic panel', shape: 'acrylic', mount: 'floor',
+    explain: 'A frosted acrylic panel in a frame (white, black or silver), lit from inside its edges by an RGBW LED strip: a DJ booth front, a backdrop. Put several side by side and join them.',
+    concepts: [
+      { title: 'Colour', text: 'The LED strip inside: red, green, blue and white.', fns: ['red', 'green', 'blue', 'white'] },
+      { title: 'Dimmer and strobe', text: 'Some controllers add a dimmer and a strobe.', fns: ['dimmer', 'shutter'] }
+    ]
+  },
   cluster: {
     label: 'Retro / multi-cell light', shape: 'cluster', mount: 'hanging',
     explain: 'A frame of round cells, each with its own lens, often a warm white COB with an RGB ring around it (“retro” hex lights, multi-cell blinders).',
@@ -382,7 +390,7 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
   }
 }
 
-export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'bar', 'tube', 'cluster', 'panel', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip', 'string', 'fog', 'sfx', 'dimmer', 'other']
+export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'bar', 'tube', 'cluster', 'panel', 'acrylic', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip', 'string', 'fog', 'sfx', 'dimmer', 'other']
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -515,6 +523,8 @@ export function blankDef(kind: FixtureKind, name = 'New fixture', manufacturer =
       return single(['dimmer', 'red', 'green', 'blue', 'white', 'amber', 'uv', 'shutter'])
     case 'strip':
       return single(['red', 'green', 'blue'])
+    case 'acrylic':
+      return single(['red', 'green', 'blue', 'white'])
     case 'wash':
       return single(['pan', 'pan', 'tilt', 'tilt', 'panTiltSpeed', 'dimmer', 'shutter', 'red', 'green', 'blue', 'white', 'zoom'])
     case 'spot':
@@ -768,6 +778,7 @@ function kindFromType(t: FixtureType): FixtureKind {
   if (look === 'uplight') return 'uplight'
   if (look === 'fog') return 'fog'
   if (look === 'twinbar' || look === 'sphere') return 'effect'
+  if (look === 'acrylic') return 'acrylic'
   if (look === 'curtain') return 'panel'
   if (t.body === 'bar') return 'bar'
   return 'par'

@@ -199,7 +199,7 @@ export function Viewport() {
         seen.add(fixture.id)
         let rig = rigs.get(fixture.id)
         // Rebuild if the kind of fixture changed; otherwise just move it.
-        if (rig && (rig.typeId !== fixture.typeId || rig.mounting !== fixture.mounting || rig.typeVersion !== getFixtureType(fixture.typeId))) {
+        if (rig && (rig.typeId !== fixture.typeId || rig.mounting !== fixture.mounting || rig.typeVersion !== getFixtureType(fixture.typeId) || rig.lookKey !== JSON.stringify(fixture.panel ?? null))) {
           scene.remove(rig.root)
           rig.dispose()
           rig = undefined

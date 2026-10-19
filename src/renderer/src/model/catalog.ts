@@ -32,6 +32,7 @@ export type LookKind =
   | 'twinbar' // two bars of LEDs side by side, each tilting on its own motor (BeamZ Double Helix, 8-beam "spiders")
   | 'curtain' // LED curtain / starcloth: LEDs scattered over a black drape hung from a truss
   | 'sphere' // a ball covered in lenses on a base, throwing beams all round as it turns (ADJ Starburst)
+  | 'acrylic' // LED acrylic panel: a frosted panel in a frame, lit from its edges by an LED strip inside
 
 /** How a fixture's cells sit on its face, for looks that draw cells (cluster, panel). */
 export interface CellLayout {
@@ -109,7 +110,8 @@ export const LOOK_DEFAULTS: Record<LookKind, { size: [number, number, number]; b
   string: { size: [3.0, 0.3, 0.06], beam: [180, 180] },
   twinbar: { size: [0.28, 0.16, 0.15], beam: [6, 6] },
   curtain: { size: [2.0, 1.0, 0.02], beam: [120, 120] },
-  sphere: { size: [0.32, 0.41, 0.32], beam: [1, 1] }
+  sphere: { size: [0.32, 0.41, 0.32], beam: [1, 1] },
+  acrylic: { size: [0.5, 1.2, 0.04], beam: [160, 160] }
 }
 
 export interface FixtureSpec {
@@ -216,6 +218,10 @@ const CATALOG: Entry[] = [
   {
     match: /spider\s*wash|wash\s*24/i,
     spec: { look: 'spider', size: [0.285, 0.22, 0.19], beam: [20, 20], output: 0.6, leds: 24, mount: 'floor', note: 'Both Lighting Spider Wash (WASH24): 24 × 12 W RGBWA+UV LEDs in separately coloured groups, 20° beams.' }
+  },
+  {
+    match: /acrylic\s*(led\s*)?panel|led\s*acrylic/i,
+    spec: { look: 'acrylic', size: [0.5, 1.2, 0.04], beam: [160, 160], output: 0.35, bodyColor: '#ececee', mount: 'floor', note: 'LED acrylic panel: a frosted acrylic panel in a frame, lit from its edges by an RGBW LED strip inside.' }
   },
   {
     match: /hydra\s*beam/i,
