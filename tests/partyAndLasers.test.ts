@@ -122,3 +122,75 @@ describe('Party objects and screens', () => {
     expect(s.params.text).toBe('Happy Birthday')
   })
 })
+
+describe('Hanging from the ceiling, and disco balls', () => {
+  it('a fixture hung from the ceiling stays up there, wherever it is moved', async () => {
+    const { hangFromCeiling, orientFixtures } = await import('../src/renderer/src/state/commands')
+    const [a] = addLibraryFixtures(ofl('american-dj/starburst'), 1)
+    const f0 = state().fixtures.find((x) => x.id === a)!
+    moveFixtures([a], [12 - f0.position[0], 0, 8 - f0.position[2]])
+    expect(hangFromCeiling([a])).toBe(true)
+    const f = () => state().fixtures.find((x) => x.id === a)!
+    expect(f().mounting).toBe('hanging')
+    expect(f().mount).toBeUndefined()
+    expect(f().position).toEqual([12, 7.5, 8])
+    moveFixtures([a], [1, 0, 0])
+    expect(f().position).toEqual([13, 7.5, 8])
+    // Stood up again, it's on the floor.
+    orientFixtures([a], 'floor')
+    expect(f().onCeiling).toBeUndefined()
+    expect(f().position[1]).toBe(0)
+  })
+
+  it('a disco ball hangs from the ceiling, under a truss bar, or sits on a totem', () => {
+    const ceiling = addStructure('discoBall', { size: 20 }, { at: [10, 0, 8] })
+    const truss = addStructure('goalpost', { width: 16 * FT, height: 10 * FT }, { at: [-10, 0, 8] })
+    const under = addStructure('discoBall', { size: 16 }, { at: [-10, 0, 8] })
+    const totem = addStructure('totem', { height: 6 * FT }, { at: [14, 0, -4] })
+    const onTop = addStructure('discoBall', { size: 12, drop: 0.2 }, { at: [14, 0, -4] })
+    const s = (id: string) => state().structures!.find((x) => x.id === id)!
+    expect(s(ceiling).hang).toBe('ceiling')
+    expect(s(ceiling).position[1]).toBe(7.5)
+    expect(s(under).hang).toBe('truss')
+    expect(s(under).position[1]).toBeCloseTo(10 * FT - 0.29, 2)
+    expect(s(onTop).hang).toBeUndefined()
+    expect(s(onTop).position[1]).toBeGreaterThan(6 * FT)
+    void truss, void totem
+  })
+})
+
+describe('Disco ball reflections', () => {
+  it('a beam on the ball throws spots round the room, and they move as it turns', async () => {
+    const THREE = await import('three')
+    const { DiscoReflections } = await import('../src/renderer/src/three/discoBalls')
+    const d = new DiscoReflections()
+    const ball = new THREE.Group()
+    ball.position.set(0, 6, 0)
+    ball.updateMatrixWorld(true)
+    const mirror = new THREE.Mesh(new THREE.SphereGeometry(0.25), new THREE.MeshStandardMaterial())
+    // A pin spot from the side and below, at 45°.
+    const beam = { position: new THREE.Vector3(-4, 2, 0), direction: new THREE.Vector3(1, 1, 0).normalize(), right: new THREE.Vector3(0, 0, 1), tanHalf: Math.tan((3 * Math.PI) / 180), color: [1, 0.2, 0.2] as [number, number, number], goboCell: 0, goboTurn: 0, prismSpread: 0, prismTurn: 0 }
+    const spots = () => {
+      d.update([{ ball, radius: 0.25, mirror }], [beam], { ceiling: 7.5, wallZ: -6 }, 0.4)
+      const m = d.group.children[0] as InstanceType<typeof THREE.InstancedMesh>
+      const p = new THREE.Vector3()
+      const list: number[] = []
+      for (let i = 0; i < m.count; i++) {
+        const mat = new THREE.Matrix4()
+        m.getMatrixAt(i, mat)
+        p.setFromMatrixPosition(mat)
+        list.push(p.x, p.y, p.z)
+      }
+      return { count: m.count, list }
+    }
+    const before = spots()
+    expect(before.count).toBeGreaterThan(30)
+    ball.rotation.y = 0.3
+    ball.updateMatrixWorld(true)
+    const after = spots()
+    expect(after.list.slice(0, 6)).not.toEqual(before.list.slice(0, 6))
+    // Nothing hits it: no spots.
+    beam.direction.set(-1, 0, 0)
+    expect(spots().count).toBe(0)
+  })
+})

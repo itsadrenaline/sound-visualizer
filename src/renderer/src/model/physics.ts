@@ -7,12 +7,15 @@
  *  - A fixture attached to a structure follows it (top plate, truss bar, clamp).
  *  - A standing fixture rests on whatever is under it: the floor, a stage, a table.
  *  - A hanging fixture needs something to hang from: it attaches to the nearest
- *    truss or bar within reach, or falls and stands on the floor.
+ *    truss or bar within reach, or falls and stands on the floor. One hung from the
+ *    ceiling on purpose (onCeiling) stays there.
+ *  - A disco ball hangs from a truss bar above it, sits on a totem or stand, or
+ *    hangs from the ceiling.
  *
  * It also works out how big the room needs to be to hold everything.
  */
 import { hasOwnStand } from './catalog'
-import type { Fixture, Project, Vec3 } from './project'
+import { roomOf, type Fixture, type Project, type Vec3 } from './project'
 import { getFixtureType } from './fixtureTypes'
 import { covers, footprint, heightOf, mountPoints, nearestOn, pointAt, STRUCTURE_KINDS, surfaceHeight, toLocal, toWorld, type MountPoint, type Structure } from './structures'
 
@@ -37,8 +40,45 @@ const round = (v: number) => Math.round(v * 1000) / 1000
 /** Where along a bar: fine enough that the position it gives doesn't drift when rounded to the millimetre. */
 const roundT = (t: number) => Math.round(t * 1e6) / 1e6
 
+/** The ceiling things can hang from, or null if the room has none. */
+export function ceilingOf(p: Project): number | null {
+  const room = roomOf(p)
+  return room.ceiling ? room.ceilingHeight : null
+}
+
+/**
+ * Where a disco ball hangs or stands, at (x, z): under a truss bar right above it,
+ * on top of a totem or stand, on a surface (a table), from the ceiling, or on the floor.
+ * Returns the height of the point it hangs from (or stands on) and how.
+ */
+function discoPlace(s: Structure, list: Structure[], base: (t: Structure) => number, ceiling: number | null): { y: number; hang?: 'truss' | 'ceiling' } {
+  let best: { y: number; hang?: 'truss' | 'ceiling'; d: number } | null = null
+  for (const t of list) {
+    if (t.id === s.id || t.kind === 'discoBall') continue
+    const local = toLocal(t, s.position)
+    for (const m of mountPoints(t)) {
+      if (m.inside || m.out || (m.kind !== 'under' && m.kind !== 'top')) continue
+      // Only the horizontal distance counts: the ball is put under (or on) the bar.
+      const { t: along } = nearestOn(m, local)
+      const q = pointAt(m, along)
+      const d = Math.hypot(local[0] - q[0], local[2] - q[2])
+      if (d > (m.to ? 0.35 : 0.3) || (best && d >= best.d)) continue
+      best = { y: base(t) + q[1], hang: m.kind === 'under' ? 'truss' : undefined, d }
+    }
+  }
+  if (best) return { y: best.y, hang: best.hang }
+  // A table or a deck under it: it stands there (on its own small stand).
+  let ground = 0
+  for (const t of list) {
+    if (t.id === s.id || !STRUCTURE_KINDS[t.kind].surface || !covers(t, s.position[0], s.position[2])) continue
+    ground = Math.max(ground, base(t) + (surfaceHeight(t) ?? 0))
+  }
+  if (ground > 0 || ceiling === null) return { y: ground }
+  return { y: ceiling, hang: 'ceiling' }
+}
+
 /** Each structure's base height: the floor, or the top of the surface it stands on. */
-function settleStructures(list: Structure[]): Structure[] {
+function settleStructures(list: Structure[], ceiling: number | null = null): Structure[] {
   const base = new Map<string, number>()
   const visiting = new Set<string>()
   const byId = new Map(list.map((s) => [s.id, s]))
@@ -69,6 +109,15 @@ function settleStructures(list: Structure[]): Structure[] {
   }
   let changed = false
   const out = list.map((s) => {
+    if (s.kind === 'discoBall') {
+      const at = discoPlace(s, list, (t) => baseOf(byId.get(t.id)!), ceiling)
+      const y = round(at.y)
+      if (Math.abs(s.position[1] - y) < 1e-4 && s.hang === at.hang) return s
+      changed = true
+      const { hang: _old, ...rest } = s
+      void _old
+      return { ...rest, position: [s.position[0], y, s.position[2]] as Vec3, ...(at.hang ? { hang: at.hang } : {}) }
+    }
     const y = baseOf(byId.get(s.id)!)
     if (Math.abs(s.position[1] - y) < 1e-4) return s
     changed = true
@@ -120,12 +169,12 @@ function placeMounted(f: Fixture, s: Structure, m: MountPoint, t: number): Fixtu
   const moved = f.mount?.structure !== s.id || f.mount.point !== m.id
   const faceOut = m.out ? true : moved || mounting === 'hanging' ? undefined : f.faceOut
   if (same(position, f.position) && f.mounting === mounting && !moved && f.mount!.t === (m.to ? roundT(t) : undefined) && f.faceOut === faceOut) return f
-  const { faceOut: _was, ...rest } = f
-  void _was
+  const { faceOut: _was, onCeiling: _up, ...rest } = f
+  void _was, void _up
   return { ...rest, position, mounting, mount: { structure: s.id, point: m.id, ...(m.to ? { t: roundT(t) } : {}) }, ...(faceOut ? { faceOut } : {}) }
 }
 
-function settleFixture(f: Fixture, structures: Structure[], byId: Map<string, Structure>, prev?: Fixture): Fixture {
+function settleFixture(f: Fixture, structures: Structure[], byId: Map<string, Structure>, prev?: Fixture, ceiling: number | null = null): Fixture {
   // A fixture with no (or a broken) position goes to the middle of the floor rather than breaking the show.
   if (!Array.isArray(f.position) || f.position.length !== 3 || f.position.some((v) => !Number.isFinite(v))) f = { ...f, position: [0, 0.1, 0] }
   // Moved by hand since last time: it comes off what it was attached to, then finds its footing again.
@@ -141,6 +190,11 @@ function settleFixture(f: Fixture, structures: Structure[], byId: Map<string, St
   const type = getFixtureType(f.typeId)
   if (f.mounting === 'hanging') {
     const hang = nearestMount(structures, f.position, ['under'], HANG_REACH)
+    // Hung from the ceiling on purpose: it stays up there, wherever you move it.
+    if (f.onCeiling && ceiling !== null) {
+      if (Math.abs(f.position[1] - ceiling) < 1e-4 && !f.mount && !f.faceOut) return f
+      return { ...f, mount: undefined, faceOut: undefined, position: [f.position[0], ceiling, f.position[2]] }
+    }
     if (hang) return placeMounted(f, hang.structure, hang.point, hang.t)
     // Nothing to hang from: it ends up standing on the floor.
     f = { ...f, mounting: 'floor' }
@@ -165,11 +219,12 @@ function settleFixture(f: Fixture, structures: Structure[], byId: Map<string, St
 export function settle(p: Project, prev?: Project): Project {
   const prevById = prev && prev !== p ? new Map(prev.fixtures.map((f) => [f.id, f])) : undefined
   const before = p.structures
-  const structures = settleStructures(before ?? defaultStructures())
+  const ceiling = ceilingOf(p)
+  const structures = settleStructures(before ?? defaultStructures(), ceiling)
   const byId = new Map(structures.map((s) => [s.id, s]))
   let changed = structures !== before
   const fixtures = p.fixtures.map((f) => {
-    const next = settleFixture(f, structures, byId, prevById?.get(f.id))
+    const next = settleFixture(f, structures, byId, prevById?.get(f.id), ceiling)
     if (next !== f) changed = true
     return next
   })

@@ -19,6 +19,7 @@ import { mountPoints, nearestOn, pointAt, STRUCTURE_KINDS, toWorld, type MountPo
 import { movingRoots, withRiders } from '../model/arrange'
 import { boundsOf, EMPTY_BOUNDS, fitCamera } from '../model/cameraFit'
 import { StructureRig, mountGuides } from './structures'
+import { DiscoReflections, type Ball } from './discoBalls'
 import { ViewToolbar } from '../ui/ViewToolbar'
 import { NavPad } from '../ui/NavPad'
 import { Notices } from '../ui/Notices'
@@ -826,6 +827,9 @@ export function Viewport() {
     }
 
     // --- The frame loop: DMX in, mechanics, draw ---
+    const disco = new DiscoReflections()
+    scene.add(disco.group)
+    let discoActive = false
     const timer = new THREE.Timer()
     let frameId = 0
     let wasLive = false
@@ -862,6 +866,18 @@ export function Viewport() {
         else rig.blackout(haze, time)
       }
       for (const set of sets.values()) set.tick(time)
+      // Disco balls reflect every beam that hits them.
+      const balls: Ball[] = []
+      for (const set of sets.values()) {
+        const b = set.disco()
+        if (!b) continue
+        set.root.updateMatrixWorld(true)
+        balls.push(b)
+      }
+      if (balls.length || discoActive) {
+        disco.update(balls, projectors.all(), { ceiling: builtRoom?.ceiling && builtFit ? builtFit.ceiling : null, wallZ: builtFit?.wallZ ?? -6 }, haze)
+        discoActive = balls.length > 0
+      }
       fog.density = 0.008 + haze * 0.025
       scene.fog = haze > 0 ? fog : null
       if (held.size) {
@@ -925,6 +941,7 @@ export function Viewport() {
       for (const rig of sets.values()) rig.dispose()
       showGuides(false)
       controls.dispose()
+      disco.dispose()
       renderer.dispose()
       container.removeChild(renderer.domElement)
     }

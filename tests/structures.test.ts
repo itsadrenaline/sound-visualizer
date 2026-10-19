@@ -136,9 +136,15 @@ describe('physics', () => {
     const [mover] = addLibraryFixtures(mh150(), 1, { mount: { structure: totem, point: 'top' } })
     orientFixtures([mover], 'hanging')
     expect(fixture(mover).mount?.structure).toBe('st-truss')
-    // With no truss at all, it says so instead of floating.
+    // With no truss at all, it hangs from the ceiling, right above where it was.
     deleteStructures(['st-truss'])
     expect(fixture(mover).mounting).toBe('floor')
+    expect(orientFixtures([mover], 'hanging').length).toBe(0)
+    expect(fixture(mover).onCeiling).toBe(true)
+    expect(fixture(mover).position[1]).toBe(7.5)
+    // And with no ceiling either, it says so instead of floating.
+    orientFixtures([mover], 'floor')
+    useStore.getState().apply('No ceiling', (p) => ({ ...p, room: { ...p.room!, ceiling: false } }))
     expect(orientFixtures([mover], 'hanging').length).toBe(1)
   })
 })

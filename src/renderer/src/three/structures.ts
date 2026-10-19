@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { ARRAY_BOX, ARRAY_SUB, BALLOON_PALETTES, cabinetOf, FT, IN, mountPoints, NEON_COLOURS, paramsOf, pointAt, SCREEN_KINDS, SUB_18, tvSize, type Cover, type Structure } from '../model/structures'
+import { ARRAY_BOX, ARRAY_SUB, BALLOON_PALETTES, cabinetOf, discoRadius, FT, IN, mountPoints, NEON_COLOURS, paramsOf, pointAt, SCREEN_KINDS, SUB_18, tvSize, type Cover, type Structure } from '../model/structures'
 import { ScreenSurface } from './screenContent'
 import { createRoomMaterial } from './roomMaterial'
 
@@ -798,6 +798,28 @@ export function buildStructure(s: Structure): THREE.Group {
       }
       break
     }
+    case 'discoBall': {
+      const R = discoRadius(p.size)
+      const drop = Math.max(0.03, p.drop ?? 0.5)
+      // Hanging: motor at the top, chain down, ball below. Standing: motor on its base, rod up, ball on top.
+      const hanging = !!s.hang
+      const motorY = hanging ? -0.05 : 0.05
+      parts.add(darkMetal, new THREE.CylinderGeometry(0.05, 0.06, 0.1, 16).translate(0, motorY, 0))
+      const end = hanging ? -0.1 - drop : 0.1 + drop
+      parts.tube(hanging ? chrome : darkMetal, hanging ? 0.004 : 0.012, v(0, hanging ? -0.1 : 0.1, 0), v(0, end, 0), 6)
+      if (!hanging) parts.add(darkMetal, new THREE.CylinderGeometry(0.15, 0.17, 0.02, 20).translate(0, 0.01, 0))
+      const ball = new THREE.Group()
+      ball.position.y = hanging ? end - R : end + R
+      // Mirror tiles: flat facets catching the light.
+      const mirror = new THREE.Mesh(new THREE.SphereGeometry(R, Math.max(16, Math.round(R * 160)), Math.max(10, Math.round(R * 100))), new THREE.MeshStandardMaterial({ color: 0xd9dce2, metalness: 0.95, roughness: 0.18, flatShading: true, emissive: 0x000000 }))
+      mirror.userData.own = true
+      ball.add(mirror)
+      group.add(ball)
+      const rpm = p.rpm ?? 2
+      group.userData.tick = (time: number) => (ball.rotation.y = (time * rpm * Math.PI * 2) / 60)
+      group.userData.disco = { ball, radius: R, mirror }
+      break
+    }
     case 'backdrop': {
       parts.add(cloth(cover === 'none' ? 'white' : cover), new THREE.PlaneGeometry(p.width, p.height - 0.05).translate(0, p.height / 2 + 0.02, 0))
       for (const sx of [-1, 1]) {
@@ -888,7 +910,7 @@ export function shapeKey(s: Structure): string {
     delete shape.text
     delete shape.tint
   }
-  return `${s.kind}:${JSON.stringify(shape)}`
+  return `${s.kind}:${s.hang ?? ''}:${JSON.stringify(shape)}`
 }
 
 /** One structure in the scene: its model, placed and turned, and a selection outline. */
@@ -933,6 +955,11 @@ export class StructureRig {
     this.screen?.set(paramsOf(s))
     this.root.position.set(...s.position)
     this.root.rotation.y = (s.rotation * Math.PI) / 180
+  }
+
+  /** A disco ball's turning ball and its radius, for the reflections (three/discoBalls.ts). */
+  disco(): { ball: THREE.Object3D; radius: number; mirror: THREE.Mesh } | null {
+    return (this.model?.userData.disco as { ball: THREE.Object3D; radius: number; mirror: THREE.Mesh } | undefined) ?? null
   }
 
   /** Every frame: moving pictures, light-up floors, a turning photo booth arm. */

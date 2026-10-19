@@ -44,5 +44,9 @@ export const projectors = {
   },
   count(): number {
     return frame.length
+  },
+  /** Every beam this frame (a disco ball reflects all of them). */
+  all(): readonly Projector[] {
+    return frame
   }
 }

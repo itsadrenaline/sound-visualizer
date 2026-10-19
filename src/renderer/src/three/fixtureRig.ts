@@ -324,18 +324,44 @@ function sphereDirections(n: number, skipBelow = -0.6): THREE.Vector3[] {
 class LaserEmitter implements Emitter {
   private fans: Array<{ lines: THREE.LineSegments; material: THREE.LineBasicMaterial; colors: THREE.BufferAttribute; phase: number }> = []
   private shown = ''
-  private static readonly LINES = 14
+  private static readonly LINES = 24
+  private spread = 40
+  private pattern = 0
+
+  /**
+   * The lines' far ends for a pattern, like the real laser's figures: 0 a flat fan
+   * (a sheet of light through haze), 1 a cone (a tunnel, a ring where it lands),
+   * 2 a few separate beams in a V.
+   */
+  private static shape(positions: Float32Array, pattern: number, spread: number): void {
+    const n = positions.length / 6
+    for (let i = 0; i < n; i++) {
+      const u = n > 1 ? i / (n - 1) : 0.5
+      let x: number, y: number, z: number
+      if (pattern === 1) {
+        const a = u * Math.PI * 2
+        const r = Math.tan(14 * DEG)
+        ;[x, y, z] = [Math.cos(a) * r, 0.5 + Math.sin(a) * r, -1]
+      } else if (pattern === 2) {
+        const a = (Math.round(u * 3) / 3 - 0.5) * spread * 1.2 * DEG
+        ;[x, y, z] = [Math.sin(a), Math.cos(a) * 0.5, -Math.cos(a)]
+      } else {
+        const a = (u - 0.5) * spread * DEG
+        ;[x, y, z] = [Math.sin(a), Math.cos(a) * 0.5, -Math.cos(a)]
+      }
+      const len = 12 / Math.hypot(x, y, z)
+      positions.set([0, 0, 0, x * len, y * len, z * len], i * 6)
+    }
+  }
 
   /** `byChannel`: a laser channel switches it on and picks the pattern; otherwise it follows the head's intensity. */
   constructor(parent: THREE.Object3D, private byChannel = true, private coloured = false, apertures = 1, width = 0.2) {
     const n = Math.max(1, Math.min(8, apertures))
     const lines = n > 1 ? LaserEmitter.LINES : 40
+    this.spread = n > 1 ? 40 : 93
     for (let k = 0; k < n; k++) {
       const positions = new Float32Array(lines * 6)
-      for (let i = 0; i < lines; i++) {
-        const a = ((i / (lines - 1)) - 0.5) * (n > 1 ? 40 : 93) * DEG
-        positions.set([0, 0, 0, Math.sin(a) * 12, 12 * Math.cos(a) * 0.5, -Math.cos(a) * 12], i * 6)
-      }
+      LaserEmitter.shape(positions, 0, this.spread)
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
       const colors = new THREE.BufferAttribute(new Float32Array(lines * 6).fill(1), 3)
@@ -380,6 +406,16 @@ class LaserEmitter implements Emitter {
     // A single colour tints the white lines; several colours keep their own.
     const peak = Math.max(...s.color, 0.0001)
     const tint: [number, number, number] = list ? [1, 1, 1] : [s.color[0] / peak, s.color[1] / peak, s.color[2] / peak]
+    // The figure: from the pattern channel when there is one, otherwise changing every few seconds, like its shows.
+    const pattern = s.gobo > 0 ? s.gobo % 3 : Math.floor(time / 6 + this.fans[0].phase) % 3
+    if (pattern !== this.pattern && on) {
+      this.pattern = pattern
+      for (const fan of this.fans) {
+        const pos = fan.lines.geometry.getAttribute('position') as THREE.BufferAttribute
+        LaserEmitter.shape(pos.array as Float32Array, pattern, this.spread)
+        pos.needsUpdate = true
+      }
+    }
     for (const fan of this.fans) {
       fan.lines.visible = on
       fan.material.opacity = 0.7
