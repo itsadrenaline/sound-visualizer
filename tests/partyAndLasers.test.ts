@@ -257,3 +257,37 @@ describe('1.6.2: Starburst from SoundSwitch, the ceiling, room lights', () => {
     expect(STRUCTURE_KINDS.danceFloor.fields.find((f) => f.key === 'pattern')!.options!.some(([name]) => name === 'Sparkle')).toBe(true)
   })
 })
+
+describe('Cameo Hydrabeam speed', () => {
+  it('its head speed goes slow to fast: at 255 the heads move at full speed', () => {
+    // From SoundSwitch: four heads, a master "Head Speed" channel.
+    const attrs = [
+      { code: 1, name: 'Dimmer', width: 1, coarse: 0, fine: 0 },
+      { code: 900, name: 'Head Speed', width: 1, coarse: 1, fine: 1 },
+      ...[0, 1, 2, 3].flatMap((k) => [{ code: 3, name: `Pan ${k + 1}`, width: 1, coarse: 2 + k * 2, fine: 2 + k * 2 }, { code: 4, name: `Tilt ${k + 1}`, width: 1, coarse: 3 + k * 2, fine: 3 + k * 2 }])
+    ]
+    const f = {
+      definitionId: 8, definition: 'Hydrabeam 400 RGBW', manufacturer: 'Cameo', universe: 0, address: 1, wheels: {},
+      mode: { name: '10 Channel', channels: 10, attributes: attrs, heads: [{ name: 'Master', attributes: [0, 1] }, ...[0, 1, 2, 3].map((k) => ({ name: `Head ${k + 1}`, attributes: [2 + k * 2, 3 + k * 2] }))] }
+    } as unknown as SoundSwitchFixture
+    const type = fixtureTypeFromMode(f)
+    const heads = decodeHeads(type, levels([255, 255, 128, 128]), 1, 0)
+    const moving = type.heads!.map((h, i) => (h.ch.pan ? heads[i] : null)).filter(Boolean)
+    expect(moving).toHaveLength(4)
+    expect(moving.every((s) => s!.moveSpeed > 0.95)).toBe(true)
+    expect(decodeHeads(type, levels([255, 0, 128, 128]), 1, 0).find((_, i) => type.heads![i].ch.pan)!.moveSpeed).toBeLessThan(0.1)
+  })
+
+  it('the Library Hydrabeam too, in every mode with a speed channel', () => {
+    const fx = lib.fixtures['cameo/hydrabeam-400-rgbw']
+    fx.modes.forEach((m, i) => {
+      const type = ofl('cameo/hydrabeam-400-rgbw', i)
+      const speed = type.heads!.find((h) => h.ch.moveSpeed)
+      if (!speed) return
+      const u = new Uint8Array(512).fill(255)
+      const states = decodeHeads(type, u, 1, 0)
+      const movers = type.heads!.map((h, k) => (h.ch.pan ? states[k] : null)).filter(Boolean)
+      expect(movers.every((s) => s!.moveSpeed > 0.95), m.name).toBe(true)
+    })
+  })
+})

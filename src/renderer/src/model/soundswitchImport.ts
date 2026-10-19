@@ -44,7 +44,7 @@ export function typeIdFor(f: SoundSwitchFixture): string {
 function functionOf(a: SoundSwitchAttribute, wheels: ImportedFixture['wheels']): HeadFunction | null {
   if (/laser/i.test(a.name)) return 'laser'
   // Names first: SoundSwitch reuses codes (85 is "Gobo Rotation" on one fixture, "Prism Rotate" on another).
-  if (/pan\s*\/?\s*tilt\s*speed|p\/t\s*speed|movement\s*speed/i.test(a.name)) return 'moveSpeed'
+  if (/pan\s*\/?\s*tilt\s*speed|p\/t\s*speed|movement\s*speed|head\s*\d*\s*speed|^speed\s*(pan|p\/t|movement)/i.test(a.name)) return 'moveSpeed'
   if (/prism/i.test(a.name) && /rot|spin/i.test(a.name)) return 'prismRotation'
   // "Rotating Gobo Wheel" picks a gobo; "Gobo Rotation" spins it.
   if (/gobo/i.test(a.name) && /rot|spin/i.test(a.name) && !/wheel/i.test(a.name)) return 'goboRotation'
@@ -71,6 +71,26 @@ function functionByName(name: string): HeadFunction | null {
   if (/^(strobe|shutter|strobe\s*\/\s*shutter)$/i.test(n)) return 'shutter'
   if (/^(ball\s*|motor\s*)?(rotation|rotate|spin)(\s*speed)?$/i.test(n)) return 'rotation'
   return null
+}
+
+/** A speed channel that goes slow (0) to fast (255). */
+const RISING_SPEED: SpinRange[] = [{ lo: 0, hi: 255, from: 0.05, to: 1 }]
+
+/**
+ * A pan/tilt speed channel's direction from its ranges' names ("Slow - Fast",
+ * "Fast to slow", "Max speed"), or undefined when they don't say.
+ */
+function speedRanges(a: SoundSwitchAttribute): SpinRange[] | undefined {
+  const out: SpinRange[] = []
+  for (const r of a.ranges ?? []) {
+    const n = r.name.toLowerCase()
+    const slow = n.indexOf('slow')
+    const fast = Math.max(n.indexOf('fast'), n.indexOf('max'))
+    if (slow >= 0 && fast >= 0) out.push({ lo: r.lo, hi: r.hi, from: slow < fast ? 0.05 : 1, to: slow < fast ? 1 : 0.05 })
+    else if (fast >= 0) out.push({ lo: r.lo, hi: r.hi, from: 1, to: 1 })
+    else if (slow >= 0) out.push({ lo: r.lo, hi: r.hi, from: 0.05, to: 0.05 })
+  }
+  return out.length ? out : undefined
 }
 
 /** The ADJ Starburst's rotation channel (from its manual): clockwise fast to slow, stop, anticlockwise slow to fast. */
@@ -112,6 +132,7 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
     let colorWheel: WheelSlot[] | undefined
     let shutter: ShutterRange[] | undefined
     let goboSlots: GoboSlot[] | undefined
+    let moveSpeed: SpinRange[] | undefined
     const fns = new Set<HeadFunction>()
     const headAttrs = h.attributes.map((i) => attrs[i]).filter(Boolean)
     for (const a of headAttrs) {
@@ -135,12 +156,13 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
         // SoundSwitch lists the gobo wheel's slots with their DMX ranges; the first is usually open.
         goboSlots = f.wheels[a.wheel].map((s, i) => ({ lo: s.lo, hi: s.hi, slot: /open|no gobo/i.test(s.name) ? 0 : i }))
       }
+      if (fn === 'moveSpeed') moveSpeed = speedRanges(a)
       if (fn === 'shutter' && a.ranges?.length) {
         shutter = a.ranges.filter((r) => r.shutter).map((r) => ({ lo: r.lo, hi: r.hi, kind: r.shutter! }))
       }
     }
     // Rockville's "warm white" blinders are named white but are warm.
-    return { name: h.name, role: roleOf(h, headAttrs, fns, fixtureHasMover, laserFixture), ch, colorWheel, shutter, goboSlots }
+    return { name: h.name, role: roleOf(h, headAttrs, fns, fixtureHasMover, laserFixture), ch, colorWheel, shutter, goboSlots, ...(moveSpeed ? { moveSpeed } : {}) }
   })
 
   // A head with only dimmer/shutter, next to heads that make the light (Rockville's
@@ -165,6 +187,8 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
 
   const pixelHeads = heads.filter((h) => h.role === 'pixel').length
   const known = catalogSpec(f.definition)
+  // Movers whose speed channel goes slow to fast (a Hydrabeam), when SoundSwitch doesn't say.
+  if (known?.speedRising) for (const h of heads) if (h.ch.moveSpeed && !h.moveSpeed) h.moveSpeed = RISING_SPEED
   // A Starburst's ball motor: its manual's speeds, when SoundSwitch doesn't give the ranges.
   if (known?.look === 'sphere') for (const h of heads) if (h.ch.rotation && !h.rotationSpin) h.rotationSpin = STARBURST_SPIN
   const spec =

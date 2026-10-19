@@ -95,10 +95,13 @@ export function registerFixtureTypes(types: FixtureType[] | undefined): void {
  * guess) gets the researched look now, without waiting for the next sync.
  */
 function withKnownLook(type: FixtureType): FixtureType {
-  if (type.source !== 'SoundSwitch' || !type.lookGuessed) return type
+  if (type.source !== 'SoundSwitch') return type
   const known = catalogSpec(type.name)
   if (!known) return type
-  return { ...type, spec: known, panRange: known.pan ?? type.panRange, tiltRange: known.tilt ?? type.tiltRange, lookGuessed: false }
+  // Speed channels that go slow to fast (a Hydrabeam): saved without their ranges, it crawled.
+  const heads = known.speedRising ? type.heads?.map((h) => (h.ch.moveSpeed && !h.moveSpeed ? { ...h, moveSpeed: [{ lo: 0, hi: 255, from: 0.05, to: 1 }] } : h)) : type.heads
+  if (!type.lookGuessed) return heads === type.heads ? type : { ...type, heads }
+  return { ...type, heads, spec: known, panRange: known.pan ?? type.panRange, tiltRange: known.tilt ?? type.tiltRange, maxSpeed: known.speed ?? type.maxSpeed, lookGuessed: false }
 }
 
 /** A plain stand-in, so a fixture whose type went missing still draws instead of crashing. */

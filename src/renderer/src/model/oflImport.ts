@@ -516,6 +516,8 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
   const power = fx.physical?.power ?? 0
   const output = power ? Math.max(0.2, Math.min(2.5, power / 100)) : 0.6
 
+  // The manual says this one's speed goes slow to fast, whatever the fixture file says (the Hydrabeam's does it the wrong way round).
+  if (known?.speedRising) for (const h of heads) if (h.ch.moveSpeed) h.moveSpeed = h.name === 'Main' || !h.moveSpeed?.some((r) => r.hi <= 10) ? [{ lo: 0, hi: 255, from: 0.05, to: 1 }] : [{ lo: 0, hi: 10, from: 1, to: 1 }, { lo: 11, hi: 255, from: 0.05, to: 1 }]
   const spec: FixtureSpec = known ? { ...known, leds: pixelCount > 1 ? pixelCount : known.leds } : {
     look,
     size: size ?? DEFAULT_SIZE(look),

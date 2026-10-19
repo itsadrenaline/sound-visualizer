@@ -359,7 +359,9 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const gobo = head.goboSlots?.length ? (goboRange?.slot ?? 0) : goboValue < 8 ? 0 : 1 + Math.floor(goboRaw * 7)
     const goboSpin = spinOf(r('goboRotation'), head.goboSpin)
     const prismSpin = spinOf(r('prismRotation'), head.prismSpin)
-    const moveSpeed = speedOf(r('moveSpeed'), head.moveSpeed)
+    // A head without its own speed channel moves at the fixture's (a Hydrabeam's "head speed").
+    const speedHead = head.ch.moveSpeed ? head : heads.find((h) => h.ch.moveSpeed)
+    const moveSpeed = speedHead ? speedOf(read(levels, address, speedHead.ch.moveSpeed), speedHead.moveSpeed) : 1
     const prism = (r('prism') ?? 0) * 255 > 20
     // A motor with known ranges turns at their speed (minus = the other way); otherwise the raw level.
     const rotation = head.rotationSpin?.length ? spinOf(r('rotation'), head.rotationSpin) : r('rotation') ?? r('laser') ?? 0
