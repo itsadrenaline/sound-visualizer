@@ -369,6 +369,9 @@ function lookFor(fx: OflFixture, heads: HeadDef[], hasMovement: boolean, size?: 
   const name = fx.name
   const pixels = heads.filter((h) => h.role === 'pixel').length
   const hasGobo = heads.some((h) => h.ch.gobo)
+  // Two bars or rows that only tilt, each on its own motor (8-beam "spiders", Double Helix).
+  const tilting = heads.filter((h) => h.ch.tilt && !h.ch.pan).length
+  if (!heads.some((h) => h.ch.pan) && (tilting === 2 || (tilting === 1 && /spider|spyder|helix/i.test(name)))) return 'twinbar'
   if (hasMovement || cats.includes('Moving Head') || cats.includes('Scanner')) return !hasGobo && (/wash|zoom|led/i.test(name) || pixels > 1) ? 'moverWash' : 'mover'
   if (cats.includes('Pixel Bar') || /tube|bar|batten|strip/i.test(name)) {
     if (size && size[1] > size[0] * 2.5) return 'tube'
@@ -400,7 +403,8 @@ function roleFor(fx: OflFixture, isMain: boolean, fns: HeadFunction[], hasPixels
   if (fns.includes('pan') || fns.includes('tilt')) return 'beam'
   if (cats.includes('Laser')) return 'laser'
   if ((cats.includes('Effect') || cats.includes('Flower')) && !cats.includes('Color Changer')) return 'derby'
-  if (hasPixels && fns.length > 0 && fns.every((f) => f === 'dimmer' || f === 'shutter')) return 'master'
+  // Dimmer, strobe (and the movement speed of heads elsewhere): the fixture's master.
+  if (hasPixels && fns.some((f) => f === 'dimmer' || f === 'shutter') && fns.every((f) => f === 'dimmer' || f === 'shutter' || f === 'moveSpeed')) return 'master'
   return 'beam'
 }
 

@@ -154,6 +154,19 @@ function findDefinitionSpans(r: Reader): Array<{ id: number; start: number; end:
 /** Mode names look like "Mode 1", "19 Channel Mode", "3 Ch". Head names ("Cell 1", "Main") don't. */
 const MODE_NAME = /mode|channel|\bch\b/i
 
+/**
+ * A mode's channel count. The count stored with it, or (stored as 0) the highest
+ * channel its attributes use. When the mode's name says how many ("6 Channel Mode",
+ * "8ch") and its attributes fit in that, the name wins: a stored count that disagrees
+ * made a 6-channel PAR take 66 channels and "clash" with the fixtures after it.
+ */
+export function modeChannels(name: string, stored: number, highest: number): number {
+  const named = /(\d{1,3})\s*-?\s*(?:ch\b|chan|channel)/i.exec(name)
+  const n = named ? Number(named[1]) : 0
+  if (n > highest && n <= 512) return n
+  return stored || highest + 1
+}
+
 /** Unnamed shutter ranges carry a code instead of a name. */
 const SHUTTER_CODES: Record<number, SoundSwitchRange['shutter']> = { 43: 'open', 44: 'closed', 46: 'strobe' }
 
@@ -220,7 +233,7 @@ function parseDefinition(r: Reader, span: { id: number; start: number; end: numb
       // A mode: [channel count][1][name], after the attributes that belong to it.
       // Some modes store 0 as the count; then the highest channel used tells us.
       if (headStart < pending.length) heads.push({ name: 'Main', attributes: range(headStart, pending.length) })
-      modes.push({ name: t.value, channels: count || highest + 1, attributes: pending, heads })
+      modes.push({ name: t.value, channels: modeChannels(t.value, count, highest), attributes: pending, heads })
       pending = []
       heads = []
       headStart = 0

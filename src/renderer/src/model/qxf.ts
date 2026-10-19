@@ -210,7 +210,11 @@ function kindOf(type: string, name: string, heads: number, channels: ChannelFn[]
       return 'laser'
     case 'Flower':
     case 'Effect':
-      return heads > 3 && channels.includes('red') ? 'gigbar' : 'effect'
+      // Only bars of several effects are GigBars; other multi-head effects are derbies,
+      // moonflowers and the like.
+      if (/sparkle\s*wall|curtain|star\s*cloth/.test(n)) return 'panel'
+      if (/wash/.test(n)) return 'par'
+      return heads > 3 && channels.includes('red') && /bar\b|set\b|gig/.test(n) ? 'gigbar' : 'effect'
     default:
       if (heads > 1 && /retro|cluster|blinder|\bcob\b/.test(n)) return 'cluster'
       if (heads > 1 && /panel|matrix/.test(n)) return 'panel'

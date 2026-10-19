@@ -115,6 +115,12 @@ export interface HeadState {
   rotation: number
   /** 0..1 fog or haze output (fog machines). */
   fog: number
+  /**
+   * The red, green, blue and white levels on their own (0..1, before the dimmer), for
+   * fixtures whose LEDs are single colours side by side (a Double Helix's heads): each
+   * LED lights with its own channel. Missing while a built-in program runs.
+   */
+  mix?: [number, number, number, number]
 }
 
 const ROLE_FUNCTIONS: ChannelFunction[] = ['red', 'green', 'blue', 'white', 'amber', 'uv']
@@ -312,7 +318,8 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const rotation = r('rotation') ?? r('laser') ?? 0
     const fog = r('fog') ?? 0
     if (!sent) intensity = 0
-    return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation, fog }
+    const mix: [number, number, number, number] | undefined = hasColor && !program && !wheel ? [r('red') ?? 0, r('green') ?? 0, r('blue') ?? 0, r('white') ?? 0] : undefined
+    return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation, fog, mix }
   })
 }
 

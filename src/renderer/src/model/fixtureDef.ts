@@ -175,6 +175,8 @@ export interface LookDef {
   mount: 'hanging' | 'floor' | 'stand'
   /** Drawn with its own stand under it (GigBar shape only). Off unless you tick it. */
   stand?: boolean
+  /** LEDs drawn on the face (a 12x12 PAR has 12). Missing: from the name, or the cells. */
+  leds?: number
   /** A photo of the real light, shown beside the twin (data URL). */
   photo?: string
 }
@@ -709,7 +711,7 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
     beam: look.beam,
     speed: moving ? 220 : undefined,
     output: look.output,
-    leds: pixels > 1 ? pixels : undefined,
+    leds: look.leds ?? (pixels > 1 ? pixels : undefined),
     halo: heads.some((h) => h.role === 'halo') || undefined,
     mount: look.mount,
     stand: look.shape === 'gigbar' ? !!look.stand : undefined,
@@ -761,6 +763,8 @@ function kindFromType(t: FixtureType): FixtureKind {
   if (look === 'strobe') return 'strobe'
   if (look === 'uplight') return 'uplight'
   if (look === 'fog') return 'fog'
+  if (look === 'twinbar') return 'effect'
+  if (look === 'curtain') return 'panel'
   if (t.body === 'bar') return 'bar'
   return 'par'
 }
@@ -834,7 +838,8 @@ export function defFromTypes(types: FixtureType[], meta: { name: string; manufac
       output: spec?.output ?? Math.max(0.2, first.candela / 1200),
       mount: spec?.mount ?? KINDS[kind].mount,
       // An existing fixture keeps the stand it's drawn with until you untick it.
-      stand: spec?.look === 'gigbar' ? hasOwnStand(spec) : undefined
+      stand: spec?.look === 'gigbar' ? hasOwnStand(spec) : undefined,
+      leds: spec?.leds
     },
     parts,
     modes,
