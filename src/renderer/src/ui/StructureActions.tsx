@@ -530,7 +530,11 @@ export function FixtureMount({ fixtures }: { fixtures: Fixture[] }) {
   return (
     <Section id="fixture:attached" title="Attached to">
       {mounted.length === 0 ? (
-        <p className="hint">Nothing: {first.mounting === 'hanging' ? 'it hangs where it is' : 'it stands on what is below it'}.</p>
+        first.onCeiling && first.mounting === 'hanging' ? (
+          <p className="hint">The ceiling: it hangs from a hook up there. Drag it to move it along the ceiling, or down below the horizon to put it on the floor.</p>
+        ) : (
+          <p className="hint">Nothing: {first.mounting === 'hanging' ? 'it hangs where it is' : 'it stands on what is below it'}. Drag it up past the horizon to hang it from the ceiling.</p>
+        )
       ) : mounted.length === fixtures.length && on && fixtures.every((f) => f.mount?.structure === on.id) ? (
         <p className="sub">
           {point?.label}{point?.out ? ', on ' : ' of '}<a onClick={() => useStore.getState().select([on.id])}>{on.name}</a>

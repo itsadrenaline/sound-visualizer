@@ -17,7 +17,7 @@
 import { hasOwnStand } from './catalog'
 import { roomOf, type Fixture, type Project, type Vec3 } from './project'
 import { getFixtureType } from './fixtureTypes'
-import { covers, footprint, heightOf, mountPoints, nearestOn, pointAt, STRUCTURE_KINDS, surfaceHeight, toLocal, toWorld, type MountPoint, type Structure } from './structures'
+import { covers, footprint, HANGING_KINDS, heightOf, mountPoints, nearestOn, pointAt, STRUCTURE_KINDS, surfaceHeight, toLocal, toWorld, type MountPoint, type Structure } from './structures'
 
 /** How far a hanging fixture can be from a bar and still be clamped to it, metres. */
 const HANG_REACH = 1.2
@@ -54,7 +54,7 @@ export function ceilingOf(p: Project): number | null {
 function discoPlace(s: Structure, list: Structure[], base: (t: Structure) => number, ceiling: number | null): { y: number; hang?: 'truss' | 'ceiling' } {
   let best: { y: number; hang?: 'truss' | 'ceiling'; d: number } | null = null
   for (const t of list) {
-    if (t.id === s.id || t.kind === 'discoBall') continue
+    if (t.id === s.id || HANGING_KINDS.includes(t.kind) || t.kind === 'ceilingDrape') continue
     const local = toLocal(t, s.position)
     for (const m of mountPoints(t)) {
       if (m.inside || m.out || (m.kind !== 'under' && m.kind !== 'top')) continue
@@ -109,7 +109,14 @@ function settleStructures(list: Structure[], ceiling: number | null = null): Str
   }
   let changed = false
   const out = list.map((s) => {
-    if (s.kind === 'discoBall') {
+    if (s.kind === 'ceilingDrape') {
+      // Always up at the ceiling (or, with no ceiling, at a usual ceiling height).
+      const y = round(ceiling ?? 4.5)
+      if (Math.abs(s.position[1] - y) < 1e-4 && s.hang === 'ceiling') return s
+      changed = true
+      return { ...s, position: [s.position[0], y, s.position[2]] as Vec3, hang: 'ceiling' as const }
+    }
+    if (HANGING_KINDS.includes(s.kind)) {
       const at = discoPlace(s, list, (t) => baseOf(byId.get(t.id)!), ceiling)
       const y = round(at.y)
       if (Math.abs(s.position[1] - y) < 1e-4 && s.hang === at.hang) return s
@@ -254,12 +261,13 @@ export function sceneExtents(p: Project): Extents {
     const [w, d] = footprint(s)
     for (const [lx, lz] of [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]) {
       const [x, , z] = toWorld(s, [lx, 0, lz])
-      grow(x, z, s.position[1] + heightOf(s))
+      // Hung from the ceiling: it's at the ceiling, it doesn't push it up.
+      grow(x, z, s.hang === 'ceiling' ? 0 : s.position[1] + heightOf(s))
     }
   }
   for (const f of p.fixtures) {
     const h = getFixtureType(f.typeId).spec?.size[1] ?? 0.4
-    grow(f.position[0], f.position[2], f.position[1] + (f.mounting === 'hanging' ? 0.1 : h))
+    grow(f.position[0], f.position[2], f.onCeiling && f.mounting === 'hanging' ? 0 : f.position[1] + (f.mounting === 'hanging' ? 0.1 : h))
   }
   return e
 }

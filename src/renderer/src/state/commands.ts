@@ -639,15 +639,31 @@ export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[]
  * Hang fixtures upside down from the ceiling, right above where they are (a Starburst
  * or a PAR on a ceiling hook). Returns false when the room has no ceiling.
  */
-export function hangFromCeiling(ids: string[]): boolean {
+export function hangFromCeiling(ids: string[], at?: { id: string; x: number; z: number }): boolean {
   const ceiling = ceilingOf(store().project)
   if (ceiling === null) return false
+  // Dragged onto the ceiling: the one you dragged lands at `at`, the others keep their spacing.
+  const lead = at && store().project.fixtures.find((f) => f.id === at.id)
+  const dx = lead ? at!.x - lead.position[0] : 0
+  const dz = lead ? at!.z - lead.position[2] : 0
   updateFixtures(ids, ids.length === 1 ? 'Hang from the ceiling' : `Hang ${ids.length} fixtures from the ceiling`, (f) => {
     const { mount: _m, faceOut: _o, ...rest } = f
     void _m, void _o
-    return { ...rest, mounting: 'hanging', onCeiling: true, position: [f.position[0], ceiling, f.position[2]] }
+    return { ...rest, mounting: 'hanging', onCeiling: true, position: [round(f.position[0] + dx), ceiling, round(f.position[2] + dz)] }
   })
   return true
+}
+
+/** Take fixtures down from the ceiling (dragged down onto the floor): they stand upright where they're put. */
+export function standOnFloor(ids: string[], at: { id: string; x: number; z: number }): void {
+  const lead = store().project.fixtures.find((f) => f.id === at.id)
+  const dx = lead ? at.x - lead.position[0] : 0
+  const dz = lead ? at.z - lead.position[2] : 0
+  updateFixtures(ids, ids.length === 1 ? 'Put on the floor' : `Put ${ids.length} fixtures on the floor`, (f) => {
+    const { mount: _m, faceOut: _o, onCeiling: _c, ...rest } = f
+    void _m, void _o, void _c
+    return { ...rest, mounting: 'floor', position: [round(f.position[0] + dx), 0, round(f.position[2] + dz)] }
+  })
 }
 
 /** Make this show follow a SoundSwitch project (all its fixtures), and bring them in now. */
