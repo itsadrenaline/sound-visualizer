@@ -16,6 +16,7 @@ import { cellPositions, ledsFromName, specFor, type FixtureSpec } from '../model
 import { createBeamMaterial } from './beamMaterial'
 import { projectors } from './projectors'
 import { goboCell } from './gobos'
+import { spotRays } from './discoBalls'
 
 const BEAM_LENGTH = 16
 const DEG = Math.PI / 180
@@ -256,6 +257,7 @@ class DerbyEmitter implements Emitter {
  */
 class BurstEmitter implements Emitter {
   private materials: THREE.ShaderMaterial[] = []
+  private beams: THREE.Mesh[] = []
   private turn = 0
   private shown = ''
   constructor(private ball: THREE.Object3D, directions: THREE.Vector3[], radius: number, private lenses: GlowEmitter) {
@@ -273,6 +275,7 @@ class BurstEmitter implements Emitter {
       beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
       beam.renderOrder = 10
       ball.add(beam)
+      this.beams.push(beam)
     })
   }
   private last = 0
@@ -292,6 +295,20 @@ class BurstEmitter implements Emitter {
     })
     this.shown = key
     this.lenses.update(s)
+    // Each beam lands as a spot on the floor, walls or ceiling, sweeping round as the ball turns.
+    if (s.intensity > 0.01) {
+      this.ball.updateWorldMatrix(true, true)
+      this.beams.forEach((beam, i) => {
+        const c = list ? list[i % this.materials.length % list.length] : s.color
+        const k = s.intensity * 1.3
+        spotRays.push({
+          origin: new THREE.Vector3().setFromMatrixPosition(beam.matrixWorld),
+          direction: new THREE.Vector3(0, 1, 0).transformDirection(beam.matrixWorld),
+          color: [c[0] * k, c[1] * k, c[2] * k],
+          tanHalf: Math.tan(1.2 * DEG)
+        })
+      })
+    }
   }
   dispose(): void {
     for (const m of this.materials) m.dispose()

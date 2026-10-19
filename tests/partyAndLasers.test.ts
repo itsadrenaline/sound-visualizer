@@ -194,3 +194,66 @@ describe('Disco ball reflections', () => {
     expect(spots().count).toBe(0)
   })
 })
+
+describe('1.6.2: Starburst from SoundSwitch, the ceiling, room lights', () => {
+  it('a SoundSwitch Starburst: UV and the ball motor are recognised by name, the ball turns both ways', () => {
+    const names = ['Red', 'Green', 'Blue', 'White', 'Yellow', 'UV', 'Strobe', 'Dimmer', 'Rotation']
+    const f = {
+      definitionId: 7, definition: 'Starburst', manufacturer: 'ADJ', universe: 0, address: 1, wheels: {},
+      mode: { name: '12 Channel', channels: 12, heads: [], attributes: names.map((name, i) => ({ code: 900 + i, name, width: 1, coarse: i, fine: i })) }
+    } as unknown as SoundSwitchFixture
+    const type = fixtureTypeFromMode(f)
+    expect(type.spec!.look).toBe('sphere')
+    const head = type.heads![0]
+    expect(head.ch.uv).toBeTruthy()
+    expect(head.ch.amber).toBeTruthy()
+    expect(head.ch.rotation).toBeTruthy()
+    const at = (uv: number, turn: number) => decodeHeads(type, levels([0, 0, 0, 0, 0, uv, 10, 255, turn]), 1, 0)[0]
+    const lit = at(255, 0)
+    expect(lit.intensity).toBeGreaterThan(0.5)
+    expect(lit.color[2]).toBeGreaterThan(0.9)
+    expect(at(255, 40).rotation).toBeGreaterThan(0)
+    expect(at(255, 250).rotation).toBeLessThan(0)
+    expect(at(255, 143).rotation).toBe(0)
+  })
+
+  it('dragged onto the ceiling, and back down to the floor', async () => {
+    const { hangFromCeiling, standOnFloor } = await import('../src/renderer/src/state/commands')
+    const [a, b] = addLibraryFixtures(ofl('american-dj/starburst'), 2)
+    const f = (id: string) => state().fixtures.find((x) => x.id === id)!
+    const gap = f(b).position[0] - f(a).position[0]
+    hangFromCeiling([a, b], { id: a, x: 2, z: 3 })
+    expect(f(a).position).toEqual([2, 7.5, 3])
+    expect(f(b).position[0] - f(a).position[0]).toBeCloseTo(gap)
+    expect(f(b).onCeiling).toBe(true)
+    standOnFloor([a, b], { id: a, x: -1, z: 1 })
+    expect([f(a).position[0], f(a).position[2]]).toEqual([-1, 1])
+    expect(f(a).position[1]).toBeLessThan(0.2)
+    expect(f(a).onCeiling).toBeUndefined()
+    expect(f(a).mounting).toBe('floor')
+  })
+
+  it('things hung from the ceiling stay at the ceiling (the room isn’t raised around them)', async () => {
+    const { roomFit } = await import('../src/renderer/src/model/physics')
+    const { hangFromCeiling } = await import('../src/renderer/src/state/commands')
+    addStructure('discoBall', { size: 20 }, { at: [10, 0, 8] })
+    addStructure('ceilingDrape', {}, { at: [0, 0, 8] })
+    const [a] = addLibraryFixtures(ofl('american-dj/starburst'), 1)
+    hangFromCeiling([a])
+    expect(roomFit(state(), 7.5).ceiling).toBe(7.5)
+  })
+
+  it('chandeliers and pendant lights hang like a disco ball; room lights can be switched off', () => {
+    const ch = addStructure('chandelier', { size: 48 }, { at: [12, 0, 10] })
+    const pend = addStructure('pendantLights', { lightOn: false }, { at: [-12, 0, 10] })
+    const s = (id: string) => state().structures!.find((x) => x.id === id)!
+    expect(s(ch).hang).toBe('ceiling')
+    expect(s(pend).hang).toBe('ceiling')
+    expect(s(pend).params.lightOn).toBe(false)
+    for (const kind of ['chandelier', 'pendantLights', 'ceilingDrape', 'wallSconce', 'photoBackdrop'] as const) {
+      expect(STRUCTURE_KINDS[kind].fields.some((f) => f.key === 'lightOn'), kind).toBe(true)
+      expect(STRUCTURE_PRESETS.some((p) => p.kind === kind), kind).toBe(true)
+    }
+    expect(STRUCTURE_KINDS.danceFloor.fields.find((f) => f.key === 'pattern')!.options!.some(([name]) => name === 'Sparkle')).toBe(true)
+  })
+})

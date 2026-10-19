@@ -10,7 +10,8 @@
  */
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { ARRAY_BOX, ARRAY_SUB, BALLOON_PALETTES, cabinetOf, discoRadius, FT, IN, mountPoints, NEON_COLOURS, paramsOf, pointAt, SCREEN_KINDS, SUB_18, tvSize, type Cover, type Structure } from '../model/structures'
+import { ARRAY_BOX, ARRAY_SUB, BALLOON_PALETTES, cabinetOf, discoRadius, FT, IN, mountPoints, NEON_COLOURS, paramsOf, pointAt, SCREEN_KINDS, SUB_18, tvSize, type Cover, type Structure, type StructureParams } from '../model/structures'
+import { projectors } from './projectors'
 import { ScreenSurface } from './screenContent'
 import { createRoomMaterial } from './roomMaterial'
 
@@ -203,16 +204,20 @@ function seeded(seed: string): () => number {
 }
 
 /**
- * Light-up dance floor tiles: a canvas, one pixel per tile, redrawn each frame with a
- * slow colour pattern (chases, checkers, a ripple from the middle).
+ * Light-up dance floor tiles: a canvas, one pixel per tile, redrawn each frame.
+ * Patterns: 1 rainbow chase, 2 flipping checkers, 3 a ripple from the middle,
+ * 4 sparkle (tiles flashing in colours), 5 starfield (white twinkles on black),
+ * 6 the whole floor fading through colours; 0 mixes them, changing every 16 beats.
  */
-function ledFloor(group: THREE.Group, w: number, d: number, tile: number): ((time: number) => void) | undefined {
+function ledFloor(group: THREE.Group, w: number, d: number, tile: number, pattern: number, seed: string): ((time: number) => void) | undefined {
   if (typeof document === 'undefined') return undefined
   const cols = Math.max(1, Math.round(w / tile))
   const rows = Math.max(1, Math.round(d / tile))
+  // Each tile has 4 × 4 LEDs, so sparkles can be smaller than a tile.
+  const res = 4
   const canvas = document.createElement('canvas')
-  canvas.width = cols
-  canvas.height = rows
+  canvas.width = cols * res
+  canvas.height = rows * res
   const texture = new THREE.CanvasTexture(canvas)
   texture.magFilter = THREE.NearestFilter
   texture.minFilter = THREE.NearestFilter
@@ -222,19 +227,37 @@ function ledFloor(group: THREE.Group, w: number, d: number, tile: number): ((tim
   plane.userData.own = true
   group.add(plane)
   const g = canvas.getContext('2d')!
+  const rand = seeded(seed)
+  // Each LED's own phase and colour for the sparkle patterns.
+  const phase = Array.from({ length: canvas.width * canvas.height }, () => rand())
+  const hsl = (h: number, l: number) => `hsl(${((h % 1) + 1) % 1 * 360}, 100%, ${l * 100}%)`
   return (time: number) => {
     const beat = (time * 124) / 60
-    const scene = Math.floor(beat / 16) % 3
-    for (let x = 0; x < cols; x++)
-      for (let y = 0; y < rows; y++) {
-        const h =
-          scene === 0 ? (x + y) / (cols + rows) + beat * 0.05 // diagonal rainbow chase
-          : scene === 1 ? ((x + y + Math.floor(beat)) % 2) * 0.5 + Math.floor(beat / 4) * 0.13 // flipping checkers
-          : Math.hypot(x - (cols - 1) / 2, y - (rows - 1) / 2) * 0.12 - beat * 0.1 // ripple from the middle
-        const l = scene === 1 ? 0.5 : 0.45 + 0.1 * Math.sin(beat * Math.PI)
-        g.fillStyle = `hsl(${((h % 1) + 1) % 1 * 360}, 100%, ${l * 100}%)`
-        g.fillRect(x, y, 1, 1)
+    const mode = pattern || [1, 2, 3, 4, 6, 5][Math.floor(beat / 16) % 6]
+    if (mode === 4 || mode === 5) {
+      g.fillStyle = mode === 5 ? '#020205' : '#06060c'
+      g.fillRect(0, 0, canvas.width, canvas.height)
+      for (let i = 0; i < phase.length; i++) {
+        // Each LED flashes briefly, at its own moment, a few times a second across the floor.
+        const t = (time * (mode === 5 ? 0.35 : 0.8) + phase[i] * 7) % 1
+        if (t > 0.12) continue
+        const level = 1 - t / 0.12
+        g.fillStyle = mode === 5 ? `rgba(255, 250, 235, ${level})` : hsl(phase[(i * 7) % phase.length] + time * 0.03, 0.35 + level * 0.3)
+        g.fillRect(i % canvas.width, Math.floor(i / canvas.width), 1, 1)
       }
+    } else {
+      for (let x = 0; x < cols; x++)
+        for (let y = 0; y < rows; y++) {
+          const h =
+            mode === 1 ? (x + y) / (cols + rows) + beat * 0.05
+            : mode === 2 ? ((x + y + Math.floor(beat)) % 2) * 0.5 + Math.floor(beat / 4) * 0.13
+            : mode === 3 ? Math.hypot(x - (cols - 1) / 2, y - (rows - 1) / 2) * 0.12 - beat * 0.1
+            : beat * 0.02
+          const l = mode === 2 ? 0.5 : mode === 6 ? 0.42 + 0.08 * Math.sin(beat * Math.PI) : 0.45 + 0.1 * Math.sin(beat * Math.PI)
+          g.fillStyle = hsl(h, l)
+          g.fillRect(x * res, y * res, res, res)
+        }
+    }
     texture.needsUpdate = true
   }
 }
@@ -709,7 +732,7 @@ export function buildStructure(s: Structure): THREE.Group {
       parts.box(surface(finish), p.width, 0.025, p.depth, 0, 0.0125, 0)
       const tile = 3 * FT
       const y = 0.027
-      if (p.led) group.userData.tick = ledFloor(group, p.width, p.depth, tile)
+      if (p.led) group.userData.tick = ledFloor(group, p.width, p.depth, tile, p.pattern ?? 0, s.id)
       for (let x = -p.width / 2 + tile; x < p.width / 2 - 0.01; x += tile) lines.push(x, y, -p.depth / 2, x, y, p.depth / 2)
       for (let z = -p.depth / 2 + tile; z < p.depth / 2 - 0.01; z += tile) lines.push(-p.width / 2, y, z, p.width / 2, y, z)
       break
@@ -820,6 +843,170 @@ export function buildStructure(s: Structure): THREE.Group {
       group.userData.disco = { ball, radius: R, mirror }
       break
     }
+    case 'photoBackdrop': {
+      // The backdrop on its frame, a camera kiosk in front, a soft light either side aimed at the guests.
+      const sequins = cover === 'none'
+      parts.add(sequins ? surface(0xc9a96a, true, 0, 1) : cloth(cover), new THREE.PlaneGeometry(p.width, p.height - 0.05).translate(0, p.height / 2 + 0.02, 0))
+      for (const sx of [-1, 1]) {
+        parts.tube(metal, 0.015, v((sx * p.width) / 2, 0.02, 0), v((sx * p.width) / 2, p.height, 0), 6)
+        parts.box(darkMetal, 0.06, 0.02, 0.6, (sx * p.width) / 2, 0.01, 0)
+      }
+      parts.tube(metal, 0.012, v(-p.width / 2, p.height, 0), v(p.width / 2, p.height, 0), 6)
+      // Kiosk: a pole with a screen and camera, 2.4 m in front.
+      parts.box(darkMetal, 0.4, 0.02, 0.4, 0, 0.01, 2.4)
+      parts.tube(darkMetal, 0.025, v(0, 0.02, 2.4), v(0, 1.35, 2.4), 10)
+      parts.box(cabinet, 0.36, 0.5, 0.06, 0, 1.55, 2.4)
+      const lamps: THREE.Mesh[] = []
+      for (const sx of [-1, 1]) {
+        const x = sx * Math.min(p.width / 2, 1.3)
+        const z = 1.9
+        // Tripod stand, then a softbox facing the guests.
+        for (let k = 0; k < 3; k++) {
+          const a = (k / 3) * Math.PI * 2
+          parts.tube(darkMetal, 0.01, v(x + Math.cos(a) * 0.35, 0, z + Math.sin(a) * 0.35), v(x, 0.6, z), 6)
+        }
+        parts.tube(darkMetal, 0.012, v(x, 0.6, z), v(x, 1.7, z), 6)
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, side: THREE.DoubleSide }))
+        face.position.set(x, 1.75, z - 0.12)
+        face.rotation.y = Math.PI + sx * 0.35
+        face.userData.own = true
+        group.add(face)
+        lamps.push(face)
+        parts.box(cabinet, 0.62, 0.62, 0.2, x - Math.sin(sx * 0.35) * 0.1, 1.75, z - 0.02)
+      }
+      group.userData.roomLight = { glows: lamps.map((m) => ({ mesh: m, color: [1, 0.97, 0.92] })), pools: lamps.map((m) => ({ at: m.position.clone(), dir: new THREE.Vector3(0, 0, -1), tanHalf: 0.9, color: [1, 0.96, 0.9], power: 0.5 })) }
+      break
+    }
+    case 'chandelier':
+    case 'pendantLights': {
+      const hanging = !!s.hang
+      const drop = Math.max(0.05, p.drop ?? 0.6)
+      const top = hanging ? 0 : 0.05
+      if (!hanging) parts.add(darkMetal, new THREE.CylinderGeometry(0.18, 0.2, 0.03, 20).translate(0, 0.015, 0))
+      const warm = new THREE.MeshBasicMaterial({ color: 0xffcf8a, toneMapped: false })
+      warm.userData.base = [1, 0.81, 0.54]
+      const bulbs: THREE.Mesh[] = []
+      const sign = hanging ? -1 : 1
+      if (s.kind === 'chandelier') {
+        const R = ((p.size ?? 36) * IN) / 2
+        const y0 = top + sign * drop
+        parts.add(chrome, new THREE.CylinderGeometry(0.06, 0.06, 0.12, 10).translate(0, hanging ? -0.06 : 0.06, 0))
+        parts.tube(brass, 0.006, v(0, top, 0), v(0, y0, 0), 6)
+        const bodyY = y0 + sign * R * 0.5
+        parts.add(brass, new THREE.SphereGeometry(R * 0.12, 12, 8).translate(0, bodyY, 0))
+        const crystal = new THREE.MeshStandardMaterial({ color: 0xe8f0ff, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.6 })
+        for (const [tier, n, r] of [[0, 8, R * 0.9], [1, 5, R * 0.5]] as const) {
+          const ty = bodyY + (tier ? 0.18 : 0) * sign * -1
+          for (let k = 0; k < n; k++) {
+            const a = (k / n) * Math.PI * 2 + tier * 0.3
+            const end = v(Math.cos(a) * r, ty, Math.sin(a) * r)
+            parts.tube(brass, 0.008, v(0, bodyY, 0), end, 5)
+            parts.add(keysWhite, new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6).translate(end.x, ty + 0.04, end.z))
+            const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), warm)
+            bulb.position.set(end.x, ty + 0.1, end.z)
+            group.add(bulb)
+            bulbs.push(bulb)
+            parts.add(crystal, new THREE.OctahedronGeometry(0.025).translate(end.x, ty - 0.07, end.z))
+          }
+        }
+        // Strands of crystals hanging under it.
+        for (let k = 0; k < 14; k++) {
+          const a = (k / 14) * Math.PI * 2
+          const r = R * (0.25 + 0.5 * ((k % 3) / 2))
+          parts.add(crystal, new THREE.OctahedronGeometry(0.018).translate(Math.cos(a) * r, bodyY - R * 0.4 - (k % 4) * 0.05, Math.sin(a) * r))
+        }
+        group.userData.roomLight = { glows: [{ mesh: bulbs[0], color: [1, 0.81, 0.54] }], pools: [{ at: new THREE.Vector3(0, bodyY, 0), dir: new THREE.Vector3(0, -1, 0), tanHalf: 2.2, color: [1, 0.78, 0.5], power: 0.9 }, { at: new THREE.Vector3(0, bodyY, 0), dir: new THREE.Vector3(0, 1, 0), tanHalf: 1.6, color: [1, 0.78, 0.5], power: 0.35 }] }
+      } else {
+        const n = Math.max(1, p.count ?? 5)
+        const rand = seeded(s.id)
+        const pools: Array<{ at: THREE.Vector3; dir: THREE.Vector3; tanHalf: number; color: number[]; power: number }> = []
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * Math.PI * 2 + rand()
+          const r = n === 1 ? 0 : 0.15 + rand() * 0.25
+          const len = drop * (0.6 + rand() * 0.4)
+          const x = Math.cos(a) * r
+          const z = Math.sin(a) * r
+          const y = top + sign * len
+          parts.tube(cabinet, 0.004, v(x, top, z), v(x, y, z), 4)
+          parts.add(darkMetal, new THREE.CylinderGeometry(0.018, 0.018, 0.04, 8).translate(x, y - sign * 0.02 * -1, z))
+          const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), warm)
+          bulb.position.set(x, y + sign * 0.05, z)
+          group.add(bulb)
+          bulbs.push(bulb)
+          if (k < 2) pools.push({ at: bulb.position.clone(), dir: new THREE.Vector3(0, -1, 0), tanHalf: 1.8, color: [1, 0.75, 0.45], power: 0.4 / Math.min(2, n) * 2 })
+        }
+        if (hanging) parts.add(darkMetal, new THREE.CylinderGeometry(0.12, 0.12, 0.03, 16).translate(0, -0.015, 0))
+        group.userData.roomLight = { glows: [{ mesh: bulbs[0], color: [1, 0.75, 0.45] }], pools }
+      }
+      for (const b of bulbs) b.userData.own = b === bulbs[0]
+      break
+    }
+    case 'ceilingDrape': {
+      // Fabric swags across the room, hanging from the ceiling, with fairy lights in it.
+      const W = p.width
+      const D = p.depth
+      const swags = Math.max(1, Math.round(D / 1.5))
+      const sag = 0.45
+      const geo = new THREE.PlaneGeometry(W, D, 1, swags * 12)
+      geo.rotateX(Math.PI / 2)
+      const pos = geo.getAttribute('position') as THREE.BufferAttribute
+      for (let i = 0; i < pos.count; i++) {
+        const z = pos.getZ(i)
+        const u = ((z + D / 2) / D) * swags
+        pos.setY(i, -sag * Math.sin(Math.PI * (u % 1)) ** 1.2)
+      }
+      geo.computeVertexNormals()
+      parts.add(cloth(cover === 'none' ? 'white' : cover), geo)
+      // Fairy lights: tiny warm points along the low lines of the swags.
+      const rand = seeded(s.id)
+      const count = Math.min(900, Math.round(W * D * 4))
+      const pts = new Float32Array(count * 3)
+      const phase = new Float32Array(count)
+      for (let i = 0; i < count; i++) {
+        const x = (rand() - 0.5) * W * 0.98
+        const u = rand() * swags
+        const z = (u / swags - 0.5) * D
+        pts.set([x, -sag * Math.sin(Math.PI * (u % 1)) ** 1.2 - 0.03, z], i * 3)
+        phase[i] = rand()
+      }
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', new THREE.BufferAttribute(pts, 3))
+      const colours = new Float32Array(count * 3)
+      g.setAttribute('color', new THREE.BufferAttribute(colours, 3))
+      const fairy = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.05, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }))
+      fairy.raycast = () => {}
+      group.add(fairy)
+      group.userData.roomLight = {
+        pools: [{ at: new THREE.Vector3(0, -sag, 0), dir: new THREE.Vector3(0, -1, 0), tanHalf: Math.max(W, D) / 6, color: [1, 0.82, 0.6], power: 0.25 }],
+        // Each light twinkles gently on its own.
+        twinkle: (time: number, level: number) => {
+          for (let i = 0; i < count; i++) {
+            const k = level * (0.65 + 0.35 * Math.sin(time * 2.2 + phase[i] * 20))
+            colours.set([k, k * 0.82, k * 0.55], i * 3)
+          }
+          ;(g.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true
+        }
+      }
+      break
+    }
+    case 'wallSconce': {
+      const b = p.bottom ?? 1.8
+      parts.box(brass, 0.12, 0.2, 0.02, 0, b, 0)
+      parts.tube(brass, 0.008, v(0, b, 0.01), v(0, b, 0.1), 6)
+      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 0.14, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe2b0, toneMapped: false, side: THREE.DoubleSide }))
+      shade.position.set(0, b + 0.03, 0.12)
+      shade.userData.own = true
+      group.add(shade)
+      group.userData.roomLight = {
+        glows: [{ mesh: shade, color: [1, 0.88, 0.69] }],
+        // Light up and down the wall behind it.
+        pools: [
+          { at: new THREE.Vector3(0, b + 0.1, 0.12), dir: new THREE.Vector3(0, 1, -0.12).normalize(), tanHalf: 0.55, color: [1, 0.8, 0.55], power: 0.35 },
+          { at: new THREE.Vector3(0, b - 0.04, 0.12), dir: new THREE.Vector3(0, -1, -0.12).normalize(), tanHalf: 0.55, color: [1, 0.8, 0.55], power: 0.25 }
+        ]
+      }
+      break
+    }
     case 'backdrop': {
       parts.add(cloth(cover === 'none' ? 'white' : cover), new THREE.PlaneGeometry(p.width, p.height - 0.05).translate(0, p.height / 2 + 0.02, 0))
       for (const sx of [-1, 1]) {
@@ -928,6 +1115,7 @@ export class StructureRig {
 
   /** What a screen shows, laid over its face. */
   private screen: ScreenSurface | null = null
+  private params: StructureParams = {}
 
   update(s: Structure): void {
     const key = shapeKey(s)
@@ -952,7 +1140,8 @@ export class StructureRig {
         this.setSelected(true)
       }
     }
-    this.screen?.set(paramsOf(s))
+    this.params = paramsOf(s)
+    this.screen?.set(this.params)
     this.root.position.set(...s.position)
     this.root.rotation.y = (s.rotation * Math.PI) / 180
   }
@@ -963,9 +1152,36 @@ export class StructureRig {
   }
 
   /** Every frame: moving pictures, light-up floors, a turning photo booth arm. */
-  tick(time: number): void {
+  tick(time: number, ambient = 0.18): void {
     this.screen?.tick(time)
     ;(this.model?.userData.tick as ((t: number) => void) | undefined)?.(time)
+    this.roomLight(time, ambient)
+  }
+
+  /**
+   * Room lights (a chandelier, a sconce, fairy lights): on or off, and (unless told
+   * otherwise) as bright as the room's light allows, so they come up with the house
+   * lights and go down with them. They light the room around them too.
+   */
+  private roomLight(time: number, ambient: number): void {
+    const light = this.model?.userData.roomLight as
+      | { glows?: Array<{ mesh: THREE.Mesh; color: number[] }>; pools?: Array<{ at: THREE.Vector3; dir: THREE.Vector3; tanHalf: number; color: number[]; power: number }>; twinkle?: (time: number, level: number) => void }
+      | undefined
+    if (!light) return
+    const on = this.params.lightOn !== false
+    const follow = this.params.followRoom !== false
+    const level = !on ? 0 : follow ? Math.min(1, 0.12 + ambient * 1.8) : 1
+    for (const g of light.glows ?? []) (g.mesh.material as THREE.MeshBasicMaterial).color.setRGB(g.color[0] * (0.08 + level), g.color[1] * (0.08 + level) * 0.98, g.color[2] * (0.08 + level) * 0.95)
+    light.twinkle?.(time, level)
+    if (level <= 0.01 || !light.pools?.length || !this.model) return
+    this.model.updateWorldMatrix(true, false)
+    for (const pool of light.pools) {
+      const position = pool.at.clone().applyMatrix4(this.model.matrixWorld)
+      const direction = pool.dir.clone().transformDirection(this.model.matrixWorld)
+      const right = new THREE.Vector3(1, 0, 0).transformDirection(this.model.matrixWorld)
+      const k = level * pool.power
+      projectors.add({ position, direction, right, tanHalf: pool.tanHalf, color: [pool.color[0] * k, pool.color[1] * k, pool.color[2] * k], goboCell: 0, goboTurn: 0, prismSpread: 0, prismTurn: 0 })
+    }
   }
 
   setSelected(on: boolean): void {

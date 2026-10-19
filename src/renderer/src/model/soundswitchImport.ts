@@ -8,7 +8,7 @@
  */
 import type { SoundSwitchAttribute, SoundSwitchFixture, SoundSwitchHead } from '../../../shared/soundswitch'
 import { plainName, type FixtureType } from './fixtureTypes'
-import { channelListFromHeads, slotFrom, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
+import { channelListFromHeads, slotFrom, type SpinRange, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
 import type { Fixture, Project } from './project'
 import { catalogSpec, ledsFromName, LOOK_DEFAULTS, specFor, type FixtureSpec, type LookKind } from './catalog'
 import { autoLayout } from './layout'
@@ -51,8 +51,30 @@ function functionOf(a: SoundSwitchAttribute, wheels: ImportedFixture['wheels']):
   if (/rotation/i.test(a.name) && a.code === 82) return 'rotation'
   // A wheel with coloured slots is a colour wheel, whatever its code says.
   if (a.wheel && wheels?.[a.wheel]?.some((s) => s.rgb)) return 'colorWheel'
-  return CODE_TO_FUNCTION[a.code] ?? null
+  return CODE_TO_FUNCTION[a.code] ?? functionByName(a.name)
 }
+
+/**
+ * When SoundSwitch's code isn't one we know, the attribute's name says what it does
+ * (a Starburst's "UV" or "Purple", "Yellow", its ball "Rotation").
+ */
+function functionByName(name: string): HeadFunction | null {
+  // Whole names only ("UV", "Purple 2", "LED White"): "Red pulse" is a program, not a colour.
+  const n = name.trim().replace(/^(led|colou?r)\s+/i, '').replace(/\s*\d+$/, '')
+  if (/^(uv|u\.v\.|ultra\s*violet|purple|violet)$/i.test(n)) return 'uv'
+  if (/^(amber|yellow)$/i.test(n)) return 'amber'
+  if (/^(white|warm\s*white|cool\s*white|cold\s*white)$/i.test(n)) return 'white'
+  if (/^red$/i.test(n)) return 'red'
+  if (/^green$/i.test(n)) return 'green'
+  if (/^blue$/i.test(n)) return 'blue'
+  if (/^(master\s*)?(dimmer|intensity)$/i.test(n)) return 'dimmer'
+  if (/^(strobe|shutter|strobe\s*\/\s*shutter)$/i.test(n)) return 'shutter'
+  if (/^(ball\s*|motor\s*)?(rotation|rotate|spin)(\s*speed)?$/i.test(n)) return 'rotation'
+  return null
+}
+
+/** The ADJ Starburst's rotation channel (from its manual): clockwise fast to slow, stop, anticlockwise slow to fast. */
+const STARBURST_SPIN: SpinRange[] = [{ lo: 0, hi: 30, from: 0, to: 0 }, { lo: 31, hi: 140, from: 1.2, to: 0.1 }, { lo: 141, hi: 145, from: 0, to: 0 }, { lo: 146, hi: 255, from: -0.1, to: -1.2 }]
 
 export { colourFromName } from './heads'
 
@@ -143,6 +165,8 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
 
   const pixelHeads = heads.filter((h) => h.role === 'pixel').length
   const known = catalogSpec(f.definition)
+  // A Starburst's ball motor: its manual's speeds, when SoundSwitch doesn't give the ranges.
+  if (known?.look === 'sphere') for (const h of heads) if (h.ch.rotation && !h.rotationSpin) h.rotationSpin = STARBURST_SPIN
   const spec =
     known ??
     (laserFixture && heads.every((h) => h.role === 'laser' || h.role === 'master')

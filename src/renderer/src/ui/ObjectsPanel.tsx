@@ -18,7 +18,7 @@ export interface StructureDrag {
   params: StructureParams
 }
 
-const ORDER: Category[] = ['Stands & totems', 'Truss', 'Staging', 'Speakers & sound', 'DJ & band', 'Party', 'Screens', 'Furniture', 'Room & decor', 'People']
+const ORDER: Category[] = ['Stands & totems', 'Truss', 'Staging', 'Speakers & sound', 'DJ & band', 'Party', 'Screens', 'Room lights', 'Furniture', 'Room & decor', 'People']
 
 /** Which categories are folded, remembered on this Mac. */
 function loadFolded(): Category[] {
@@ -184,6 +184,11 @@ export function Icon({ kind }: { kind: StructureKind }) {
     photoBooth: <><ellipse cx="12" cy="18" rx="8" ry="2.5" {...s} /><path d="M12 18V9l7-3" {...s} /><circle cx="19" cy="6" r="2" {...s} /></>,
     neonSign: <><rect x="2" y="6" width="20" height="10" rx="2" {...s} /><path d="M6 13V9l3 4V9M12 9v4h2M16 9h2v4h-2" {...s} /><path d="M8 16v5M16 16v5" {...s} /></>,
     discoBall: <><path d="M12 2v5" {...s} /><circle cx="12" cy="14" r="7" {...s} /><path d="M5 14h14M12 7v14M7 9.5c3 1.5 7 1.5 10 0M7 18.5c3-1.5 7-1.5 10 0" {...s} /></>,
+    photoBackdrop: <><path d="M3 20V4h12v16" {...s} /><rect x="16" y="9" width="5" height="4" rx="1" {...s} /><path d="M18.5 13v8M16 21h5" {...s} /></>,
+    chandelier: <><path d="M12 2v5M5 12h14M7 12v-2M17 12v-2M12 7l-5 5M12 7l5 5" {...s} /><circle cx="7" cy="9" r="1" {...s} /><circle cx="17" cy="9" r="1" {...s} /><path d="M9 12l3 6 3-6" {...s} /></>,
+    pendantLights: <><path d="M6 2v10M12 2v14M18 2v8" {...s} /><circle cx="6" cy="14" r="2" {...s} /><circle cx="12" cy="18" r="2" {...s} /><circle cx="18" cy="12" r="2" {...s} /></>,
+    ceilingDrape: <><path d="M2 4h20M2 4c3 5 6 5 10 0c4 5 7 5 10 0" {...s} /><circle cx="5" cy="7" r=".8" fill="currentColor" /><circle cx="12" cy="5" r=".8" fill="currentColor" /><circle cx="17" cy="8" r=".8" fill="currentColor" /></>,
+    wallSconce: <><path d="M4 3v18" {...s} /><path d="M4 12h4M8 8h6l-1 8H9z" {...s} /><path d="M11 5v-2M11 21v-2" {...s} /></>,
     crowd: <><circle cx="7" cy="7" r="2" {...s} /><circle cx="17" cy="7" r="2" {...s} /><circle cx="12" cy="10" r="2" {...s} /><path d="M3 18c0-3 2-6 4-6s4 3 4 6M13 18c0-3 2-6 4-6s4 3 4 6M8 21c0-3 2-6 4-6s4 3 4 6" {...s} /></>
   }
   return (

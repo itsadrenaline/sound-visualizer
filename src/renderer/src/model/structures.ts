@@ -35,7 +35,9 @@ export type StructureKind =
   // Room
   | 'wall' | 'danceFloor' | 'screen' | 'ledWall' | 'backdrop' | 'stanchions' | 'plant' | 'pillar'
   // Party
-  | 'tv' | 'balloonArch' | 'photoBooth' | 'neonSign' | 'discoBall'
+  | 'tv' | 'balloonArch' | 'photoBooth' | 'neonSign' | 'discoBall' | 'photoBackdrop'
+  // Room lights (not part of the show)
+  | 'chandelier' | 'pendantLights' | 'ceilingDrape' | 'wallSconce'
   // People
   | 'person' | 'crowd'
 
@@ -102,16 +104,34 @@ export interface StructureParams {
   tint?: number
   /** Dance floor: light-up LED tiles. */
   led?: boolean
+  /** Dance floor: what the LED tiles do, from FLOOR_PATTERNS. */
+  pattern?: number
   /** Balloon arch: colours, from BALLOON_PALETTES. */
   palette?: number
   /** Disco ball: length of the chain it hangs on (or the rod it stands on), metres. */
   drop?: number
   /** Disco ball: motor speed, turns per minute (0 = still). */
   rpm?: number
+  /** Room lights (chandeliers, sconces, fairy lights, a photo booth's lamps): switched on. Missing = on. */
+  lightOn?: boolean
+  /** Room lights: dim and brighten with the room's light (Room ▸ light). Missing = yes. */
+  followRoom?: boolean
 }
+
+/** Things that hang from a truss bar above them or the ceiling (or sit on a stand): see physics.ts. */
+export const HANGING_KINDS: StructureKind[] = ['discoBall', 'chandelier', 'pendantLights']
+/** Lights that are part of the room, not the show: they follow the room's light and can be switched off. */
+export const ROOM_LIGHT_KINDS: StructureKind[] = ['chandelier', 'pendantLights', 'ceilingDrape', 'wallSconce', 'photoBackdrop']
+const ROOM_LIGHT_FIELDS: ParamField[] = [
+  { key: 'lightOn', label: 'Light on', kind: 'boolean' },
+  { key: 'followRoom', label: 'Dims with the room light', kind: 'boolean' }
+]
 
 /** A disco ball's radius from its diameter in inches. */
 export const discoRadius = (size = 16) => (size * IN) / 2
+
+/** What a light-up dance floor can do. */
+export const FLOOR_PATTERNS: Array<[string, number]> = [['Mix', 0], ['Rainbow chase', 1], ['Checkers', 2], ['Ripple', 3], ['Sparkle', 4], ['Starfield', 5], ['Colour fade', 6]]
 
 /** What a screen can show. */
 export type ScreenContent = 'off' | 'colours' | 'visuals' | 'image' | 'video' | 'text'
@@ -177,7 +197,7 @@ export interface ParamField {
   coverNames?: Partial<Record<Cover, string>>
 }
 
-export type Category = 'Stands & totems' | 'Truss' | 'Staging' | 'Speakers & sound' | 'DJ & band' | 'Party' | 'Screens' | 'Furniture' | 'Room & decor' | 'People'
+export type Category = 'Stands & totems' | 'Truss' | 'Staging' | 'Speakers & sound' | 'DJ & band' | 'Party' | 'Screens' | 'Room lights' | 'Furniture' | 'Room & decor' | 'People'
 
 export interface KindInfo {
   label: string
@@ -530,7 +550,8 @@ export const STRUCTURE_KINDS: Record<StructureKind, KindInfo> = {
       { key: 'width', label: 'Width', kind: 'length', min: 0.9, max: 25, presets: [12, 15, 18, 24] },
       { key: 'depth', label: 'Depth', kind: 'length', min: 0.9, max: 25, presets: [12, 15, 18, 24] },
       { key: 'cover', label: 'Finish', kind: 'cover', coverNames: { none: 'Wood' } },
-      { key: 'led', label: 'LED tiles that light up', kind: 'boolean' }
+      { key: 'led', label: 'LED tiles that light up', kind: 'boolean' },
+      { key: 'pattern', label: 'LED pattern', kind: 'choice', options: FLOOR_PATTERNS }
     ]
   },
   screen: {
@@ -589,6 +610,54 @@ export const STRUCTURE_KINDS: Record<StructureKind, KindInfo> = {
       { key: 'drop', label: 'Chain or rod length', kind: 'length', min: 0.05, max: 4, presets: [0.5, 1, 2, 3, 5] },
       { key: 'rpm', label: 'Turning', kind: 'choice', options: [['Still', 0], ['Slow', 1], ['Normal', 2], ['Fast', 4]] }
     ]
+  },
+  photoBackdrop: {
+    label: 'Photo booth with backdrop', category: 'Party', surface: false,
+    description: 'A selfie or photo booth: a backdrop on a frame, a camera kiosk in front and two soft lights on stands.',
+    defaults: { width: 8 * FT, height: 8 * FT, cover: 'white', lightOn: true, followRoom: false },
+    fields: [
+      { key: 'width', label: 'Backdrop width', kind: 'length', min: 1.5, max: 6, presets: [6, 8, 10] },
+      { key: 'height', label: 'Backdrop height', kind: 'length', min: 1.5, max: 4, presets: [7, 8, 10] },
+      { key: 'cover', label: 'Backdrop', kind: 'cover', coverNames: { none: 'Sequins' } },
+      ...ROOM_LIGHT_FIELDS
+    ]
+  },
+  chandelier: {
+    label: 'Chandelier', category: 'Room lights', surface: false,
+    description: 'A crystal chandelier with candle bulbs. It hangs from the ceiling or a truss bar above it. A room light: it dims with the room light and can be switched off.',
+    defaults: { size: 36, drop: 0.6, lightOn: true },
+    fields: [
+      { key: 'size', label: 'Size', kind: 'choice', options: [['24 in', 24], ['36 in', 36], ['48 in', 48], ['60 in', 60]] },
+      { key: 'drop', label: 'Chain length', kind: 'length', min: 0.05, max: 4, presets: [1, 2, 3, 4] },
+      ...ROOM_LIGHT_FIELDS
+    ]
+  },
+  pendantLights: {
+    label: 'Pendant lights', category: 'Room lights', surface: false,
+    description: 'Bare bulbs on long cords, hanging at different lengths from the ceiling or a truss bar. A room light.',
+    defaults: { count: 5, drop: 1.2, lightOn: true },
+    fields: [
+      { key: 'count', label: 'Bulbs', kind: 'count', min: 1, max: 12 },
+      { key: 'drop', label: 'Cord length', kind: 'length', min: 0.1, max: 4, presets: [2, 3, 4, 6] },
+      ...ROOM_LIGHT_FIELDS
+    ]
+  },
+  ceilingDrape: {
+    label: 'Ceiling drape with fairy lights', category: 'Room lights', surface: false,
+    description: 'Fabric swagged across the ceiling with fairy lights in it. A room light.',
+    defaults: { width: 20 * FT, depth: 20 * FT, cover: 'white', lightOn: true },
+    fields: [
+      { key: 'width', label: 'Width', kind: 'length', min: 2, max: 20, presets: [12, 20, 30, 40] },
+      { key: 'depth', label: 'Depth', kind: 'length', min: 2, max: 20, presets: [12, 20, 30, 40] },
+      { key: 'cover', label: 'Fabric', kind: 'cover', coverNames: { none: 'Ivory' } },
+      ...ROOM_LIGHT_FIELDS
+    ]
+  },
+  wallSconce: {
+    label: 'Wall light', category: 'Room lights', surface: false,
+    description: 'A sconce on the wall, washing light up and down it. Put it against a wall or a backdrop. A room light.',
+    defaults: { bottom: 6 * FT, lightOn: true },
+    fields: [{ key: 'bottom', label: 'Height', kind: 'length', min: 0.5, max: 4, presets: [5, 6, 7, 8] }, ...ROOM_LIGHT_FIELDS]
   },
   neonSign: {
     label: 'Neon sign', category: 'Party', surface: false,
@@ -704,6 +773,11 @@ export function footprint(s: Structure): [number, number] {
     case 'photoBooth': return [Math.max(1.4, (p.size ?? 39) * IN + 0.5), Math.max(1.4, (p.size ?? 39) * IN + 0.5)]
     case 'neonSign': return [p.width, 0.35]
     case 'discoBall': return [Math.max(0.2, discoRadius(p.size) * 2), Math.max(0.2, discoRadius(p.size) * 2)]
+    case 'photoBackdrop': return [p.width + 0.6, 2.6]
+    case 'chandelier': return [(p.size ?? 36) * IN, (p.size ?? 36) * IN]
+    case 'pendantLights': return [0.9, 0.9]
+    case 'ceilingDrape': return [p.width, p.depth]
+    case 'wallSconce': return [0.3, 0.2]
     case 'backdrop': return [p.width, 0.6]
     case 'stanchions': return [Math.max(1, (p.count ?? 2) - 1) * p.width, 0.35]
     case 'plant': return [Math.max(0.35, p.height * 0.35), Math.max(0.35, p.height * 0.35)]
@@ -743,6 +817,10 @@ export function heightOf(s: Structure): number {
     case 'photoBooth': return 0.1
     case 'neonSign': return (p.bottom ?? 0) + p.width * 0.4
     case 'discoBall': return s.hang ? 0 : 0.1 + (p.drop ?? 0.5) + discoRadius(p.size) * 2
+    case 'photoBackdrop': return p.height
+    case 'chandelier': case 'pendantLights': return s.hang ? 0 : (p.drop ?? 0.5) + 0.8
+    case 'ceilingDrape': return 0.5
+    case 'wallSconce': return (p.bottom ?? 1.8) + 0.3
     case 'stanchions': return 0.95
     case 'crowd': return 1.8
   }
@@ -941,6 +1019,11 @@ export function defaultName(kind: StructureKind, params: StructureParams): strin
     case 'photoBooth': return '360 photo booth'
     case 'neonSign': return `Neon sign “${(p.text ?? '').slice(0, 20)}”`
     case 'discoBall': return `Disco ball ${p.size ?? 16} in`
+    case 'photoBackdrop': return 'Photo booth'
+    case 'chandelier': return `Chandelier ${p.size ?? 36} in`
+    case 'pendantLights': return `Pendant lights × ${p.count ?? 5}`
+    case 'ceilingDrape': return `Ceiling drape ${ft(p.width)} × ${ft(p.depth)} ft`
+    case 'wallSconce': return 'Wall light'
     case 'ledWall': return `LED wall ${ft(p.width)} × ${ft(p.height)} ft`
     case 'stanchions': return `Stanchions × ${p.count}`
     case 'crowd': return `Crowd ${ft(p.width)} × ${ft(p.depth)} ft`
@@ -1009,12 +1092,20 @@ export const STRUCTURE_PRESETS: Array<{ name: string; kind: StructureKind; param
   { name: 'Dance floor, white', kind: 'danceFloor', params: { cover: 'white' } },
   // Party
   { name: 'LED dance floor 15 × 15 ft', kind: 'danceFloor', params: { led: true, cover: 'black' } },
+  { name: 'Sparkle dance floor 15 × 15 ft', kind: 'danceFloor', params: { led: true, cover: 'black', pattern: 4 } },
   { name: 'Balloon arch', kind: 'balloonArch', params: {} },
   { name: '360 photo booth', kind: 'photoBooth', params: {} },
   { name: 'Neon sign', kind: 'neonSign', params: {} },
+  { name: 'Photo booth with backdrop', kind: 'photoBackdrop', params: {} },
   { name: 'Disco ball 12 in', kind: 'discoBall', params: { size: 12 } },
   { name: 'Disco ball 20 in', kind: 'discoBall', params: { size: 20 } },
   { name: 'Disco ball 30 in', kind: 'discoBall', params: { size: 30, drop: 1 } },
+  // Room lights
+  { name: 'Chandelier 36 in', kind: 'chandelier', params: {} },
+  { name: 'Chandelier 48 in', kind: 'chandelier', params: { size: 48 } },
+  { name: 'Pendant lights', kind: 'pendantLights', params: {} },
+  { name: 'Ceiling drape with fairy lights', kind: 'ceilingDrape', params: {} },
+  { name: 'Wall light', kind: 'wallSconce', params: {} },
   // Screens
   { name: 'Projection screen 12 ft', kind: 'screen', params: {} },
   { name: 'LED wall 4 × 2.5 m', kind: 'ledWall', params: {} },

@@ -7,19 +7,19 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
-import { addLibraryFixtures, addStructure, mountFixtures, moveFixtures, moveSelection } from '../state/commands'
+import { addLibraryFixtures, addStructure, hangFromCeiling, mountFixtures, moveFixtures, moveSelection, standOnFloor } from '../state/commands'
 import { registerView, type NudgeKind, type ViewPreset } from '../state/viewBus'
 import { useLibrary } from '../state/library'
 import { DRAG_TYPE, type DragPayload } from '../ui/LibraryPanel'
 import { STRUCTURE_DRAG, type StructureDrag } from '../ui/ObjectsPanel'
 import { StructureEditor, StructureHud, StructureMenu, useStructureEditor } from '../ui/StructureActions'
 import { ShowBuilder } from '../ui/ShowBuilder'
-import { roomFit, type RoomFit } from '../model/physics'
+import { ceilingOf, roomFit, type RoomFit } from '../model/physics'
 import { mountPoints, nearestOn, pointAt, STRUCTURE_KINDS, toWorld, type MountPoint, type Structure } from '../model/structures'
 import { movingRoots, withRiders } from '../model/arrange'
 import { boundsOf, EMPTY_BOUNDS, fitCamera } from '../model/cameraFit'
 import { StructureRig, mountGuides } from './structures'
-import { DiscoReflections, type Ball } from './discoBalls'
+import { DiscoReflections, spotRays, type Ball } from './discoBalls'
 import { ViewToolbar } from '../ui/ViewToolbar'
 import { NavPad } from '../ui/NavPad'
 import { Notices } from '../ui/Notices'
@@ -341,8 +341,21 @@ export function Viewport() {
         addLibraryFixtures(type, 1, { at: snap.position, mount: { structure: snap.structure.id, point: snap.point.id, t: snap.t } })
         return
       }
-      const at = floorPoint(e.clientX, e.clientY) ?? new THREE.Vector3(0, 0, 0)
       const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v))
+      // Dropped up on the ceiling: it hangs there.
+      const ceiling = ceilingOf(useStore.getState().project)
+      if (ceiling !== null && !floorPoint(e.clientX, e.clientY)) {
+        const rect = renderer.domElement.getBoundingClientRect()
+        const ray = new THREE.Raycaster()
+        ray.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera)
+        const up = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -ceiling), new THREE.Vector3())
+        if (up) {
+          const [id] = addLibraryFixtures(type, 1, { at: [clamp(up.x, 30), 0.1, clamp(up.z, 25)] })
+          if (id) hangFromCeiling([id], { id, x: clamp(up.x, 30), z: clamp(up.z, 25) })
+          return
+        }
+      }
+      const at = floorPoint(e.clientX, e.clientY) ?? new THREE.Vector3(0, 0, 0)
       addLibraryFixtures(type, 1, { at: [clamp(at.x, 30), 0.1, clamp(at.z, 25)] })
     }
     container.addEventListener('dragover', onDragOver)
@@ -370,6 +383,8 @@ export function Viewport() {
       from?: THREE.Vector3
       delta?: THREE.Vector3
       snap?: Snap | null
+      /** Dragged onto the ceiling, or down off it onto the floor. */
+      surface?: { x: number; y: number; z: number; ceiling: boolean } | null
       moved: boolean
     } = { kind: 'none', x: 0, y: 0, moved: false }
     const applyNav = () => {
@@ -464,6 +479,31 @@ export function Viewport() {
       }
       return best
     }
+    /**
+     * Where a dragged fixture goes when it's taken past the horizon of its own level:
+     * a floor fixture pointed up at the ceiling hangs there; a ceiling one pointed down
+     * at the floor stands there. Only when its own level can't be reached (`offPlane`).
+     */
+    const surfaceAt = (clientX: number, clientY: number, id: string | undefined, offPlane: boolean) => {
+      if (!offPlane || !id) return null
+      const { project } = useStore.getState()
+      const f = project.fixtures.find((x) => x.id === id)
+      const ceiling = ceilingOf(project)
+      if (!f || ceiling === null) return null
+      raycaster.setFromCamera(toNdc(clientX, clientY), camera)
+      const up = raycaster.ray.direction.y > 0
+      const onCeiling = !!f.onCeiling && f.mounting === 'hanging'
+      if (up === onCeiling) return null
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), up ? -ceiling : 0)
+      const at = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+      if (!at) return null
+      // Keep it in the room: pointing past the back wall puts it at the back of the ceiling, not behind the wall.
+      if (builtFit) {
+        at.x = Math.max(-builtFit.halfWidth + 0.3, Math.min(builtFit.halfWidth - 0.3, at.x))
+        at.z = Math.max(builtFit.wallZ + 0.4, Math.min(builtFit.front - 0.3, at.z))
+      }
+      return { x: Math.round(at.x * 20) / 20, y: up ? ceiling : 0, z: Math.round(at.z * 20) / 20, ceiling: up }
+    }
     const toLocalVec = (st: Structure, w: THREE.Vector3): [number, number, number] => {
       const a = (st.rotation * Math.PI) / 180
       const dx = w.x - st.position[0]
@@ -494,6 +534,12 @@ export function Viewport() {
         scene.add(guides)
       }
       if (!on) ring.visible = false
+    }
+    /** The ring, lying flat on the ceiling or the floor where a dragged fixture will go. */
+    const showSurfaceRing = (at: { x: number; y: number; z: number }) => {
+      ring.visible = true
+      ring.position.set(at.x, at.y + (at.y > 0 ? -0.02 : 0.02), at.z)
+      ring.rotation.set(Math.PI / 2, 0, 0)
     }
     const showRing = (snap: Snap | null) => {
       ring.visible = !!snap
@@ -656,6 +702,13 @@ export function Viewport() {
         const at = raycaster.ray.intersectPlane(gesture.plane, new THREE.Vector3())
         // Snap to 5 cm, like the arrows.
         if (at) gesture.delta = at.sub(gesture.from).divideScalar(0.05).round().multiplyScalar(0.05)
+        // Along the ceiling, pointing near the horizon reaches far away: keep it inside the room.
+        const dragged = gesture.kind === 'body' && gesture.id ? useStore.getState().project.fixtures.find((f) => f.id === gesture.id) : undefined
+        if (dragged?.onCeiling && builtFit && gesture.delta) {
+          const x = Math.max(-builtFit.halfWidth + 0.3, Math.min(builtFit.halfWidth - 0.3, dragged.position[0] + gesture.delta.x))
+          const z = Math.max(builtFit.wallZ + 0.4, Math.min(builtFit.front - 0.3, dragged.position[2] + gesture.delta.z))
+          gesture.delta.set(x - dragged.position[0], gesture.delta.y, z - dragged.position[2])
+        }
         const delta = gesture.delta ?? new THREE.Vector3()
         const { selection } = useStore.getState()
         if (gesture.kind === 'set') {
@@ -664,9 +717,14 @@ export function Viewport() {
         }
         // A fixture near a mount point snaps onto it: a totem top, a truss, a facade.
         gesture.snap = snapAt(e.clientX, e.clientY, 28)
+        // Pointing above the horizon (past where the floor ends): onto the ceiling. A light on
+        // the ceiling dragged below the horizon comes down onto the floor.
+        gesture.surface = gesture.snap ? null : surfaceAt(e.clientX, e.clientY, gesture.id, !at)
         showRing(gesture.snap)
+        if (gesture.surface) showSurfaceRing(gesture.surface)
         previewMove(selection, delta, false)
         if (gesture.snap && gesture.id) rigs.get(gesture.id)?.root.position.set(...gesture.snap.position)
+        if (gesture.surface && gesture.id) rigs.get(gesture.id)?.root.position.set(gesture.surface.x, gesture.surface.y, gesture.surface.z)
       }
     }
     const onUp = (e: PointerEvent) => {
@@ -681,7 +739,10 @@ export function Viewport() {
         const { selection } = useStore.getState()
         const fixtures = useStore.getState().project.fixtures.filter((f) => selection.includes(f.id)).map((f) => f.id)
         if (g.moved && g.snap) mountFixtures(fixtures, g.snap.structure.id, g.snap.point.id, g.snap.t)
-        else if (g.moved && g.delta) moveFixtures(fixtures, [g.delta.x, 0, g.delta.z])
+        else if (g.moved && g.surface && g.id) {
+          if (g.surface.ceiling) hangFromCeiling(fixtures, { id: g.id, x: g.surface.x, z: g.surface.z })
+          else standOnFloor(fixtures, { id: g.id, x: g.surface.x, z: g.surface.z })
+        } else if (g.moved && g.delta) moveFixtures(fixtures, [g.delta.x, 0, g.delta.z])
         else clickSelect(g.id, e.shiftKey)
         sync(useStore.getState().project, useStore.getState().selection)
         return
@@ -849,6 +910,7 @@ export function Viewport() {
       wasLive = live
 
       projectors.begin()
+      spotRays.length = 0
       dmxBus.alignUniverses([...new Set(project.fixtures.map((f) => f.universe))])
       const universes = new Map<number, Uint8Array>()
       for (const fixture of project.fixtures) {
@@ -865,7 +927,8 @@ export function Viewport() {
         if (mix.isLive(fixture.id)) rig.update(decodeHeads(getFixtureType(fixture.typeId), levels, fixture.address, time), dt, haze, time)
         else rig.blackout(haze, time)
       }
-      for (const set of sets.values()) set.tick(time)
+      const ambient = roomOf(project).ambient
+      for (const set of sets.values()) set.tick(time, ambient)
       // Disco balls reflect every beam that hits them.
       const balls: Ball[] = []
       for (const set of sets.values()) {
@@ -874,9 +937,9 @@ export function Viewport() {
         set.root.updateMatrixWorld(true)
         balls.push(b)
       }
-      if (balls.length || discoActive) {
-        disco.update(balls, projectors.all(), { ceiling: builtRoom?.ceiling && builtFit ? builtFit.ceiling : null, wallZ: builtFit?.wallZ ?? -6 }, haze)
-        discoActive = balls.length > 0
+      if (balls.length || spotRays.length || discoActive) {
+        disco.update(balls, projectors.all(), { ceiling: builtRoom?.ceiling && builtFit ? builtFit.ceiling : null, wallZ: builtFit?.wallZ ?? -6 }, haze, spotRays)
+        discoActive = balls.length > 0 || spotRays.length > 0
       }
       fog.density = 0.008 + haze * 0.025
       scene.fog = haze > 0 ? fog : null

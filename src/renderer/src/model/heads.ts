@@ -311,9 +311,10 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
       const u = r('uv') ?? 0
       const t = head.whiteTint ?? [1, 1, 1]
       color = [
-        Math.min(1, (r('red') ?? 0) + w * t[0] + a + u * 0.3),
-        Math.min(1, (r('green') ?? 0) + w * t[1] + a * 0.55),
-        Math.min(1, (r('blue') ?? 0) + w * t[2] + u * 0.9)
+        // UV shows as a deep violet (it's barely visible light; what glows under it isn't drawn).
+        Math.min(1, (r('red') ?? 0) + w * t[0] + a + u * 0.42),
+        Math.min(1, (r('green') ?? 0) + w * t[1] + a * 0.55 + u * 0.04),
+        Math.min(1, (r('blue') ?? 0) + w * t[2] + u)
       ]
     } else if (hasCmy) {
       // Colour mixing flags on a white lamp: each one takes its opposite colour out.

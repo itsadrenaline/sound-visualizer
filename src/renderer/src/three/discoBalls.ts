@@ -52,6 +52,20 @@ function tilesIn(centre: THREE.Vector3, reach: number, step: number, budget: num
   return n
 }
 
+/**
+ * Single beams that land as spots, listed each frame by the fixtures that throw them
+ * (a Starburst's lens beams): drawn with the disco ball spots, so they sweep round the
+ * room the same way as the ball turns.
+ */
+export interface SpotRay {
+  origin: THREE.Vector3
+  direction: THREE.Vector3
+  color: [number, number, number]
+  /** tan(half the beam angle): how big the spot gets with distance. */
+  tanHalf: number
+}
+export const spotRays: SpotRay[] = []
+
 export interface Ball {
   /** The turning part: its world matrix turns the tiles. */
   ball: THREE.Object3D
@@ -97,9 +111,48 @@ export class DiscoReflections {
     this.group.add(this.dots, this.rays)
   }
 
-  update(balls: Ball[], beams: readonly Projector[], room: RoomBounds, haze: number): void {
+  /** Where a ray from p along r lands: distance and surface normal (normal zero if it lands nowhere). */
+  private land(p: THREE.Vector3, r: THREE.Vector3, room: RoomBounds, normal: THREE.Vector3): number {
+    let s = REACH
+    normal.set(0, 0, 0)
+    if (r.y < -1e-4) {
+      const k = -p.y / r.y
+      if (k < s) (s = k), normal.set(0, 1, 0)
+    }
+    if (room.ceiling !== null && r.y > 1e-4) {
+      const k = (room.ceiling - p.y) / r.y
+      if (k < s) (s = k), normal.set(0, -1, 0)
+    }
+    if (r.z < -1e-4) {
+      const k = (room.wallZ - p.z) / r.z
+      if (k > 0 && k < s) (s = k), normal.set(0, 0, 1)
+    }
+    return s
+  }
+
+  update(balls: Ball[], beams: readonly Projector[], room: RoomBounds, haze: number, singles: readonly SpotRay[] = []): void {
     let dots = 0
     let rays = 0
+    // Single beams (a Starburst's): a spot where each lands.
+    {
+      const normal = new THREE.Vector3()
+      const hit = new THREE.Vector3()
+      for (const ray of singles) {
+        if (dots >= MAX_DOTS) break
+        const strength = Math.max(...ray.color)
+        if (strength < 0.01) continue
+        const s = this.land(ray.origin, ray.direction, room, normal)
+        if (normal.lengthSq() === 0) continue
+        hit.copy(ray.origin).addScaledVector(ray.direction, s).addScaledVector(normal, 0.012)
+        const size = Math.min(0.6, 0.02 + s * ray.tanHalf)
+        this.q.setFromUnitVectors(this.z, normal)
+        this.m.compose(hit, this.q, new THREE.Vector3(size, size, size))
+        this.dots.setMatrixAt(dots, this.m)
+        this.c.setRGB(...ray.color)
+        this.dots.setColorAt(dots, this.c)
+        dots++
+      }
+    }
     const centre = new THREE.Vector3()
     const toBall = new THREE.Vector3()
     const d = new THREE.Vector3()
