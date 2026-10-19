@@ -6,7 +6,7 @@
  */
 import { useMemo, useState } from 'react'
 import { KINDS, KIND_ORDER, type FixtureDef, type FixtureKind, type LookDef } from '../../model/fixtureDef'
-import { LOOK_DEFAULTS, type CellLayout, type LookKind } from '../../model/catalog'
+import { ledsFromName, LOOK_DEFAULTS, type CellLayout, type LookKind } from '../../model/catalog'
 import { searchLibrary, useLibrary } from '../../state/library'
 import { setCellCount, useStudio } from '../../state/studio'
 import { notify } from '../../state/notices'
@@ -15,8 +15,12 @@ import { SaveAsKind } from './MyKinds'
 const SHAPES: Array<[LookKind, string]> = [
   ['par', 'Round can (PAR)'], ['flood', 'Box flood'], ['uplight', 'Small uplight'], ['spider', 'Box of lenses'], ['cluster', 'Round cells on a frame'],
   ['panel', 'Panel of square cells'], ['bar', 'Bar of cells'], ['tube', 'Tube / stick'], ['strip', 'Thin strip'], ['string', 'String of bulbs'], ['mover', 'Moving head (spot/beam)'],
-  ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar / multi-effect bar'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box'], ['fog', 'Machine with a nozzle (fog, effects)']
+  ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar / multi-effect bar'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box'], ['fog', 'Machine with a nozzle (fog, effects)'],
+  ['twinbar', 'Two tilting bars (helix, spider)'], ['curtain', 'LED curtain / starcloth']
 ]
+
+/** Looks drawn with LEDs on the face, where the LED count shows. */
+const LED_FACES: LookKind[] = ['par', 'flood', 'uplight', 'moverWash', 'twinbar', 'curtain']
 
 const LAYOUTS: Array<[CellLayout['kind'], string]> = [['row', 'In a row'], ['column', 'In a column'], ['grid', 'In a grid'], ['ring', 'In a ring'], ['ringCentre', 'A ring and a centre one'], ['hex', 'Packed (honeycomb)']]
 
@@ -113,6 +117,20 @@ export function LookPanel({ def }: { def: FixtureDef }) {
         <label className="field small" title="How many cells in each row of the grid">
           <span className="label">Across</span>
           <input type="number" min={1} max={64} value={look.layout.cols ?? Math.ceil(Math.sqrt(cells))} onChange={(e) => setLook({ layout: { kind: 'grid', cols: Math.max(1, Number(e.target.value)) } })} />
+        </label>
+      )}
+
+      {LED_FACES.includes(look.shape) && (
+        <label className="field small" title="How many LEDs to draw on the face (a 12x12 PAR has 12). Empty: from the name, or the number of cells.">
+          <span className="label">LEDs on the face</span>
+          <input
+            type="number"
+            min={1}
+            max={400}
+            placeholder={String(cells > 1 ? cells : ledsFromName(def.name) ?? 7)}
+            value={look.leds ?? ''}
+            onChange={(e) => setLook({ leds: e.target.value ? Math.max(1, Math.min(400, Math.round(Number(e.target.value)))) : undefined })}
+          />
         </label>
       )}
 

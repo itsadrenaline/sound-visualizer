@@ -29,6 +29,8 @@ export type LookKind =
   | 'derby' // box with a dome of rotating multi-coloured beams (derby, moonflower)
   | 'strobe' // flat bright panel (strobe, blinder)
   | 'fog' // fog or haze machine: a box with a nozzle
+  | 'twinbar' // two bars of LEDs side by side, each tilting on its own motor (BeamZ Double Helix, 8-beam "spiders")
+  | 'curtain' // LED curtain / starcloth: LEDs scattered over a black drape hung from a truss
 
 /** How a fixture's cells sit on its face, for looks that draw cells (cluster, panel). */
 export interface CellLayout {
@@ -103,7 +105,9 @@ export const LOOK_DEFAULTS: Record<LookKind, { size: [number, number, number]; b
   derby: { size: [0.3, 0.22, 0.25], beam: [15, 15] },
   strobe: { size: [0.35, 0.12, 0.12], beam: [110, 110] },
   fog: { size: [0.25, 0.2, 0.5], beam: [30, 30] },
-  string: { size: [3.0, 0.3, 0.06], beam: [180, 180] }
+  string: { size: [3.0, 0.3, 0.06], beam: [180, 180] },
+  twinbar: { size: [0.28, 0.16, 0.15], beam: [6, 6] },
+  curtain: { size: [2.0, 1.0, 0.02], beam: [120, 120] }
 }
 
 export interface FixtureSpec {
@@ -201,8 +205,20 @@ const CATALOG: Entry[] = [
     spec: { look: 'flood', size: [0.216, 0.254, 0.18], beam: [60, 90], output: 0.45, leds: 18, mount: 'floor', note: 'Chauvet Wash FX: 18 tri-colour RGB LEDs, pixel-mappable zones, 90° coverage.' }
   },
   {
-    match: /spider/i,
+    match: /spider\s*wash|wash\s*24/i,
     spec: { look: 'spider', size: [0.285, 0.22, 0.19], beam: [20, 20], output: 0.6, leds: 24, mount: 'floor', note: 'Both Lighting Spider Wash (WASH24): 24 × 12 W RGBWA+UV LEDs in separately coloured groups, 20° beams.' }
+  },
+  {
+    match: /double\s*helix|mhl\s*-?820/i,
+    spec: { look: 'twinbar', size: [0.28, 0.16, 0.15], pan: 0, tilt: 135, beam: [6, 6], speed: 180, output: 0.35, leds: 8, mount: 'floor', note: 'BeamZ Double Helix (MHL820): two heads side by side, each a bar of four 3 W LEDs (red, green, blue, white) tilting 135° on its own motor. Beam angle not printed: narrow, like similar effects.' }
+  },
+  {
+    match: /sparkle\s*wall.*(led\s?36|1\s*x\s*2|2\s*x\s*1)|151\.?202/i,
+    spec: { look: 'curtain', size: [2.0, 1.0, 0.02], beam: [120, 120], output: 0.3, leds: 36, mount: 'hanging', note: 'BeamZ SparkleWall LED36 (151.202): an LED curtain, 36 RGBW LEDs over 2 × 1 m of black cloth, all one colour.' }
+  },
+  {
+    match: /sparkle\s*wall|151\.?200/i,
+    spec: { look: 'curtain', size: [3.0, 2.0, 0.02], beam: [120, 120], output: 0.4, leds: 96, mount: 'hanging', note: 'BeamZ SparkleWall LED96 (151.200): an LED curtain, 96 RGBW LEDs over 3 × 2 m of black cloth, all one colour.' }
   }
 ]
 
@@ -217,4 +233,16 @@ export function catalogSpec(name: string): FixtureSpec | undefined {
 /** The spec for a fixture by its name, or a sensible generic one. */
 export function specFor(definitionName: string, isMover: boolean): FixtureSpec {
   return CATALOG.find((e) => e.match.test(definitionName))?.spec ?? (isMover ? GENERIC_MOVER : GENERIC_PAR)
+}
+
+/**
+ * How many LEDs a fixture's name says it has: "Par RGBWAU 12x12" and "18 x 10W" are
+ * 12 and 18 LEDs, "8x3W" is 8. Sizes ("3 x 2 m") and channel counts aren't LEDs.
+ * Used to draw the face when nothing else says how many LEDs there are.
+ */
+export function ledsFromName(name: string): number | undefined {
+  const m = /(?:^|[^\d.])(\d{1,3})\s*[x×]\s*(\d{1,3}(?:[.,]\d+)?)\s*(w\b|watt)?(?!\s*(?:m\b|mm\b|cm\b|mtr|ft\b|'|"|\d))/i.exec(name)
+  // "LED36", "LED96" (BeamZ SparkleWall): the LED count is part of the model name.
+  const n = Number(m?.[1] ?? /\bLED\s?(\d{2,3})\b/i.exec(name)?.[1] ?? 0)
+  return n >= 2 && n <= 200 ? n : undefined
 }

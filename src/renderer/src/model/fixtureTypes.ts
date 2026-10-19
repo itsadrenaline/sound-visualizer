@@ -7,7 +7,7 @@
 
 /** What a channel controls. `fine` channels hold the low byte of a 16-bit value. */
 import type { HeadDef } from './heads'
-import type { FixtureSpec } from './catalog'
+import { catalogSpec, type FixtureSpec } from './catalog'
 
 export type ChannelFunction =
   | 'pan' | 'panFine'
@@ -87,7 +87,18 @@ export const FIXTURE_TYPES: Record<string, FixtureType> = {
 const registered = new Map<string, FixtureType>()
 
 export function registerFixtureTypes(types: FixtureType[] | undefined): void {
-  for (const type of types ?? []) registered.set(type.id, type)
+  for (const type of types ?? []) registered.set(type.id, withKnownLook(type))
+}
+
+/**
+ * A show saved before we knew what a SoundSwitch fixture looks like (its look was a
+ * guess) gets the researched look now, without waiting for the next sync.
+ */
+function withKnownLook(type: FixtureType): FixtureType {
+  if (type.source !== 'SoundSwitch' || !type.lookGuessed) return type
+  const known = catalogSpec(type.name)
+  if (!known) return type
+  return { ...type, spec: known, panRange: known.pan ?? type.panRange, tiltRange: known.tilt ?? type.tiltRange, lookGuessed: false }
 }
 
 /** A plain stand-in, so a fixture whose type went missing still draws instead of crashing. */

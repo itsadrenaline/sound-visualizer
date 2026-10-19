@@ -10,7 +10,7 @@ import type { SoundSwitchAttribute, SoundSwitchFixture, SoundSwitchHead } from '
 import { plainName, type FixtureType } from './fixtureTypes'
 import { channelListFromHeads, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
 import type { Fixture, Project } from './project'
-import { catalogSpec, LOOK_DEFAULTS, specFor, type FixtureSpec, type LookKind } from './catalog'
+import { catalogSpec, ledsFromName, LOOK_DEFAULTS, specFor, type FixtureSpec, type LookKind } from './catalog'
 import { autoLayout } from './layout'
 
 /** SoundSwitch attribute codes, worked out from the names SoundSwitch shows for them. */
@@ -54,10 +54,27 @@ function functionOf(a: SoundSwitchAttribute, wheels: ImportedFixture['wheels']):
   return CODE_TO_FUNCTION[a.code] ?? null
 }
 
-function roleOf(head: SoundSwitchHead, attrs: SoundSwitchAttribute[], fns: Set<HeadFunction>, fixtureHasMover: boolean): HeadRole {
+/** A colour from its name ("Red", "Yellow color", "Red + Green"), or null if it names none. */
+export function colourFromName(name: string): [number, number, number] | null {
+  const COLOURS: Array<[RegExp, [number, number, number]]> = [
+    [/white/i, [1, 1, 1]], [/yellow/i, [1, 1, 0]], [/purple|magenta|pink|violet/i, [1, 0, 1]], [/cyan|turquoise|aqua|light\s*blue/i, [0, 1, 1]],
+    [/orange|amber/i, [1, 0.5, 0]], [/\buv\b/i, [0.45, 0, 1]], [/red/i, [1, 0, 0]], [/green/i, [0, 1, 0]], [/blue/i, [0, 0, 1]]
+  ]
+  // "Red + Green", "R/G": several at once.
+  const parts = name.split(/\s*(?:\+|&|\/|\band\b)\s*/i).map((p) => COLOURS.find(([re]) => re.test(p))?.[1]).filter((c): c is [number, number, number] => !!c)
+  if (!parts.length) return null
+  return [0, 1, 2].map((i) => Math.min(1, parts.reduce((sum, c) => sum + c[i], 0))) as [number, number, number]
+}
+
+/** Lasers by name: "EL-900RGB", "Laserworld …", anything with "laser" in it. */
+const LASER_NAME = /laser|\bEL-?\d{3,4}\s*RG/i
+
+function roleOf(head: SoundSwitchHead, attrs: SoundSwitchAttribute[], fns: Set<HeadFunction>, fixtureHasMover: boolean, laserFixture = false): HeadRole {
   const name = head.name
   const hasColor = ['red', 'green', 'blue', 'amber', 'uv'].some((f) => fns.has(f as HeadFunction))
   if (fns.has('laser') || attrs.some((a) => /laser/i.test(a.name))) return 'laser'
+  // A laser projector (its pan/tilt are the X/Y of the drawing, not a moving head).
+  if (laserFixture && !/strobe|derby|master/i.test(name)) return 'laser'
   if (/master/i.test(name) && fns.has('dimmer')) return 'master'
   if (/derby/i.test(name)) return 'derby'
   if (/strobe|white light/i.test(name) || (!hasColor && !fns.has('pan') && fns.has('shutter') && !fns.has('dimmer'))) return 'strobe'
@@ -73,7 +90,10 @@ export const LAYOUT_VERSION = 2
 export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
   const attrs = f.mode.attributes
   const sourceHeads: SoundSwitchHead[] = f.mode.heads?.length ? f.mode.heads : [{ name: 'Main', attributes: attrs.map((_, i) => i) }]
-  const fixtureHasMover = attrs.some((a) => a.code === 3 || a.code === 4)
+  // Not a multi-effect light that happens to have a laser in it ("Derby Laser Strobe").
+  const laserFixture = (LASER_NAME.test(f.definition) || /laser/i.test(f.manufacturer ?? '')) && !/derby|strobe|\bpar\b|wash|gig|bar\b|combo|moon/i.test(f.definition)
+  // A laser's X/Y axes are pan and tilt codes in SoundSwitch, but it isn't a moving head.
+  const fixtureHasMover = !laserFixture && attrs.some((a) => a.code === 3 || a.code === 4)
 
   const heads: HeadDef[] = sourceHeads.map((h) => {
     const ch: HeadDef['ch'] = {}
@@ -92,6 +112,12 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
           .filter((s) => s.rgb)
           .map((s) => ({ lo: s.lo, hi: s.hi, rgb: s.rgb!.map((v) => v / 255) as [number, number, number] }))
       }
+      // Colours given only as named ranges ("Red", "Yellow color", "Red + Green"), as on
+      // lasers: their names say the colour.
+      if (fn === 'colorWheel' && !colorWheel?.length && a.ranges?.length) {
+        const named = a.ranges.map((r) => ({ lo: r.lo, hi: r.hi, rgb: r.rgb ? (r.rgb.map((v) => v / 255) as [number, number, number]) : colourFromName(r.name) })).filter((r): r is WheelSlot => !!r.rgb)
+        if (named.length) colorWheel = named
+      }
       if (fn === 'gobo' && a.wheel && f.wheels?.[a.wheel]?.length) {
         // SoundSwitch lists the gobo wheel's slots with their DMX ranges; the first is usually open.
         goboSlots = f.wheels[a.wheel].map((s, i) => ({ lo: s.lo, hi: s.hi, slot: /open|no gobo/i.test(s.name) ? 0 : i }))
@@ -101,7 +127,7 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
       }
     }
     // Rockville's "warm white" blinders are named white but are warm.
-    return { name: h.name, role: roleOf(h, headAttrs, fns, fixtureHasMover), ch, colorWheel, shutter, goboSlots }
+    return { name: h.name, role: roleOf(h, headAttrs, fns, fixtureHasMover, laserFixture), ch, colorWheel, shutter, goboSlots }
   })
 
   // A head with only dimmer/shutter, next to heads that make the light (Rockville's
@@ -126,7 +152,15 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
 
   const pixelHeads = heads.filter((h) => h.role === 'pixel').length
   const known = catalogSpec(f.definition)
-  const spec = known ?? (pixelHeads > 1 ? multiCellSpec(f.definition, pixelHeads) : specFor(f.definition, fixtureHasMover))
+  const spec =
+    known ??
+    (laserFixture && heads.every((h) => h.role === 'laser' || h.role === 'master')
+      ? { look: 'laser' as const, size: LOOK_DEFAULTS.laser.size, beam: LOOK_DEFAULTS.laser.beam, output: 0.5, mount: 'hanging' as const, note: `${f.definition}: a laser. Its real size isn't known: set it in Fixture Studio.` }
+      : heads.filter((h) => h.ch.tilt && !h.ch.pan).length === 2 && !heads.some((h) => h.ch.pan)
+        ? twinBarSpec(f.definition)
+        : pixelHeads > 1
+          ? multiCellSpec(f.definition, pixelHeads)
+        : specFor(f.definition, fixtureHasMover))
   const body: FixtureType['body'] = fixtureHasMover ? 'movingHead' : pixelHeads > 1 ? 'bar' : 'par'
   return {
     id: typeIdFor(f),
@@ -145,6 +179,11 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
     spec,
     lookGuessed: !known
   }
+}
+
+/** Two bars that only tilt, each on its own motor (8-beam spiders): drawn as such. */
+function twinBarSpec(name: string): FixtureSpec {
+  return { look: 'twinbar', size: LOOK_DEFAULTS.twinbar.size, pan: 0, tilt: 180, beam: LOOK_DEFAULTS.twinbar.beam, speed: 180, output: 0.35, leds: ledsFromName(name) ?? 8, mount: 'floor', note: `${name}: two tilting bars of LEDs. Its size isn't known: set it in Fixture Studio.` }
 }
 
 /** A believable look for a multi-cell fixture we have no spec for, from its name and cell count. */

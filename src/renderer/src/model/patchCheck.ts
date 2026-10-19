@@ -8,6 +8,12 @@
  *    gets the other's levels;
  *  - an overflow: a fixture whose channels run past 512.
  * A clash you mean to keep can be ignored; that's saved with the show.
+ *
+ * Fixtures that come from SoundSwitch are patched in SoundSwitch: when two of them
+ * share channels, that's how the SoundSwitch project is set up (often on purpose: a
+ * second light set to the same address follows the first). Moving one here would be
+ * undone by the next sync, so it isn't a problem: sharedInSoundSwitch() lists them
+ * for a quiet note instead.
  */
 import { footprint, nextFreeAddress, type Fixture, type Project } from './project'
 import { getFixtureType, plainName } from './fixtureTypes'
@@ -55,6 +61,21 @@ export function range(universe: number, from: number, to: number): string {
   return `U${universe + 1} ${from}${to > from ? `–${to}` : ''}`
 }
 
+/** Patched in SoundSwitch (every fixture in the slot came from the linked project). */
+const fromSoundSwitch = (s: Slot) => s.fixtures.every((f) => !!f.soundswitchKey)
+
+/** Two slots that share channels because SoundSwitch's patch has them that way. */
+export function sharedInSoundSwitch(p: Project): Array<[Slot, Slot]> {
+  const slots = slotsOf(p.fixtures)
+  const out: Array<[Slot, Slot]> = []
+  for (let i = 0; i < slots.length; i++)
+    for (let j = i + 1; j < slots.length; j++) {
+      const [a, b] = [slots[i], slots[j]]
+      if (a.universe === b.universe && a.address <= b.end && b.address <= a.end && fromSoundSwitch(a) && fromSoundSwitch(b)) out.push([a, b])
+    }
+  return out
+}
+
 export function patchProblems(p: Project): PatchProblem[] {
   const ignored = new Set(p.ignoredClashes ?? [])
   const slots = slotsOf(p.fixtures)
@@ -64,6 +85,8 @@ export function patchProblems(p: Project): PatchProblem[] {
       const a = slots[i]
       const b = slots[j]
       if (a.universe !== b.universe || a.address > b.end || b.address > a.end) continue
+      // SoundSwitch's own patch: set up there, and the next sync would undo a move.
+      if (fromSoundSwitch(a) && fromSoundSwitch(b)) continue
       const key = [a.key, b.key].sort().join('|')
       if (ignored.has(key)) continue
       // Move whichever starts later (on a tie, the one added later).
@@ -73,6 +96,7 @@ export function patchProblems(p: Project): PatchProblem[] {
   }
   for (const s of slots) {
     if (s.address >= 1 && s.end <= 512) continue
+    if (fromSoundSwitch(s)) continue
     problems.push({ key: `over:${s.key}`, kind: 'overflow', move: s, from: Math.max(513, s.address), to: s.end })
   }
   return problems

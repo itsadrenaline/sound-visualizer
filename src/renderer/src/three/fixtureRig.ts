@@ -12,7 +12,7 @@ import * as THREE from 'three'
 import type { Fixture } from '../model/project'
 import type { FixtureType } from '../model/fixtureTypes'
 import { headsOf, type HeadDef, type HeadState } from '../model/heads'
-import { cellPositions, specFor, type FixtureSpec } from '../model/catalog'
+import { cellPositions, ledsFromName, specFor, type FixtureSpec } from '../model/catalog'
 import { createBeamMaterial } from './beamMaterial'
 import { projectors } from './projectors'
 import { goboCell } from './gobos'
@@ -256,16 +256,18 @@ class LaserEmitter implements Emitter {
   private material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })
   /**
    * `byChannel`: SoundSwitch's laser channel switches it on and picks the pattern.
-   * Otherwise (library fixtures) it follows the head's intensity and colour.
+   * Otherwise (library fixtures) it follows the head's intensity.
+   * `coloured`: the head has a colour channel (a laser's colour macro, RGB): the beams
+   * take that colour. Without one, red and green beams like a typical RG laser.
    */
-  constructor(parent: THREE.Object3D, private byChannel = true) {
+  constructor(parent: THREE.Object3D, private byChannel = true, private coloured = false) {
     const n = 40
     const positions = new Float32Array(n * 6)
     const colors = new Float32Array(n * 6)
     for (let i = 0; i < n; i++) {
       const a = ((i / (n - 1)) - 0.5) * 93 * DEG
       positions.set([0, 0, 0, Math.sin(a) * 12, 12 * Math.cos(a) * 0.5, -Math.cos(a) * 12], i * 6)
-      const c = i % 2 ? [0.1, 1, 0.1] : [1, 0.1, 0.05]
+      const c = coloured ? [1, 1, 1] : i % 2 ? [0.1, 1, 0.1] : [1, 0.1, 0.05]
       colors.set([...c, ...c], i * 6)
     }
     const geometry = new THREE.BufferGeometry()
@@ -275,10 +277,15 @@ class LaserEmitter implements Emitter {
     parent.add(this.lines)
   }
   update(s: HeadState, _haze: number, time: number): void {
-    const on = this.byChannel ? s.rotation > 0.02 : s.intensity > 0.02 && Math.max(...s.color) > 0.02
+    const lit = Math.max(...s.color) > 0.02
+    const on = this.byChannel ? s.rotation > 0.02 && (!this.coloured || (lit && s.intensity > 0.02)) : s.intensity > 0.02 && lit
     this.lines.visible = on
     this.material.opacity = 0.7
-    if (!this.byChannel) this.material.color.setRGB(...s.color)
+    if (this.coloured || !this.byChannel) {
+      // Pure, bright laser colours: the strongest part of the colour at full.
+      const peak = Math.max(...s.color, 0.0001)
+      this.material.color.setRGB(s.color[0] / peak, s.color[1] / peak, s.color[2] / peak)
+    }
     this.lines.rotation.y = Math.sin(time * (0.5 + s.rotation * 3)) * 0.6
     this.lines.rotation.x = Math.sin(time * 0.7) * 0.15
   }
@@ -287,6 +294,13 @@ class LaserEmitter implements Emitter {
     this.material.dispose()
   }
 }
+
+/** Does this head choose its own colour (a colour macro or wheel, or RGB)? */
+const hasColour = (h: HeadDef) => !!(h.ch.colorWheel || h.ch.red || h.ch.green || h.ch.blue)
+/** Does this head have its own red, green, blue or white channels? */
+const hasMix = (h: HeadDef) => !!(h.ch.red || h.ch.green || h.ch.blue || h.ch.white)
+/** A Double Helix bar's four LEDs, in order. */
+const LED_COLOURS: Array<[number, number, number]> = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0.95, 0.88]]
 
 // ---------------------------------------------------------------------------
 // Bodies, built to size.
@@ -316,6 +330,36 @@ function hexLayout(n: number, r: number): Array<[number, number]> {
   }
   const scale = r / Math.max(1, ring - 1)
   return out.map(([x, y]) => [x * scale, y * scale])
+}
+
+/**
+ * `n` LEDs on a round face of radius r, in rings like a real PAR (12 = 4 + 8,
+ * 18 = 6 + 12, 7 = 1 + 6). `spacing` is the gap between neighbours, to size the dots.
+ */
+export function roundLayout(n: number, r: number): { points: Array<[number, number]>; spacing: number } {
+  if (n <= 1) return { points: [[0, 0]], spacing: r * 2 }
+  if (n <= 7) {
+    // One ring, with one in the middle when there are 7.
+    const ring = n === 7 ? 6 : n
+    const rr = r * 0.62
+    const points: Array<[number, number]> = Array.from({ length: ring }, (_, i) => [Math.cos((i / ring) * Math.PI * 2) * rr, Math.sin((i / ring) * Math.PI * 2) * rr])
+    if (n === 7) points.push([0, 0])
+    return { points, spacing: Math.min(rr, 2 * rr * Math.sin(Math.PI / ring)) }
+  }
+  const rings = Math.max(2, Math.round(Math.sqrt(n / 3.2)))
+  const weights = Array.from({ length: rings }, (_, i) => i + 1)
+  const total = weights.reduce((a, b) => a + b, 0)
+  const counts = weights.map((w) => Math.max(3, Math.round((n * w) / total)))
+  counts[rings - 1] += n - counts.reduce((a, b) => a + b, 0)
+  const points: Array<[number, number]> = []
+  let spacing = r
+  counts.forEach((c, i) => {
+    const rr = (r * (i + 1)) / rings
+    const turn = i % 2 ? Math.PI / c : 0
+    for (let k = 0; k < c; k++) points.push([Math.cos(turn + (k / c) * Math.PI * 2) * rr, Math.sin(turn + (k / c) * Math.PI * 2) * rr])
+    spacing = Math.min(spacing, r / rings, 2 * rr * Math.sin(Math.PI / c))
+  })
+  return { points, spacing }
 }
 
 interface Mover {
@@ -403,6 +447,22 @@ export class FixtureRig {
     const beamHeads = this.headIndex((x) => x.role === 'beam')
     const candela = this.type.candela
 
+    // Several moving heads on one fixture (Hydrabeam, Crazy Pocket, Duo Q-Beam): one small
+    // mover for each, side by side, each following its own pan and tilt.
+    const moverHeads = this.headIndex((x) => !!(x.ch.pan || x.ch.tilt))
+    if ((s.look === 'mover' || s.look === 'moverWash') && moverHeads.length > 1) {
+      const n = moverHeads.length
+      const step = w / n
+      const each: [number, number, number] = [step * 0.95, h, Math.min(d, step * 1.1)]
+      moverHeads.forEach((i, k) => {
+        const x = -w / 2 + step * (k + 0.5)
+        const tilt = this.buildMover(this.mount, i, each, x, s.look === 'moverWash')
+        const headLen = s.look === 'moverWash' ? h * 0.32 : h * 0.55
+        this.emitters[i] = new BeamEmitter(tilt, this.root, Math.min(each[0], each[2]) * 0.24, headLen / 2 + 0.002, candela / n, 0)
+      })
+      return
+    }
+
     switch (s.look) {
       case 'mover':
       case 'moverWash': {
@@ -413,7 +473,7 @@ export class FixtureRig {
         this.emitters[main] = new BeamEmitter(tilt, this.root, lensR, headLen / 2 + 0.002, candela, s.look === 'mover' ? 3 : 0)
         if (s.look === 'moverWash') {
           // The 19 LED lenses, glowing in the beam colour.
-          const count = s.leds ?? 19
+          const count = s.leds ?? ledsFromName(this.type.name) ?? 19
           const dots = hexLayout(count, lensR * 0.8).map(([x, z]) => {
             const m = new THREE.Mesh(new THREE.CircleGeometry(lensR * (count <= 7 ? 0.24 : 0.13), 16))
             m.rotation.x = -Math.PI / 2
@@ -514,7 +574,7 @@ export class FixtureRig {
           const holder = new THREE.Group()
           holder.position.set(0, 0.08, 0.04)
           this.mount.add(holder)
-          this.emitters[laser] = new LaserEmitter(holder, !!this.heads[laser].ch.laser)
+          this.emitters[laser] = new LaserEmitter(holder, !!this.heads[laser].ch.laser, hasColour(this.heads[laser]))
         }
         break
       }
@@ -667,7 +727,7 @@ export class FixtureRig {
           const holder = new THREE.Group()
           holder.position.y = faceY
           aim.add(holder)
-          this.emitters[i] = this.heads[i].role === 'laser' ? new LaserEmitter(holder, !!this.heads[i].ch.laser) : new DerbyEmitter(holder)
+          this.emitters[i] = this.heads[i].role === 'laser' ? new LaserEmitter(holder, !!this.heads[i].ch.laser, hasColour(this.heads[i])) : new DerbyEmitter(holder)
         }
         break
       }
@@ -707,7 +767,7 @@ export class FixtureRig {
         effectHeads.forEach((i, k) => {
           if (k === 0 || this.heads[i].role === 'laser' || this.heads[i].role === 'derby') {
             const asLaser = this.heads[i].role === 'laser' || (s.look === 'laser' && this.heads[i].role !== 'derby')
-            this.emitters[i] = asLaser ? new LaserEmitter(holder, !!this.heads[i].ch.laser) : new DerbyEmitter(holder)
+            this.emitters[i] = asLaser ? new LaserEmitter(holder, !!this.heads[i].ch.laser, hasColour(this.heads[i])) : new DerbyEmitter(holder)
           }
         })
         break
@@ -742,6 +802,72 @@ export class FixtureRig {
         }
         break
       }
+      case 'twinbar': {
+        // Two bars side by side on a low base, each turning about its long axis on its own
+        // motor, each with four single-colour LEDs (red, green, blue, white) in a row.
+        const baseH = h * 0.32
+        const base = box(w, baseH, d, this.body)
+        base.position.y = baseH / 2
+        this.mount.add(base)
+        const tiltHeads = this.headIndex((x) => !!x.ch.tilt)
+        const coloured = this.headIndex(hasMix)
+        const barR = Math.min(d * 0.2, h * 0.3)
+        this.twinBars = [0, 1].map((k) => {
+          const own = tiltHeads[k]
+          const yoke = new THREE.Group()
+          yoke.position.set(0, baseH + barR * 1.1, (k - 0.5) * d * 0.48)
+          this.mount.add(yoke)
+          const tilt = new THREE.Group()
+          yoke.add(tilt)
+          tilt.add(box(w * 0.94, barR * 2, barR * 1.7, this.body))
+          // Without a tilt channel per bar (a one-motor model), both follow the first.
+          const mover = own ?? tiltHeads[0]
+          if (mover !== undefined) this.movers.push({ head: mover, yoke, tilt, pan: 0, tiltAngle: 0 })
+          const beams = [0, 1, 2, 3].map((j) => {
+            const holder = new THREE.Group()
+            holder.position.x = (j - 1.5) * w * 0.215
+            tilt.add(holder)
+            return new BeamEmitter(holder, this.root, barR * 0.55, barR + 0.002, candela / 4, 0)
+          })
+          // Its colour: the bar's own channels, or the colour both bars share.
+          const head = own !== undefined && hasMix(this.heads[own]) ? own : (coloured[k] !== undefined && !this.heads[coloured[k]].ch.tilt ? coloured[k] : coloured[0] ?? -1)
+          // One part per LED (eight single-colour parts): each beam follows its own part.
+          const leds = coloured.length >= 8 && coloured.every((i) => !this.heads[i].ch.tilt) ? coloured.slice(k * 4, k * 4 + 4) : undefined
+          return { beams, head, leds }
+        })
+        break
+      }
+      case 'curtain': {
+        // A dark cloth hanging from its top bar (the fixture's position), LEDs scattered over
+        // it. Hung (the usual way) it drapes down; on the floor it stands up from there.
+        const rail = box(w, 0.03, 0.03, this.body)
+        this.mount.add(rail)
+        const cloth = new THREE.Mesh(new THREE.PlaneGeometry(w, h), this.body)
+        cloth.position.y = h / 2
+        this.mount.add(cloth)
+        const leds = s.leds ?? ledsFromName(this.type.name) ?? 36
+        const lights = this.headIndex((x) => x.role === 'pixel' || x.role === 'beam' || x.role === 'strobe')
+        const dotR = Math.max(0.008, Math.min(w, h) * 0.012)
+        // Evenly spread but not in a grid, like a starcloth: the same pattern every time.
+        const cols = Math.max(1, Math.round(Math.sqrt(leds * (w / h))))
+        const rows = Math.ceil(leds / cols)
+        let seed = 7
+        const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+        const dots: THREE.Mesh[][] = lights.map(() => [])
+        for (let k = 0; k < leds; k++) {
+          const c = k % cols
+          const r = Math.floor(k / cols)
+          const x = -w / 2 + (w * (c + 0.2 + rand() * 0.6)) / cols
+          const y = (h * (r + 0.2 + rand() * 0.6)) / rows
+          const m = new THREE.Mesh(new THREE.CircleGeometry(dotR, 10))
+          m.position.set(x, y, 0.004)
+          this.mount.add(m)
+          // Several sections (some modes split the curtain): each lights its part, left to right.
+          dots[Math.min(lights.length - 1, Math.floor(((x + w / 2) / w) * lights.length))]?.push(m)
+        }
+        lights.forEach((i, z) => (this.emitters[i] = new GlowEmitter(dots[z], 3)))
+        break
+      }
       case 'uplight':
       case 'flood':
       case 'spider':
@@ -765,7 +891,7 @@ export class FixtureRig {
           const holder = new THREE.Group()
           holder.position.y = faceY
           aim.add(holder)
-          this.emitters[i] = this.heads[i].role === 'laser' ? new LaserEmitter(holder, !!this.heads[i].ch.laser) : new DerbyEmitter(holder)
+          this.emitters[i] = this.heads[i].role === 'laser' ? new LaserEmitter(holder, !!this.heads[i].ch.laser, hasColour(this.heads[i])) : new DerbyEmitter(holder)
         }
         if (s.look === 'spider') {
           // Separately coloured lens groups, fanned out like the real fixture's arms.
@@ -782,16 +908,31 @@ export class FixtureRig {
         } else {
           // LED dots on the face, glowing in the head colour, and one beam for the fixture.
           const main = lights[0] ?? 0
-          const leds = s.leds ?? 7
-          const cols = s.look === 'uplight' ? 2 : Math.ceil(Math.sqrt(leds * (w / h)))
-          const rows = Math.ceil(leds / cols)
+          // As many LEDs as it really has: the spec, else its name ("12x12" is 12 LEDs).
+          const leds = s.leds ?? ledsFromName(this.type.name) ?? 7
           const dots: THREE.Mesh[] = []
-          for (let k = 0; k < leds; k++) {
-            const m = new THREE.Mesh(new THREE.CircleGeometry(Math.min(w / cols, h / rows) * 0.32, 12))
-            m.rotation.x = -Math.PI / 2
-            m.position.set(((k % cols) - (cols - 1) / 2) * (w / cols) * 0.9, faceY, (Math.floor(k / cols) - (rows - 1) / 2) * (h / rows) * 0.9)
-            aim.add(m)
-            dots.push(m)
+          if (s.look === 'par') {
+            // A round can: LEDs in rings, like the real face.
+            const r = w * 0.4
+            const spots = roundLayout(leds, r)
+            const dotR = Math.min(r * 0.3, spots.spacing * 0.4)
+            for (const [x, z] of spots.points) {
+              const m = new THREE.Mesh(new THREE.CircleGeometry(dotR, 14))
+              m.rotation.x = -Math.PI / 2
+              m.position.set(x, faceY, z)
+              aim.add(m)
+              dots.push(m)
+            }
+          } else {
+            const cols = s.look === 'uplight' ? 2 : Math.ceil(Math.sqrt(leds * (w / h)))
+            const rows = Math.ceil(leds / cols)
+            for (let k = 0; k < leds; k++) {
+              const m = new THREE.Mesh(new THREE.CircleGeometry(Math.min(w / cols, h / rows) * 0.32, 12))
+              m.rotation.x = -Math.PI / 2
+              m.position.set(((k % cols) - (cols - 1) / 2) * (w / cols) * 0.9, faceY, (Math.floor(k / cols) - (rows - 1) / 2) * (h / rows) * 0.9)
+              aim.add(m)
+              dots.push(m)
+            }
           }
           // With several zones (Wash FX), each zone lights its share of the dots.
           if (lights.length > 1) {
@@ -829,6 +970,8 @@ export class FixtureRig {
   private dotsFollow: GlowEmitter | null = null
   private dotsHead = -1
   private extraBeam: { emitter: BeamEmitter; heads: number[] } | null = null
+  /** Twin-bar fixtures: each bar's four LED beams and the head that colours them. */
+  private twinBars: Array<{ beams: BeamEmitter[]; head: number; leds?: number[] }> = []
 
   /** Move or re-aim the fixture after its document properties change. */
   place(fixture: Fixture): void {
@@ -845,7 +988,7 @@ export class FixtureRig {
   /** Stop every beam this far out (a light inside a totem), or let them run (undefined). */
   setReach(reach: number | undefined): void {
     const r = reach ?? BEAM_LENGTH
-    const all = [...this.emitters, this.extraBeam?.emitter]
+    const all = [...this.emitters, this.extraBeam?.emitter, ...this.twinBars.flatMap((b) => b.beams)]
     for (const e of all) if (e instanceof BeamEmitter) e.reach = r
   }
 
@@ -878,6 +1021,15 @@ export class FixtureRig {
     }
     this.emitters.forEach((e, i) => e?.update(states[i] ?? DARK, haze, time))
     if (this.dotsFollow) this.dotsFollow.update(states[this.dotsHead] ?? DARK)
+    for (const bar of this.twinBars) {
+      const st = states[bar.head] ?? DARK
+      // Each LED is one colour: it lights with its own channel. While a program runs (no
+      // levels per colour), all four show the program's colour.
+      bar.beams.forEach((beam, j) => {
+        if (bar.leds) return beam.update(states[bar.leds[j]] ?? DARK, haze, time)
+        beam.update(st.mix ? { ...st, color: LED_COLOURS[j], intensity: st.intensity * st.mix[j] } : st, haze, time)
+      })
+    }
     if (this.extraBeam) {
       // One beam for a multi-zone wash: the average of its zones.
       const zs = this.extraBeam.heads.map((i) => states[i]).filter(Boolean)
@@ -893,6 +1045,7 @@ export class FixtureRig {
     this.emitters.forEach((e) => e?.update(DARK, haze, time))
     this.dotsFollow?.update(DARK)
     this.extraBeam?.emitter.update(DARK, haze, time)
+    for (const bar of this.twinBars) for (const beam of bar.beams) beam.update(DARK, haze, time)
   }
 
   dispose(): void {
@@ -903,6 +1056,7 @@ export class FixtureRig {
     for (const e of this.emitters) e?.dispose()
     this.dotsFollow?.dispose()
     this.extraBeam?.emitter.dispose()
+    for (const bar of this.twinBars) for (const beam of bar.beams) beam.dispose()
   }
 }
 

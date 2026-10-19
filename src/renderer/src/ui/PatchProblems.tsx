@@ -6,7 +6,7 @@
 import { useMemo } from 'react'
 import { useStore } from '../state/store'
 import { fixAllPatchProblems, fixPatchProblem, ignorePatchProblem } from '../state/commands'
-import { describe, fixFor, fixLabel, patchProblems, type PatchProblem } from '../model/patchCheck'
+import { describe, fixFor, fixLabel, patchProblems, range, sharedInSoundSwitch, slotName, type PatchProblem } from '../model/patchCheck'
 import { notify } from '../state/notices'
 import { view } from '../state/viewBus'
 
@@ -76,11 +76,28 @@ export function SelectionProblems({ ids }: { ids: string[] }) {
   )
 }
 
+/**
+ * A quiet line, not a problem: fixtures SoundSwitch itself patches on shared channels
+ * (a second light on the same address follows the first). Hover for which ones.
+ */
+function SharedNote() {
+  const project = useStore((s) => s.project)
+  const shared = useMemo(() => sharedInSoundSwitch(project), [project])
+  if (!shared.length) return null
+  const names = new Set(shared.flatMap(([a, b]) => [...a.fixtures, ...b.fixtures].map((f) => f.id)))
+  const detail = shared.map(([a, b]) => `${slotName(a)} and ${slotName(b)}: ${range(a.universe, Math.max(a.address, b.address), Math.min(a.end, b.end))}`).join('\n')
+  return (
+    <div className="patch-note" title={`Patched this way in SoundSwitch, so they get the same levels there too:\n${detail}`}>
+      {names.size} fixtures share channels in your SoundSwitch patch, as set up there.
+    </div>
+  )
+}
+
 /** For the fixture list: one line when there are problems, opening to the list. */
 export function ProblemsBanner({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
   const problems = usePatchProblems()
   const project = useStore((s) => s.project)
-  if (!problems.length) return null
+  if (!problems.length) return <SharedNote />
   const fixable = problems.filter((p) => fixFor(project, p)).length
   return (
     <div className="problems-banner">
@@ -106,6 +123,7 @@ export function ProblemsBanner({ open, setOpen }: { open: boolean; setOpen: (ope
               Fix all {fixable}
             </button>
           )}
+          <SharedNote />
         </>
       )}
     </div>
