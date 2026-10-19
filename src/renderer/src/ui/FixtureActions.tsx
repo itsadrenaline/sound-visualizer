@@ -15,6 +15,7 @@ import { autoPlaceFixtures, deleteFixtures, detachFixtures, distributeFixtures, 
 import { notify } from '../state/notices'
 import { attachOptions } from './StructureActions'
 import { nearestMount } from '../model/physics'
+import { mountPoints } from '../model/structures'
 import { getFixtureType } from '../model/fixtureTypes'
 import { headsOf } from '../model/heads'
 import { view } from '../state/viewBus'
@@ -148,6 +149,12 @@ export function FixtureMenu() {
   }, [at, close])
 
   if (!at || !info.chosen.length) return null
+  // Attached to a clamp or a facade (not on top, not hanging): these can turn to face out.
+  const clamped = info.chosen.filter((f) => {
+    const s = f.mount && structures.find((x) => x.id === f.mount!.structure)
+    const m = s && mountPoints(s).find((x) => x.id === f.mount!.point)
+    return !!m && (m.kind === 'clamp' || m.kind === 'face')
+  })
   const { ids, mix, moving } = info
   const movingIds = moving.map((f) => f.id)
   const run = (action: () => void) => () => {
@@ -182,6 +189,17 @@ export function FixtureMenu() {
           </>
         )}
         <hr />
+        {clamped.length > 0 && (
+          <Item
+            label="Face out (on its back)"
+            check={clamped.every((f) => f.faceOut) ? '✓' : clamped.some((f) => f.faceOut) ? '–' : ''}
+            title="Clamped to the front of a truss, a leg or a facade: on its back, so it faces the audience instead of pointing up"
+            onClick={run(() => {
+              const out = clamped.some((f) => !f.faceOut)
+              updateFixtures(clamped.map((f) => f.id), out ? 'Face out' : 'Stand upright', (f) => ({ ...f, faceOut: out || undefined }))
+            })}
+          />
+        )}
         {info.chosen.some((f) => hasOwnStand(getFixtureType(f.typeId).spec)) && (
           <Item
             label="Its own stand"

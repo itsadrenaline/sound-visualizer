@@ -8,7 +8,7 @@
  */
 import type { SoundSwitchAttribute, SoundSwitchFixture, SoundSwitchHead } from '../../../shared/soundswitch'
 import { plainName, type FixtureType } from './fixtureTypes'
-import { channelListFromHeads, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
+import { channelListFromHeads, slotFrom, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
 import type { Fixture, Project } from './project'
 import { catalogSpec, ledsFromName, LOOK_DEFAULTS, specFor, type FixtureSpec, type LookKind } from './catalog'
 import { autoLayout } from './layout'
@@ -54,17 +54,7 @@ function functionOf(a: SoundSwitchAttribute, wheels: ImportedFixture['wheels']):
   return CODE_TO_FUNCTION[a.code] ?? null
 }
 
-/** A colour from its name ("Red", "Yellow color", "Red + Green"), or null if it names none. */
-export function colourFromName(name: string): [number, number, number] | null {
-  const COLOURS: Array<[RegExp, [number, number, number]]> = [
-    [/white/i, [1, 1, 1]], [/yellow/i, [1, 1, 0]], [/purple|magenta|pink|violet/i, [1, 0, 1]], [/cyan|turquoise|aqua|light\s*blue/i, [0, 1, 1]],
-    [/orange|amber/i, [1, 0.5, 0]], [/\buv\b/i, [0.45, 0, 1]], [/red/i, [1, 0, 0]], [/green/i, [0, 1, 0]], [/blue/i, [0, 0, 1]]
-  ]
-  // "Red + Green", "R/G": several at once.
-  const parts = name.split(/\s*(?:\+|&|\/|\band\b)\s*/i).map((p) => COLOURS.find(([re]) => re.test(p))?.[1]).filter((c): c is [number, number, number] => !!c)
-  if (!parts.length) return null
-  return [0, 1, 2].map((i) => Math.min(1, parts.reduce((sum, c) => sum + c[i], 0))) as [number, number, number]
-}
+export { colourFromName } from './heads'
 
 /** Lasers by name: "EL-900RGB", "Laserworld …", anything with "laser" in it. */
 const LASER_NAME = /laser|\bEL-?\d{3,4}\s*RG/i
@@ -108,14 +98,15 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
       ch[fn] = a.width === 2 ? { coarse: a.coarse, fine: a.fine } : { coarse: a.coarse }
       fns.add(fn)
       if (fn === 'colorWheel' && a.wheel && f.wheels?.[a.wheel]) {
+        // Colours from SoundSwitch, or from the slot's name ("Red", "Multicolour", "R+G").
         colorWheel = f.wheels[a.wheel]
-          .filter((s) => s.rgb)
-          .map((s) => ({ lo: s.lo, hi: s.hi, rgb: s.rgb!.map((v) => v / 255) as [number, number, number] }))
+          .map((s) => slotFrom(s.lo, s.hi, s.name ?? '', s.rgb ? (s.rgb.map((v) => v / 255) as [number, number, number]) : null))
+          .filter((s): s is WheelSlot => !!s)
       }
       // Colours given only as named ranges ("Red", "Yellow color", "Red + Green"), as on
       // lasers: their names say the colour.
       if (fn === 'colorWheel' && !colorWheel?.length && a.ranges?.length) {
-        const named = a.ranges.map((r) => ({ lo: r.lo, hi: r.hi, rgb: r.rgb ? (r.rgb.map((v) => v / 255) as [number, number, number]) : colourFromName(r.name) })).filter((r): r is WheelSlot => !!r.rgb)
+        const named = a.ranges.map((r) => slotFrom(r.lo, r.hi, r.name, r.rgb ? (r.rgb.map((v) => v / 255) as [number, number, number]) : null)).filter((r): r is WheelSlot => !!r)
         if (named.length) colorWheel = named
       }
       if (fn === 'gobo' && a.wheel && f.wheels?.[a.wheel]?.length) {

@@ -16,11 +16,11 @@ const SHAPES: Array<[LookKind, string]> = [
   ['par', 'Round can (PAR)'], ['flood', 'Box flood'], ['uplight', 'Small uplight'], ['spider', 'Box of lenses'], ['cluster', 'Round cells on a frame'],
   ['panel', 'Panel of square cells'], ['bar', 'Bar of cells'], ['tube', 'Tube / stick'], ['strip', 'Thin strip'], ['string', 'String of bulbs'], ['mover', 'Moving head (spot/beam)'],
   ['moverWash', 'Moving head (wash)'], ['gigbar', 'GigBar / multi-effect bar'], ['strobe', 'Strobe panel'], ['laser', 'Laser box'], ['derby', 'Derby / effect box'], ['fog', 'Machine with a nozzle (fog, effects)'],
-  ['twinbar', 'Two tilting bars (helix, spider)'], ['curtain', 'LED curtain / starcloth']
+  ['twinbar', 'Two tilting bars (helix, spider)'], ['curtain', 'LED curtain / starcloth'], ['sphere', 'Ball of lenses (Starburst)']
 ]
 
 /** Looks drawn with LEDs on the face, where the LED count shows. */
-const LED_FACES: LookKind[] = ['par', 'flood', 'uplight', 'moverWash', 'twinbar', 'curtain']
+const LED_FACES: LookKind[] = ['par', 'flood', 'uplight', 'moverWash', 'twinbar', 'curtain', 'sphere']
 
 const LAYOUTS: Array<[CellLayout['kind'], string]> = [['row', 'In a row'], ['column', 'In a column'], ['grid', 'In a grid'], ['ring', 'In a ring'], ['ringCentre', 'A ring and a centre one'], ['hex', 'Packed (honeycomb)']]
 
@@ -131,6 +131,13 @@ export function LookPanel({ def }: { def: FixtureDef }) {
             value={look.leds ?? ''}
             onChange={(e) => setLook({ leds: e.target.value ? Math.max(1, Math.min(400, Math.round(Number(e.target.value)))) : undefined })}
           />
+        </label>
+      )}
+
+      {look.shape === 'laser' && (
+        <label className="field small" title="How many separate fans of beams come out of the front. The Laserworld EL-900RGB has 4.">
+          <span className="label">Apertures</span>
+          <input type="number" min={1} max={8} value={look.apertures ?? 1} onChange={(e) => setLook({ apertures: Math.max(1, Math.min(8, Math.round(Number(e.target.value) || 1))) })} />
         </label>
       )}
 

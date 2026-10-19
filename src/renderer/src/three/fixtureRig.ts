@@ -250,50 +250,153 @@ class DerbyEmitter implements Emitter {
   }
 }
 
-/** A laser: a fan of very thin red and green lines, moving with the pattern channel. */
-class LaserEmitter implements Emitter {
-  private lines: THREE.LineSegments
-  private material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })
-  /**
-   * `byChannel`: SoundSwitch's laser channel switches it on and picks the pattern.
-   * Otherwise (library fixtures) it follows the head's intensity.
-   * `coloured`: the head has a colour channel (a laser's colour macro, RGB): the beams
-   * take that colour. Without one, red and green beams like a typical RG laser.
-   */
-  constructor(parent: THREE.Object3D, private byChannel = true, private coloured = false) {
-    const n = 40
-    const positions = new Float32Array(n * 6)
-    const colors = new Float32Array(n * 6)
-    for (let i = 0; i < n; i++) {
-      const a = ((i / (n - 1)) - 0.5) * 93 * DEG
-      positions.set([0, 0, 0, Math.sin(a) * 12, 12 * Math.cos(a) * 0.5, -Math.cos(a) * 12], i * 6)
-      const c = coloured ? [1, 1, 1] : i % 2 ? [0.1, 1, 0.1] : [1, 0.1, 0.05]
-      colors.set([...c, ...c], i * 6)
-    }
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    this.lines = new THREE.LineSegments(geometry, this.material)
-    parent.add(this.lines)
+/**
+ * A ball of lenses (ADJ Starburst): thin beams out through the lenses in every
+ * direction, the lenses glowing, all turning with the motor channel.
+ */
+class BurstEmitter implements Emitter {
+  private materials: THREE.ShaderMaterial[] = []
+  private turn = 0
+  private shown = ''
+  constructor(private ball: THREE.Object3D, directions: THREE.Vector3[], radius: number, private lenses: GlowEmitter) {
+    // A few materials, so a multi-colour setting can give neighbouring beams different colours.
+    for (let k = 0; k < 7; k++) this.materials.push(createBeamMaterial())
+    const length = BEAM_LENGTH * 0.6
+    const r = length * Math.tan(1.2 * DEG)
+    directions.forEach((dir, i) => {
+      const cone = new THREE.ConeGeometry(1, 1, 8, 1, true)
+      cone.rotateX(Math.PI)
+      cone.translate(0, 0.5, 0)
+      const beam = new THREE.Mesh(cone, this.materials[i % this.materials.length])
+      beam.scale.set(r, length, r)
+      beam.position.copy(dir).multiplyScalar(radius)
+      beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+      beam.renderOrder = 10
+      ball.add(beam)
+    })
   }
+  private last = 0
+  update(s: HeadState, haze: number, time: number): void {
+    // Turns per second from the motor channel (minus = anticlockwise).
+    const dt = this.last ? Math.min(0.1, Math.max(0, time - this.last)) : 0
+    this.last = time
+    this.turn += s.rotation * Math.PI * 2 * dt * 0.5
+    this.ball.rotation.y = this.turn
+    const list = s.colours
+    const key = list ? list.map((c) => c.join()).join('|') : s.color.join()
+    this.materials.forEach((m, k) => {
+      const c = list ? list[k % list.length] : s.color
+      if (key !== this.shown) m.uniforms.color.value.setRGB(...c)
+      m.uniforms.intensity.value = s.intensity * 0.9
+      m.uniforms.haze.value = haze
+    })
+    this.shown = key
+    this.lenses.update(s)
+  }
+  dispose(): void {
+    for (const m of this.materials) m.dispose()
+    this.lenses.dispose()
+  }
+}
+
+/** `n` directions spread evenly over a sphere (a Fibonacci spiral), skipping the bottom where it sits on its base. */
+function sphereDirections(n: number, skipBelow = -0.6): THREE.Vector3[] {
+  const out: THREE.Vector3[] = []
+  const total = Math.round(n / ((1 - skipBelow) / 2))
+  for (let i = 0; i < total; i++) {
+    const y = 1 - (2 * (i + 0.5)) / total
+    if (y < skipBelow) continue
+    const r = Math.sqrt(1 - y * y)
+    const a = i * Math.PI * (3 - Math.sqrt(5))
+    out.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r))
+  }
+  return out
+}
+
+/**
+ * A laser: fans of very thin lines, one fan per aperture (the Laserworld EL-900RGB has
+ * four, each on its own pair of motors, so each fan sweeps on its own).
+ *
+ * Colour: the head's colour (a colour channel or RGB), or several at once ("red + green",
+ * "multicolour": each line one of them, the rainbow ones changing over time). A laser
+ * with no colour channel draws red and green lines, like a typical RG laser.
+ */
+class LaserEmitter implements Emitter {
+  private fans: Array<{ lines: THREE.LineSegments; material: THREE.LineBasicMaterial; colors: THREE.BufferAttribute; phase: number }> = []
+  private shown = ''
+  private static readonly LINES = 14
+
+  /** `byChannel`: a laser channel switches it on and picks the pattern; otherwise it follows the head's intensity. */
+  constructor(parent: THREE.Object3D, private byChannel = true, private coloured = false, apertures = 1, width = 0.2) {
+    const n = Math.max(1, Math.min(8, apertures))
+    const lines = n > 1 ? LaserEmitter.LINES : 40
+    for (let k = 0; k < n; k++) {
+      const positions = new Float32Array(lines * 6)
+      for (let i = 0; i < lines; i++) {
+        const a = ((i / (lines - 1)) - 0.5) * (n > 1 ? 40 : 93) * DEG
+        positions.set([0, 0, 0, Math.sin(a) * 12, 12 * Math.cos(a) * 0.5, -Math.cos(a) * 12], i * 6)
+      }
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      const colors = new THREE.BufferAttribute(new Float32Array(lines * 6).fill(1), 3)
+      geometry.setAttribute('color', colors)
+      const material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })
+      const fan = new THREE.LineSegments(geometry, material)
+      // Several apertures sit along a curved front, each turned a little further out.
+      const x = n > 1 ? ((k / (n - 1)) - 0.5) * width * 0.7 : 0
+      const holder = new THREE.Group()
+      holder.position.x = x
+      holder.rotation.y = n > 1 ? -((k / (n - 1)) - 0.5) * 60 * DEG : 0
+      holder.add(fan)
+      parent.add(holder)
+      this.fans.push({ lines: fan, material, colors, phase: k * 1.7 })
+    }
+  }
+
+  /** Line colours: `list` repeated along the fans (offset per fan), or red/green, or white (tinted by the material). */
+  private paint(list: Array<[number, number, number]> | null, offset: number): void {
+    this.fans.forEach((fan, k) => {
+      const arr = fan.colors.array as Float32Array
+      const n = arr.length / 6
+      for (let i = 0; i < n; i++) {
+        const c = list ? list[(i + k * 2 + offset) % list.length] : [1, 1, 1]
+        arr.set([...c, ...c], i * 6)
+      }
+      fan.colors.needsUpdate = true
+    })
+  }
+
   update(s: HeadState, _haze: number, time: number): void {
     const lit = Math.max(...s.color) > 0.02
     const on = this.byChannel ? s.rotation > 0.02 && (!this.coloured || (lit && s.intensity > 0.02)) : s.intensity > 0.02 && lit
-    this.lines.visible = on
-    this.material.opacity = 0.7
-    if (this.coloured || !this.byChannel) {
-      // Pure, bright laser colours: the strongest part of the colour at full.
-      const peak = Math.max(...s.color, 0.0001)
-      this.material.color.setRGB(s.color[0] / peak, s.color[1] / peak, s.color[2] / peak)
+    // Which colours to show; repaint only when they change.
+    const list = s.colours ?? (this.coloured || !this.byChannel ? null : RED_GREEN)
+    const offset = list && list.length > 2 ? Math.floor(time * 1.5) : 0
+    const key = list ? `${list.map((c) => c.join()).join('|')}@${offset}` : 'one'
+    if (key !== this.shown) {
+      this.paint(list, offset)
+      this.shown = key
     }
-    this.lines.rotation.y = Math.sin(time * (0.5 + s.rotation * 3)) * 0.6
-    this.lines.rotation.x = Math.sin(time * 0.7) * 0.15
+    // A single colour tints the white lines; several colours keep their own.
+    const peak = Math.max(...s.color, 0.0001)
+    const tint: [number, number, number] = list ? [1, 1, 1] : [s.color[0] / peak, s.color[1] / peak, s.color[2] / peak]
+    for (const fan of this.fans) {
+      fan.lines.visible = on
+      fan.material.opacity = 0.7
+      fan.material.color.setRGB(...tint)
+      fan.lines.rotation.y = Math.sin(time * (0.5 + s.rotation * 3) + fan.phase) * (this.fans.length > 1 ? 0.35 : 0.6)
+      fan.lines.rotation.x = Math.sin(time * 0.7 + fan.phase * 0.6) * 0.15
+    }
   }
   dispose(): void {
-    this.lines.geometry.dispose()
-    this.material.dispose()
+    for (const fan of this.fans) {
+      fan.lines.geometry.dispose()
+      fan.material.dispose()
+    }
   }
 }
+
+const RED_GREEN: Array<[number, number, number]> = [[1, 0.1, 0.05], [0.1, 1, 0.1]]
 
 /** Does this head choose its own colour (a colour macro or wheel, or RGB)? */
 const hasColour = (h: HeadDef) => !!(h.ch.colorWheel || h.ch.red || h.ch.green || h.ch.blue)
@@ -441,6 +544,18 @@ export class FixtureRig {
     return tilt
   }
 
+  /**
+   * Lasers whose own part has no colour channel take the colour of the part that has
+   * one (a SoundSwitch definition can put the colour wheel in another part).
+   */
+  private colourFrom = new Map<number, number>()
+  private laserAt(holder: THREE.Object3D, i: number): LaserEmitter {
+    const own = hasColour(this.heads[i])
+    const other = own ? -1 : this.headIndex((x) => hasColour(x) && x.role !== 'derby')[0] ?? -1
+    if (other >= 0) this.colourFrom.set(i, other)
+    return new LaserEmitter(holder, !!this.heads[i].ch.laser, own || other >= 0, this.spec.look === 'laser' ? this.spec.apertures ?? 1 : 1, this.spec.size[0])
+  }
+
   private build(): void {
     const s = this.spec
     const [w, h, d] = s.size
@@ -574,7 +689,7 @@ export class FixtureRig {
           const holder = new THREE.Group()
           holder.position.set(0, 0.08, 0.04)
           this.mount.add(holder)
-          this.emitters[laser] = new LaserEmitter(holder, !!this.heads[laser].ch.laser, hasColour(this.heads[laser]))
+          this.emitters[laser] = this.laserAt(holder, laser)
         }
         break
       }
@@ -727,7 +842,7 @@ export class FixtureRig {
           const holder = new THREE.Group()
           holder.position.y = faceY
           aim.add(holder)
-          this.emitters[i] = this.heads[i].role === 'laser' ? new LaserEmitter(holder, !!this.heads[i].ch.laser, hasColour(this.heads[i])) : new DerbyEmitter(holder)
+          this.emitters[i] = this.heads[i].role === 'laser' ? this.laserAt(holder, i) : new DerbyEmitter(holder)
         }
         break
       }
@@ -767,7 +882,7 @@ export class FixtureRig {
         effectHeads.forEach((i, k) => {
           if (k === 0 || this.heads[i].role === 'laser' || this.heads[i].role === 'derby') {
             const asLaser = this.heads[i].role === 'laser' || (s.look === 'laser' && this.heads[i].role !== 'derby')
-            this.emitters[i] = asLaser ? new LaserEmitter(holder, !!this.heads[i].ch.laser, hasColour(this.heads[i])) : new DerbyEmitter(holder)
+            this.emitters[i] = asLaser ? this.laserAt(holder, i) : new DerbyEmitter(holder)
           }
         })
         break
@@ -800,6 +915,35 @@ export class FixtureRig {
             this.emitters[fogHead] = { update: (st, hz, t) => (fog.update(st, hz, t), glow.update(st)), dispose: () => (fog.dispose(), glow.dispose()) }
           } else this.emitters[ledHead] = new GlowEmitter([ring], 2.5)
         }
+        break
+      }
+      case 'sphere': {
+        // A base, a short neck and the ball of lenses on it.
+        const baseH = h * 0.22
+        const base = box(w, baseH, d * 0.72, this.body)
+        base.position.y = baseH / 2
+        this.mount.add(base)
+        const R = Math.min(w, d) * 0.46
+        const neck = cylinder(R * 0.28, 0.04, this.body, 16)
+        neck.position.y = baseH + 0.02
+        this.mount.add(neck)
+        const ball = new THREE.Group()
+        ball.position.y = baseH + 0.04 + R
+        this.mount.add(ball)
+        ball.add(new THREE.Mesh(new THREE.SphereGeometry(R * 0.97, 24, 16), this.body))
+        // Lenses all over it, each a small glowing disc facing out.
+        const dirs = sphereDirections(s.leds ?? 56)
+        const up = new THREE.Vector3(0, 0, 1)
+        const discs = dirs.map((dir) => {
+          const m = new THREE.Mesh(new THREE.CircleGeometry(R * 0.13, 12))
+          m.position.copy(dir).multiplyScalar(R * 0.99)
+          m.quaternion.setFromUnitVectors(up, dir)
+          ball.add(m)
+          return m
+        })
+        const light = this.headIndex((x) => hasMix(x) || !!x.ch.dimmer)[0] ?? 0
+        // Every other lens throws a beam (a beam from all of them is a lot to draw).
+        this.emitters[light] = new BurstEmitter(ball, dirs.filter((_, i) => i % 2 === 0), R, new GlowEmitter(discs, 3))
         break
       }
       case 'twinbar': {
@@ -891,7 +1035,7 @@ export class FixtureRig {
           const holder = new THREE.Group()
           holder.position.y = faceY
           aim.add(holder)
-          this.emitters[i] = this.heads[i].role === 'laser' ? new LaserEmitter(holder, !!this.heads[i].ch.laser, hasColour(this.heads[i])) : new DerbyEmitter(holder)
+          this.emitters[i] = this.heads[i].role === 'laser' ? this.laserAt(holder, i) : new DerbyEmitter(holder)
         }
         if (s.look === 'spider') {
           // Separately coloured lens groups, fanned out like the real fixture's arms.
@@ -967,6 +1111,7 @@ export class FixtureRig {
 
   // For box fixtures: the group that aimTilt rotates, and helpers for dots/zones.
   private aimGroup: THREE.Group | null = null
+  private faceOut = false
   private dotsFollow: GlowEmitter | null = null
   private dotsHead = -1
   private extraBeam: { emitter: BeamEmitter; heads: number[] } | null = null
@@ -978,8 +1123,9 @@ export class FixtureRig {
     if (this.stand) this.stand.visible = !fixture.hideStand
     this.root.position.set(...fixture.position)
     this.root.rotation.set(0, (fixture.rotation ?? 0) * DEG, 0)
-    // Hanging fixtures are mounted upside down.
-    this.mount.rotation.set(0, 0, fixture.mounting === 'hanging' ? Math.PI : 0)
+    // Hanging fixtures are mounted upside down; facing out, on their backs (top towards the audience).
+    this.faceOut = !!fixture.faceOut && fixture.mounting !== 'hanging'
+    this.mount.rotation.set(this.faceOut ? Math.PI / 2 : 0, 0, fixture.mounting === 'hanging' ? Math.PI : 0)
     if (this.aimGroup) this.aimGroup.rotation.x = -fixture.aimTilt * DEG
     this.invertPan = !!fixture.invertPan
     this.invertTilt = !!fixture.invertTilt
@@ -998,6 +1144,7 @@ export class FixtureRig {
     const look = this.spec.look
     // Gigbars sit on their stand; everything else stands up from (or hangs down from) its position.
     const up = look === 'gigbar' && this.stand?.visible ? 0.08 : look === 'tube' ? h / 2 : h * 0.45
+    if (this.faceOut) return out.copy(this.root.position).add(new THREE.Vector3(0, 0, up).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.root.rotation.y))
     return out.copy(this.root.position).add(new THREE.Vector3(0, this.mounting === 'hanging' ? -up : up, 0))
   }
 
@@ -1019,7 +1166,12 @@ export class FixtureRig {
       m.yoke.rotation.y = m.pan * DEG
       m.tilt.rotation.x = m.tiltAngle * DEG
     }
-    this.emitters.forEach((e, i) => e?.update(states[i] ?? DARK, haze, time))
+    this.emitters.forEach((e, i) => {
+      const own = states[i] ?? DARK
+      const from = this.colourFrom.get(i)
+      const c = from !== undefined ? states[from] : undefined
+      e?.update(c ? { ...own, color: c.color, colours: c.colours } : own, haze, time)
+    })
     if (this.dotsFollow) this.dotsFollow.update(states[this.dotsHead] ?? DARK)
     for (const bar of this.twinBars) {
       const st = states[bar.head] ?? DARK

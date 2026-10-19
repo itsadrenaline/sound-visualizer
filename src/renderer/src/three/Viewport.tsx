@@ -861,6 +861,7 @@ export function Viewport() {
         if (mix.isLive(fixture.id)) rig.update(decodeHeads(getFixtureType(fixture.typeId), levels, fixture.address, time), dt, haze, time)
         else rig.blackout(haze, time)
       }
+      for (const set of sets.values()) set.tick(time)
       fog.density = 0.008 + haze * 0.025
       scene.fog = haze > 0 ? fog : null
       if (held.size) {

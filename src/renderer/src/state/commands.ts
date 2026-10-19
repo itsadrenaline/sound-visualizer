@@ -547,7 +547,7 @@ export function planMount(p: Project, list: Fixture[], structure: string, point:
   const s = structuresOf(p).find((x) => x.id === structure)
   if (!s || !list.length) return null
   const points = mountPoints(s)
-  const m = points.find((x) => x.id === point) ?? points.find((x) => x.kind === point && !x.inside) ?? points.find((x) => x.kind === point)
+  const m = points.find((x) => x.id === point) ?? points.find((x) => x.kind === point && !x.inside && !x.out) ?? points.find((x) => x.kind === point)
   if (!m) return null
   const chosen = m.to ? list : list.slice(0, 1)
   const length = m.to ? Math.hypot(m.to[0] - m.at[0], m.to[1] - m.at[1], m.to[2] - m.at[2]) : 0
@@ -564,6 +564,7 @@ export function planMount(p: Project, list: Fixture[], structure: string, point:
       {
         mounting: m.kind === 'under' ? ('hanging' as const) : ('floor' as const),
         mount: { structure: s.id, point: m.id, ...(m.to ? { t: Math.round(Math.max(0, Math.min(1, raw[i] + shift)) * 1e6) / 1e6 } : {}) },
+        faceOut: m.out ? true : undefined,
         ...(facing !== undefined ? { rotation: facing } : {}),
         ...(m.aim !== undefined ? { aimTilt: m.aim } : {})
       }

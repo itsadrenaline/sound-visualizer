@@ -103,8 +103,8 @@ export function nearestMount(structures: Structure[], world: Vec3, kinds: MountP
     const local = toLocal(s, world)
     for (const m of mountPoints(s)) {
       if (!kinds.includes(m.kind)) continue
-      // Inside a totem is a place you choose, never one a fixture falls into.
-      if (m.inside && !inside) continue
+      // Inside a totem, or on its back facing out, is a place you choose, never one a fixture falls into.
+      if ((m.inside || m.out) && !inside) continue
       const { t, distance } = nearestOn(m, local)
       if (distance > reach || (best && distance >= best.distance)) continue
       best = { structure: s, point: m, t, distance, position: toWorld(s, pointAt(m, t)) }
@@ -116,22 +116,27 @@ export function nearestMount(structures: Structure[], world: Vec3, kinds: MountP
 function placeMounted(f: Fixture, s: Structure, m: MountPoint, t: number): Fixture {
   const position = toWorld(s, pointAt(m, t)).map(round) as Vec3
   const mounting: Fixture['mounting'] = m.kind === 'under' ? 'hanging' : 'floor'
-  if (same(position, f.position) && f.mounting === mounting && f.mount?.structure === s.id && f.mount.point === m.id && f.mount.t === (m.to ? roundT(t) : undefined)) return f
-  return { ...f, position, mounting, mount: { structure: s.id, point: m.id, ...(m.to ? { t: roundT(t) } : {}) } }
+  // Facing out comes with the mount point; on a clamp or facade you can also turn it out yourself.
+  const moved = f.mount?.structure !== s.id || f.mount.point !== m.id
+  const faceOut = m.out ? true : moved || mounting === 'hanging' ? undefined : f.faceOut
+  if (same(position, f.position) && f.mounting === mounting && !moved && f.mount!.t === (m.to ? roundT(t) : undefined) && f.faceOut === faceOut) return f
+  const { faceOut: _was, ...rest } = f
+  void _was
+  return { ...rest, position, mounting, mount: { structure: s.id, point: m.id, ...(m.to ? { t: roundT(t) } : {}) }, ...(faceOut ? { faceOut } : {}) }
 }
 
 function settleFixture(f: Fixture, structures: Structure[], byId: Map<string, Structure>, prev?: Fixture): Fixture {
   // A fixture with no (or a broken) position goes to the middle of the floor rather than breaking the show.
   if (!Array.isArray(f.position) || f.position.length !== 3 || f.position.some((v) => !Number.isFinite(v))) f = { ...f, position: [0, 0.1, 0] }
   // Moved by hand since last time: it comes off what it was attached to, then finds its footing again.
-  if (f.mount && prev && !same(prev.position, f.position)) f = { ...f, mount: undefined }
+  if (f.mount && prev && !same(prev.position, f.position)) f = { ...f, mount: undefined, faceOut: undefined }
   // Attached: follow the structure.
   if (f.mount) {
     const s = byId.get(f.mount.structure)
     const m = s && mountPoints(s).find((p) => p.id === f.mount!.point)
     if (s && m) return placeMounted(f, s, m, f.mount.t ?? 0.5)
     // Its structure is gone: let it fall (below).
-    f = { ...f, mount: undefined }
+    f = { ...f, mount: undefined, faceOut: undefined }
   }
   const type = getFixtureType(f.typeId)
   if (f.mounting === 'hanging') {

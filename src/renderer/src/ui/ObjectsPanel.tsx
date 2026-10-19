@@ -18,7 +18,7 @@ export interface StructureDrag {
   params: StructureParams
 }
 
-const ORDER: Category[] = ['Stands & totems', 'Truss', 'Staging', 'Speakers & sound', 'DJ & band', 'Furniture', 'Room & decor', 'People']
+const ORDER: Category[] = ['Stands & totems', 'Truss', 'Staging', 'Speakers & sound', 'DJ & band', 'Party', 'Screens', 'Furniture', 'Room & decor', 'People']
 
 /** Which categories are folded, remembered on this Mac. */
 function loadFolded(): Category[] {
@@ -179,6 +179,10 @@ export function Icon({ kind }: { kind: StructureKind }) {
     plant: <><path d="M8 15h8l-1 6H9zM12 15V9" {...s} /><path d="M12 9c-4 0-6-3-6-6 4 0 6 2 6 6zM12 11c3 0 6-2 6-5-4 0-6 2-6 5z" {...s} /></>,
     pillar: <><path d="M7 3h10M7 21h10M9 3v18M15 3v18" {...s} /></>,
     person: <><circle cx="12" cy="5" r="2.5" {...s} /><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6" {...s} /></>,
+    tv: <><rect x="2" y="4" width="20" height="12" rx="1" {...s} /><path d="M12 16v4M8 21h8" {...s} /></>,
+    balloonArch: <><path d="M4 21V12a8 8 0 0116 0v9" {...s} /><circle cx="5" cy="13" r="1.8" {...s} /><circle cx="7" cy="8" r="1.8" {...s} /><circle cx="12" cy="5" r="1.8" {...s} /><circle cx="17" cy="8" r="1.8" {...s} /><circle cx="19" cy="13" r="1.8" {...s} /></>,
+    photoBooth: <><ellipse cx="12" cy="18" rx="8" ry="2.5" {...s} /><path d="M12 18V9l7-3" {...s} /><circle cx="19" cy="6" r="2" {...s} /></>,
+    neonSign: <><rect x="2" y="6" width="20" height="10" rx="2" {...s} /><path d="M6 13V9l3 4V9M12 9v4h2M16 9h2v4h-2" {...s} /><path d="M8 16v5M16 16v5" {...s} /></>,
     crowd: <><circle cx="7" cy="7" r="2" {...s} /><circle cx="17" cy="7" r="2" {...s} /><circle cx="12" cy="10" r="2" {...s} /><path d="M3 18c0-3 2-6 4-6s4 3 4 6M13 18c0-3 2-6 4-6s4 3 4 6M8 21c0-3 2-6 4-6s4 3 4 6" {...s} /></>
   }
   return (

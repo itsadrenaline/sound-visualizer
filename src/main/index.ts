@@ -12,6 +12,7 @@ import { catchCrashes, log, logFolder } from './log'
 import { deleteMyFixture, importFixtureFiles, listMyFixtures, loadLibrary, qlcDefinition, qlcEntries, saveMyFixture } from './library'
 import { openProject, readProject, saveImage, saveProject } from './files'
 import { buildMenu } from './menu'
+import { readMedia, saveMedia } from './media'
 import { claudeRequest, claudeStatus, clearClaudeKey, setClaudeKey } from './claude'
 import { checkInstall, freshStart } from './install'
 import { openFile, saveFile } from './files'
@@ -134,6 +135,8 @@ listen('set-title', (_e, name: string, path: string | null, edited: boolean) => 
 // --- Fixture library -------------------------------------------------------------
 handle('library-load', () => loadLibrary())
 handle('library-import', () => importFixtureFiles(window))
+handle('media-save', (_e, name: string, data: Uint8Array) => saveMedia(String(name), new Uint8Array(data)))
+handle('media-read', (_e, id: string) => readMedia(String(id)))
 handle('library-qlc', () => qlcEntries())
 handle('library-qlc-def', (_e, key: string) => qlcDefinition(String(key)))
 handle('my-fixtures', () => listMyFixtures())

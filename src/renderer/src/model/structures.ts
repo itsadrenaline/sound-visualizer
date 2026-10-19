@@ -34,6 +34,8 @@ export type StructureKind =
   | 'roundTable' | 'highTop' | 'bar' | 'chairs' | 'sofa'
   // Room
   | 'wall' | 'danceFloor' | 'screen' | 'ledWall' | 'backdrop' | 'stanchions' | 'plant' | 'pillar'
+  // Party
+  | 'tv' | 'balloonArch' | 'photoBooth' | 'neonSign'
   // People
   | 'person' | 'crowd'
 
@@ -83,6 +85,41 @@ export interface StructureParams {
   vinyl?: boolean
   /** Guitar amp: a half stack instead of a combo. */
   stack?: boolean
+  /** Screens, TVs and LED walls: what's showing (see SCREEN_CONTENT). */
+  content?: ScreenContent
+  /** The picture (a data: URL, kept in the show) or video (an id in this computer's media store) it shows. */
+  media?: string
+  /** The picked file's name, to show in the inspector. */
+  mediaName?: string
+  /** Words on a screen or a neon sign. */
+  text?: string
+  /** Colour of the words or the neon, from NEON_COLOURS. */
+  tint?: number
+  /** Dance floor: light-up LED tiles. */
+  led?: boolean
+  /** Balloon arch: colours, from BALLOON_PALETTES. */
+  palette?: number
+}
+
+/** What a screen can show. */
+export type ScreenContent = 'off' | 'colours' | 'visuals' | 'image' | 'video' | 'text'
+export const SCREEN_CONTENT: Array<[ScreenContent, string]> = [['off', 'Nothing'], ['colours', 'Colours'], ['visuals', 'Visuals'], ['image', 'Picture'], ['video', 'Video'], ['text', 'Words']]
+/** Screens: things that show a picture. */
+export const SCREEN_KINDS: StructureKind[] = ['screen', 'ledWall', 'tv']
+
+export const NEON_COLOURS: Array<[string, string]> = [['Pink', '#ff3fa4'], ['Blue', '#3fa9ff'], ['White', '#fff3e0'], ['Red', '#ff3030'], ['Green', '#3fff7a'], ['Yellow', '#ffd23f'], ['Purple', '#b03fff'], ['Orange', '#ff8a2a']]
+export const BALLOON_PALETTES: Array<[string, string[]]> = [
+  ['Gold and white', ['#d4af37', '#f6f1e7', '#e8cf7a']],
+  ['Pink and white', ['#ff8fc4', '#ffffff', '#ff4fa0']],
+  ['Blue and silver', ['#2f6fd6', '#c9ccd2', '#8fc2ff']],
+  ['Black and gold', ['#141414', '#d4af37', '#2a2a2a']],
+  ['Red and white', ['#d62020', '#ffffff', '#ff6b6b']],
+  ['Rainbow', ['#ff3030', '#ff9a2a', '#ffe23f', '#3fd66b', '#3fa9ff', '#9a4fff']]
+]
+
+/** A TV's diagonal (inches) → width and height of the screen, metres (16:9). */
+export function tvSize(diagonal = 65): [number, number] {
+  return [diagonal * 0.8716 * IN, diagonal * 0.4903 * IN]
 }
 
 /** Where a fixture attaches. */
@@ -107,12 +144,17 @@ export interface MountPoint {
   reach?: number
   /** Inside the structure (a totem's scrim): the fixture's beam lights the scrim from within. */
   inside?: boolean
+  /**
+   * Clamped on its back to the front of the truss, so it faces out (towards the
+   * audience, or `facing`) instead of up: a Double Helix or a PAR on a truss face.
+   */
+  out?: boolean
 }
 
 export interface ParamField {
   key: keyof StructureParams
   label: string
-  kind: 'length' | 'cover' | 'count' | 'boolean' | 'truss' | 'choice'
+  kind: 'length' | 'cover' | 'count' | 'boolean' | 'truss' | 'choice' | 'content' | 'text'
   min?: number
   max?: number
   /** Quick picks, in feet for lengths. */
@@ -123,7 +165,7 @@ export interface ParamField {
   coverNames?: Partial<Record<Cover, string>>
 }
 
-export type Category = 'Stands & totems' | 'Truss' | 'Staging' | 'Speakers & sound' | 'DJ & band' | 'Furniture' | 'Room & decor' | 'People'
+export type Category = 'Stands & totems' | 'Truss' | 'Staging' | 'Speakers & sound' | 'DJ & band' | 'Party' | 'Screens' | 'Furniture' | 'Room & decor' | 'People'
 
 export interface KindInfo {
   label: string
@@ -469,32 +511,72 @@ export const STRUCTURE_KINDS: Record<StructureKind, KindInfo> = {
     ]
   },
   danceFloor: {
-    label: 'Dance floor', category: 'Room & decor', surface: true, ground: true,
-    description: 'Dance floor panels laid on the floor (3 × 3 ft tiles).',
+    label: 'Dance floor', category: 'Party', surface: true, ground: true,
+    description: 'Dance floor panels laid on the floor (3 × 3 ft tiles). Turn on LED tiles for a light-up floor.',
     defaults: { width: 15 * FT, depth: 15 * FT, cover: 'none' },
     fields: [
       { key: 'width', label: 'Width', kind: 'length', min: 0.9, max: 25, presets: [12, 15, 18, 24] },
       { key: 'depth', label: 'Depth', kind: 'length', min: 0.9, max: 25, presets: [12, 15, 18, 24] },
-      { key: 'cover', label: 'Finish', kind: 'cover', coverNames: { none: 'Wood' } }
+      { key: 'cover', label: 'Finish', kind: 'cover', coverNames: { none: 'Wood' } },
+      { key: 'led', label: 'LED tiles that light up', kind: 'boolean' }
     ]
   },
   screen: {
-    label: 'Projection screen', category: 'Room & decor', surface: false,
-    description: 'A 16:9 fast-fold screen on legs. Width sets the size; light lands on it.',
-    defaults: { width: 12 * FT, bottom: 3 * FT },
+    label: 'Projection screen', category: 'Screens', surface: false,
+    description: 'A 16:9 fast-fold screen on legs, with a projector on it: show colours, visuals, a picture, a video or words. Light lands on it too.',
+    defaults: { width: 12 * FT, bottom: 3 * FT, content: 'off' },
     fields: [
+      { key: 'content', label: 'Showing', kind: 'content' },
       { key: 'width', label: 'Width', kind: 'length', min: 1, max: 10, presets: [8, 10, 12, 16, 20] },
       { key: 'bottom', label: 'Bottom edge', kind: 'length', min: 0, max: 4, presets: [2, 3, 4, 6] }
     ]
   },
   ledWall: {
-    label: 'LED video wall', category: 'Room & decor', surface: false,
-    description: 'An LED wall of 500 mm panels on a ground-support frame.',
-    defaults: { width: 4, height: 2.5, bottom: 0.5 },
+    label: 'LED video wall', category: 'Screens', surface: false,
+    description: 'An LED wall of 500 mm panels on a ground-support frame: show colours, visuals, a picture, a video or words.',
+    defaults: { width: 4, height: 2.5, bottom: 0.5, content: 'visuals' },
     fields: [
+      { key: 'content', label: 'Showing', kind: 'content' },
       { key: 'width', label: 'Width', kind: 'length', min: 0.5, max: 20, presets: [8, 12, 16, 24] },
       { key: 'height', label: 'Height', kind: 'length', min: 0.5, max: 8, presets: [6, 8, 10, 12] },
       { key: 'bottom', label: 'Bottom edge', kind: 'length', min: 0, max: 4, presets: [0, 2, 3, 4] }
+    ]
+  },
+  tv: {
+    label: 'TV', category: 'Screens', surface: false,
+    description: 'A flat-screen TV on a floor stand (or on its feet on a table): show colours, visuals, a picture, a video or words.',
+    defaults: { size: 65, bottom: 3 * FT, content: 'colours' },
+    fields: [
+      { key: 'content', label: 'Showing', kind: 'content' },
+      { key: 'size', label: 'Size', kind: 'choice', options: [['43 in', 43], ['55 in', 55], ['65 in', 65], ['75 in', 75], ['85 in', 85], ['98 in', 98]] },
+      { key: 'bottom', label: 'Bottom edge (0 = on its feet)', kind: 'length', min: 0, max: 2.5, presets: [0, 2, 3, 4, 5] }
+    ]
+  },
+  balloonArch: {
+    label: 'Balloon arch', category: 'Party', surface: false,
+    description: 'An arch of balloons on a frame, over an entrance, the DJ or a photo spot.',
+    defaults: { width: 10 * FT, height: 8 * FT, palette: 0 },
+    fields: [
+      { key: 'palette', label: 'Colours', kind: 'choice', options: BALLOON_PALETTES.map(([name], i) => [name, i] as [string, number]) },
+      { key: 'width', label: 'Width', kind: 'length', min: 1.2, max: 8, presets: [6, 8, 10, 12, 16] },
+      { key: 'height', label: 'Height', kind: 'length', min: 1.2, max: 5, presets: [6, 7, 8, 10] }
+    ]
+  },
+  photoBooth: {
+    label: '360 photo booth', category: 'Party', surface: true,
+    description: 'A round platform guests stand on while a camera arm turns around them, with a ring light.',
+    defaults: { size: 39 },
+    fields: [{ key: 'size', label: 'Platform', kind: 'choice', options: [['31 in', 31], ['39 in', 39], ['45 in', 45]] }]
+  },
+  neonSign: {
+    label: 'Neon sign', category: 'Party', surface: false,
+    description: 'Glowing words on a clear panel, on a stand or a wall: "Happy Birthday", a name, the venue.',
+    defaults: { width: 4 * FT, bottom: 4 * FT, text: 'Let’s Party', tint: 0 },
+    fields: [
+      { key: 'text', label: 'Words', kind: 'text' },
+      { key: 'tint', label: 'Colour', kind: 'choice', options: NEON_COLOURS.map(([name], i) => [name, i] as [string, number]) },
+      { key: 'width', label: 'Width', kind: 'length', min: 0.4, max: 4, presets: [2, 3, 4, 6] },
+      { key: 'bottom', label: 'Bottom edge', kind: 'length', min: 0, max: 3, presets: [3, 4, 5, 6] }
     ]
   },
   backdrop: {
@@ -595,6 +677,10 @@ export function footprint(s: Structure): [number, number] {
     case 'danceFloor': return [p.width, p.depth]
     case 'screen': return [p.width + 0.1, 0.7]
     case 'ledWall': return [p.width, 0.9]
+    case 'tv': return [tvSize(p.size)[0], (p.bottom ?? 0) > 0.15 ? 0.6 : 0.25]
+    case 'balloonArch': return [p.width + 0.5, 0.5]
+    case 'photoBooth': return [Math.max(1.4, (p.size ?? 39) * IN + 0.5), Math.max(1.4, (p.size ?? 39) * IN + 0.5)]
+    case 'neonSign': return [p.width, 0.35]
     case 'backdrop': return [p.width, 0.6]
     case 'stanchions': return [Math.max(1, (p.count ?? 2) - 1) * p.width, 0.35]
     case 'plant': return [Math.max(0.35, p.height * 0.35), Math.max(0.35, p.height * 0.35)]
@@ -629,6 +715,10 @@ export function heightOf(s: Structure): number {
     case 'danceFloor': return 0.025
     case 'screen': return (p.bottom ?? 0) + (p.width * 9) / 16 + 0.1
     case 'ledWall': case 'backdrop': return (p.bottom ?? 0) + p.height
+    case 'tv': return (p.bottom ?? 0) + tvSize(p.size)[1] + 0.06
+    case 'balloonArch': return p.height + 0.3
+    case 'photoBooth': return 0.1
+    case 'neonSign': return (p.bottom ?? 0) + p.width * 0.4
     case 'stanchions': return 0.95
     case 'crowd': return 1.8
   }
@@ -652,6 +742,12 @@ function bar(id: string, kind: MountKind, label: string, length: number, y: numb
   return { id, kind, at: [round(-length / 2), round(y), round(z)], to: [round(length / 2), round(y), round(z)], facing, label }
 }
 
+/** The same mount, with fixtures on their backs facing out (see MountPoint.out). */
+function facingOut(m: MountPoint, id: string, label: string, z?: number): MountPoint {
+  const shift = (v: Vec3): Vec3 => (z === undefined ? v : [v[0], v[1], round(z)])
+  return { ...m, id, kind: m.kind === 'clamp' ? 'clamp' : 'face', at: shift(m.at), to: m.to && shift(m.to), label, out: true }
+}
+
 /** A vertical leg or column: clamp anywhere between two heights. */
 function leg(id: string, label: string, x: number, z: number, from: number, to: number): MountPoint {
   return { id, kind: 'clamp', at: [round(x), round(from), round(z)], to: [round(x), round(to), round(z)], facing: 0, label }
@@ -669,6 +765,7 @@ export function mountPoints(s: Structure): MountPoint[] {
       return [
         { id: 'top', kind: 'top', at: [0, round(p.height + 0.012), 0], label: 'Top plate' },
         leg('front', 'Front face', 0, t / 2 + 0.05, 0.35, Math.max(0.4, p.height - 0.15)),
+        facingOut(leg('front', '', 0, t / 2 + 0.01, 0.2, Math.max(0.3, p.height - 0.1)), 'frontOut', 'Front face, facing out'),
         { id: 'inBottom', kind: 'top', at: [0, 0.012, 0], label: 'Inside, at the bottom (pointing up)', aim: 0, reach: inner, inside: true },
         { id: 'inTop', kind: 'under', at: [0, round(p.height), 0], label: 'Inside, at the top (pointing down)', aim: 0, reach: inner, inside: true }
       ]
@@ -709,17 +806,23 @@ export function mountPoints(s: Structure): MountPoint[] {
         bar('under', 'under', 'Under the crossbar', p.width - t, p.height - t, 0),
         bar('top', 'top', 'On the crossbar', p.width - t, p.height, 0),
         leg('legL', 'Left leg', -p.width / 2, t / 2 + 0.05, 0.5, p.height - t - 0.2),
-        leg('legR', 'Right leg', p.width / 2, t / 2 + 0.05, 0.5, p.height - t - 0.2)
+        leg('legR', 'Right leg', p.width / 2, t / 2 + 0.05, 0.5, p.height - t - 0.2),
+        // On their backs on the front of the truss, facing the audience.
+        facingOut(bar('x', 'face', '', p.width - t * 2, p.height - t / 2, t / 2 + 0.01, 0), 'frontOut', 'Front of the crossbar, facing out'),
+        facingOut(leg('x', '', -p.width / 2, t / 2 + 0.01, 0.3, p.height - t - 0.1), 'legLOut', 'Front of the left leg, facing out'),
+        facingOut(leg('x', '', p.width / 2, t / 2 + 0.01, 0.3, p.height - t - 0.1), 'legROut', 'Front of the right leg, facing out')
       ]
     case 'trussBox':
       return [
         bar('front', 'under', 'Under the front bar', p.width - t, p.height - t, p.depth / 2),
         bar('back', 'under', 'Under the back bar', p.width - t, p.height - t, -p.depth / 2),
         bar('ftop', 'top', 'On the front bar', p.width - t, p.height, p.depth / 2),
-        bar('btop', 'top', 'On the back bar', p.width - t, p.height, -p.depth / 2)
+        bar('btop', 'top', 'On the back bar', p.width - t, p.height, -p.depth / 2),
+        facingOut(bar('x', 'face', '', p.width - t * 2, p.height - t / 2, p.depth / 2 + t / 2 + 0.01, 0), 'frontOut', 'Front of the front bar, facing out'),
+        facingOut(bar('x', 'face', '', p.width - t * 2, p.height - t / 2, -p.depth / 2 - t / 2 - 0.01, 180), 'backOut', 'Back of the back bar, facing out')
       ]
     case 'groundTruss':
-      return [bar('top', 'top', 'On the truss', p.width - 0.1, t, 0)]
+      return [bar('top', 'top', 'On the truss', p.width - 0.1, t, 0), facingOut(bar('x', 'face', '', p.width - 0.1, t / 2, t / 2 + 0.01, 0), 'frontOut', 'Front of the truss, facing out')]
     case 'djBooth':
       return [bar('ftop', 'face', 'Facade, top edge', p.width - 0.2, p.height - 0.06, p.depth / 2 + 0.02, 0), bar('fbot', 'face', 'Facade, bottom edge', p.width - 0.2, 0.08, p.depth / 2 + 0.02, 0)]
     case 'pipeDrape':
@@ -808,6 +911,10 @@ export function defaultName(kind: StructureKind, params: StructureParams): strin
     case 'wall': return `Wall ${ft(p.width)} × ${ft(p.height)} ft`
     case 'danceFloor': return `Dance floor ${ft(p.width)} × ${ft(p.depth)} ft`
     case 'screen': return `Screen ${ft(p.width)} ft`
+    case 'tv': return `TV ${p.size ?? 65} in`
+    case 'balloonArch': return `Balloon arch ${ft(p.width)} ft`
+    case 'photoBooth': return '360 photo booth'
+    case 'neonSign': return `Neon sign “${(p.text ?? '').slice(0, 20)}”`
     case 'ledWall': return `LED wall ${ft(p.width)} × ${ft(p.height)} ft`
     case 'stanchions': return `Stanchions × ${p.count}`
     case 'crowd': return `Crowd ${ft(p.width)} × ${ft(p.depth)} ft`
@@ -874,8 +981,17 @@ export const STRUCTURE_PRESETS: Array<{ name: string; kind: StructureKind; param
   { name: 'Pipe & drape, 2 × 10 ft', kind: 'pipeDrape', params: {} },
   { name: 'Dance floor 15 × 15 ft', kind: 'danceFloor', params: {} },
   { name: 'Dance floor, white', kind: 'danceFloor', params: { cover: 'white' } },
+  // Party
+  { name: 'LED dance floor 15 × 15 ft', kind: 'danceFloor', params: { led: true, cover: 'black' } },
+  { name: 'Balloon arch', kind: 'balloonArch', params: {} },
+  { name: '360 photo booth', kind: 'photoBooth', params: {} },
+  { name: 'Neon sign', kind: 'neonSign', params: {} },
+  // Screens
   { name: 'Projection screen 12 ft', kind: 'screen', params: {} },
   { name: 'LED wall 4 × 2.5 m', kind: 'ledWall', params: {} },
+  { name: 'TV 65 in on a stand', kind: 'tv', params: {} },
+  { name: 'TV 85 in on a stand', kind: 'tv', params: { size: 85 } },
+  { name: 'TV 55 in on a table', kind: 'tv', params: { size: 55, bottom: 0 } },
   { name: 'Backdrop 8 × 8 ft', kind: 'backdrop', params: {} },
   { name: 'Stanchions and rope', kind: 'stanchions', params: {} },
   { name: 'Plant', kind: 'plant', params: {} },
