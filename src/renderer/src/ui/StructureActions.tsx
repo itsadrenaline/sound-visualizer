@@ -18,7 +18,8 @@ import {
   setStructureParams,
   updateStructures
 } from '../state/commands'
-import { FT, mountPoints, nearestOn, paramsOf, STRUCTURE_KINDS, toLocal, TRUSS_OPTIONS, type Cover, type MountPoint, type ParamField, type Structure } from '../model/structures'
+import { FT, mountPoints, NEON_COLOURS, nearestOn, paramsOf, SCREEN_CONTENT, STRUCTURE_KINDS, toLocal, TRUSS_OPTIONS, type Cover, type MountPoint, type ParamField, type Structure } from '../model/structures'
+import { notify } from '../state/notices'
 import { roomFit } from '../model/physics'
 import { roomOf, type Fixture } from '../model/project'
 import { view } from '../state/viewBus'
@@ -356,6 +357,10 @@ function ParamInput({ field, chosen }: { field: ParamField; chosen: Structure[] 
           </div>
         </div>
       )
+    case 'text':
+      return <TextField label={field.label} value={(value as string) ?? ''} onCommit={(text) => setStructureParams(ids, { [field.key]: text })} />
+    case 'content':
+      return <ContentField ids={ids} chosen={chosen} />
     case 'truss':
       return (
         <label className="field">
@@ -371,6 +376,129 @@ function ParamInput({ field, chosen }: { field: ParamField; chosen: Structure[] 
         </label>
       )
   }
+}
+
+/** A line of words, saved when you leave the box or press Return (one undo step, not one per letter). */
+function TextField({ label, value, onCommit }: { label: string; value: string; onCommit: (text: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <label className="field">
+      <span className="label">{label}</span>
+      <input
+        type="text"
+        value={draft ?? value}
+        placeholder="Happy Birthday"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (draft !== null && draft !== value) onCommit(draft)
+          setDraft(null)
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+      />
+    </label>
+  )
+}
+
+/** Pick a file with the browser's file dialog. */
+function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.addEventListener('change', () => resolve(input.files?.[0] ?? null))
+    input.addEventListener('cancel', () => resolve(null))
+    input.click()
+  })
+}
+
+/** A picture, made small enough to keep in the show (at most 1600 px across). */
+async function pictureFrom(file: File): Promise<string> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = new Image()
+    img.src = url
+    await img.decode()
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * k))
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * k))
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.85)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/** What a screen shows: nothing, colours, visuals, a picture, a video or words. */
+function ContentField({ ids, chosen }: { ids: string[]; chosen: Structure[] }) {
+  const p = paramsOf(chosen[0])
+  const same = chosen.every((s) => paramsOf(s).content === p.content)
+  const content = same ? p.content ?? 'off' : null
+  const choosePicture = async () => {
+    const file = await pickFile('image/*')
+    if (!file) return
+    try {
+      setStructureParams(ids, { content: 'image', media: await pictureFrom(file), mediaName: file.name })
+    } catch {
+      notify('error', `Couldn't read “${file.name}” as a picture.`)
+    }
+  }
+  const chooseVideo = async () => {
+    const file = await pickFile('video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm')
+    if (!file || !window.api) return
+    if (file.size > 500 * 1024 * 1024) return notify('error', `“${file.name}” is over 500 MB: use a shorter or smaller video.`)
+    try {
+      const id = await window.api.saveMedia(file.name, new Uint8Array(await file.arrayBuffer()))
+      setStructureParams(ids, { content: 'video', media: id, mediaName: file.name })
+    } catch (error) {
+      notify('error', `Couldn't keep “${file.name}”: ${(error as Error).message}`)
+    }
+  }
+  return (
+    <div className="field">
+      <span className="label">Showing</span>
+      <div className="presets">
+        {SCREEN_CONTENT.map(([value, label]) => (
+          <button
+            key={value}
+            className={`mini ${content === value ? 'on' : ''}`}
+            onClick={() => {
+              // A picture or video needs a file: ask for one straight away.
+              if (value === 'image' && (p.content !== 'image' || !p.media)) return void choosePicture()
+              if (value === 'video' && (p.content !== 'video' || !p.media)) return void chooseVideo()
+              setStructureParams(ids, { content: value })
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {content === 'image' && (
+        <div className="presets">
+          <span className="hint">{p.mediaName ?? 'A picture'}</span>
+          <button className="mini" onClick={() => void choosePicture()}>Choose another…</button>
+        </div>
+      )}
+      {content === 'video' && (
+        <div className="presets">
+          <span className="hint">{p.mediaName ?? 'A video'} (kept on this computer: on another one, choose it again)</span>
+          <button className="mini" onClick={() => void chooseVideo()}>Choose another…</button>
+        </div>
+      )}
+      {content === 'text' && (
+        <>
+          <TextField label="Words" value={p.text ?? ''} onCommit={(text) => setStructureParams(ids, { text })} />
+          <div className="presets">
+            {NEON_COLOURS.map(([name, hex], i) => (
+              <button key={name} className={`mini ${(p.tint ?? 2) === i ? 'on' : ''}`} title={name} onClick={() => setStructureParams(ids, { tint: i })}>
+                <span style={{ color: hex }}>●</span> {name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +533,7 @@ export function FixtureMount({ fixtures }: { fixtures: Fixture[] }) {
         <p className="hint">Nothing: {first.mounting === 'hanging' ? 'it hangs where it is' : 'it stands on what is below it'}.</p>
       ) : mounted.length === fixtures.length && on && fixtures.every((f) => f.mount?.structure === on.id) ? (
         <p className="sub">
-          {point?.label} of <a onClick={() => useStore.getState().select([on.id])}>{on.name}</a>
+          {point?.label}{point?.out ? ', on ' : ' of '}<a onClick={() => useStore.getState().select([on.id])}>{on.name}</a>
         </p>
       ) : (
         <p className="sub">{mounted.length} of {fixtures.length} are attached to something.</p>

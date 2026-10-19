@@ -23,6 +23,47 @@ export interface WheelSlot {
   hi: number
   /** 0..1 */
   rgb: [number, number, number]
+  /**
+   * Several colours at once ("Red + Green", "Multicolour"): lasers and derbies show
+   * each beam in one of them. `rgb` is their mix.
+   */
+  colours?: Array<[number, number, number]>
+}
+
+type RGB = [number, number, number]
+const NAMED: Array<[RegExp, RGB]> = [
+  [/white|\bwit\b|weiss|weiß|blanc/i, [1, 1, 1]], [/yellow/i, [1, 1, 0]], [/purple|magenta|pink|violet/i, [1, 0, 1]], [/cyan|turquoise|aqua|light\s*blue/i, [0, 1, 1]],
+  [/orange|amber/i, [1, 0.5, 0]], [/\buv\b/i, [0.45, 0, 1]], [/red|\brood\b|\brot\b/i, [1, 0, 0]], [/green|groen|grün|grun/i, [0, 1, 0]], [/blue|blauw|blau/i, [0, 0, 1]]
+]
+/** Every colour a full-colour (RGB) laser or derby cycles through. */
+export const RAINBOW: RGB[] = [[1, 0, 0], [1, 0.5, 0], [1, 1, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1], [1, 0, 1]]
+
+/**
+ * The colours a range's name gives: "Red" → one, "Red + Green" or "R/G" → two,
+ * "Multicolour", "RGB", "Colour change", "7 colours" → all of them. Empty if it names none.
+ */
+export function coloursFromName(name: string): RGB[] {
+  if (/multi|mix|rainbow|\brgb\b|full\s*colou?r|all\s*colou?rs?|colou?r\s*(change|chase|cycle|jump|fade)|\b7\s*colou?r/i.test(name)) return RAINBOW
+  return name
+    .split(/\s*(?:\+|&|\/|,|\band\b|\ben\b|\bund\b)\s*/i)
+    .map((p) => NAMED.find(([re]) => re.test(p))?.[1])
+    .filter((c): c is RGB => !!c)
+}
+
+/** One colour for a name: the colours it names, mixed. Null if it names none. */
+export function colourFromName(name: string): RGB | null {
+  const parts = coloursFromName(name)
+  if (!parts.length) return null
+  if (parts === RAINBOW) return [1, 1, 1]
+  return [0, 1, 2].map((i) => Math.min(1, parts.reduce((sum, c) => sum + c[i], 0))) as RGB
+}
+
+/** A wheel slot from its name and (if known) its colour: several colours when the name says so. */
+export function slotFrom(lo: number, hi: number, name: string, rgb?: RGB | null): WheelSlot | null {
+  const colours = coloursFromName(name)
+  const mix = rgb ?? colourFromName(name)
+  if (!mix) return null
+  return colours.length > 1 ? { lo, hi, rgb: mix, colours } : { lo, hi, rgb: mix }
 }
 
 export interface ShutterRange {
@@ -82,6 +123,8 @@ export interface HeadDef {
   goboSlots?: GoboSlot[]
   goboSpin?: SpinRange[]
   prismSpin?: SpinRange[]
+  /** The rotation channel's ranges (a derby or Starburst motor): turns per second, minus = anticlockwise. */
+  rotationSpin?: SpinRange[]
   /** Pan/tilt speed channel: `from`/`to` are fractions of full speed (1 = fastest). */
   moveSpeed?: SpinRange[]
   /** The colour of this head's white channel: warm white is orange-ish, cool white bluish. */
@@ -121,6 +164,8 @@ export interface HeadState {
    * LED lights with its own channel. Missing while a built-in program runs.
    */
   mix?: [number, number, number, number]
+  /** A colour slot with several colours ("Red + Green", "Multicolour"): one per beam. */
+  colours?: Array<[number, number, number]>
 }
 
 const ROLE_FUNCTIONS: ChannelFunction[] = ['red', 'green', 'blue', 'white', 'amber', 'uv']
@@ -207,11 +252,10 @@ function shutterFactor(raw: number | undefined, ranges: ShutterRange[] | undefin
   return (time * hz) % 1 < 0.3 ? 1 : 0
 }
 
-function wheelColor(raw: number | undefined, slots: WheelSlot[] | undefined): [number, number, number] | null {
+function wheelSlot(raw: number | undefined, slots: WheelSlot[] | undefined): WheelSlot | null {
   if (raw === undefined || !slots?.length) return null
   const value = Math.round(raw * 255)
-  const slot = slots.find((s) => value >= s.lo && value <= s.hi)
-  return slot ? slot.rgb : null
+  return slots.find((s) => value >= s.lo && value <= s.hi) ?? null
 }
 
 /** Gobo rotation speed. Without the fixture's ranges: 0-7 stop, then clockwise slow to fast, then anticlockwise. */
@@ -275,7 +319,8 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
       // Colour mixing flags on a white lamp: each one takes its opposite colour out.
       color = [1 - (r('cyan') ?? 0) * 0.95, 1 - (r('magenta') ?? 0) * 0.95, 1 - (r('yellow') ?? 0) * 0.95]
     }
-    let wheel = wheelColor(r('colorWheel'), head.colorWheel)
+    const slot = wheelSlot(r('colorWheel'), head.colorWheel)
+    let wheel = slot ? slot.rgb : null
     // On an RGB fixture the macro's "black" slot means "no macro": the mixed colour shows.
     if (wheel && hasColor && Math.max(...wheel) <= 0.001) wheel = null
     // A real colour wheel filters the white lamp. On an RGB fixture the same kind of
@@ -315,11 +360,13 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const prismSpin = spinOf(r('prismRotation'), head.prismSpin)
     const moveSpeed = speedOf(r('moveSpeed'), head.moveSpeed)
     const prism = (r('prism') ?? 0) * 255 > 20
-    const rotation = r('rotation') ?? r('laser') ?? 0
+    // A motor with known ranges turns at their speed (minus = the other way); otherwise the raw level.
+    const rotation = head.rotationSpin?.length ? spinOf(r('rotation'), head.rotationSpin) : r('rotation') ?? r('laser') ?? 0
     const fog = r('fog') ?? 0
     if (!sent) intensity = 0
     const mix: [number, number, number, number] | undefined = hasColor && !program && !wheel ? [r('red') ?? 0, r('green') ?? 0, r('blue') ?? 0, r('white') ?? 0] : undefined
-    return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation, fog, mix }
+    const colours = wheel && slot?.colours && !program ? slot.colours : undefined
+    return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation, fog, mix, colours }
   })
 }
 

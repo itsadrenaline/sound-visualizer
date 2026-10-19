@@ -84,6 +84,10 @@ export interface VisualizerApi {
   onProjectOpened(callback: (opened: OpenedProject) => void): () => void
   setTitle(name: string, path: string | null, edited: boolean): void
   saveImage(dataUrl: string, name: string): Promise<string | null>
+  /** Keep a video for a screen on this computer; returns its id. */
+  saveMedia(name: string, data: Uint8Array): Promise<string>
+  /** A kept video's bytes, or null if this computer doesn't have it. */
+  readMedia(id: string): Promise<Uint8Array | null>
 
   /** The fixture library (Open Fixture Library plus your imported files), as raw OFL JSON. */
   loadLibrary(): Promise<unknown>

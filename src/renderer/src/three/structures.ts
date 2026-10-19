@@ -10,7 +10,8 @@
  */
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { ARRAY_BOX, ARRAY_SUB, cabinetOf, FT, IN, mountPoints, paramsOf, pointAt, SUB_18, type Cover, type Structure } from '../model/structures'
+import { ARRAY_BOX, ARRAY_SUB, BALLOON_PALETTES, cabinetOf, FT, IN, mountPoints, NEON_COLOURS, paramsOf, pointAt, SCREEN_KINDS, SUB_18, tvSize, type Cover, type Structure } from '../model/structures'
+import { ScreenSurface } from './screenContent'
 import { createRoomMaterial } from './roomMaterial'
 
 const metal = new THREE.MeshStandardMaterial({ color: 0xa4a7ad, roughness: 0.35, metalness: 0.6 })
@@ -199,6 +200,110 @@ function seeded(seed: string): () => number {
     h = Math.imul(h ^ (h >>> 13), 3266489909)
     return ((h ^= h >>> 16) >>> 0) / 4294967296
   }
+}
+
+/**
+ * Light-up dance floor tiles: a canvas, one pixel per tile, redrawn each frame with a
+ * slow colour pattern (chases, checkers, a ripple from the middle).
+ */
+function ledFloor(group: THREE.Group, w: number, d: number, tile: number): ((time: number) => void) | undefined {
+  if (typeof document === 'undefined') return undefined
+  const cols = Math.max(1, Math.round(w / tile))
+  const rows = Math.max(1, Math.round(d / tile))
+  const canvas = document.createElement('canvas')
+  canvas.width = cols
+  canvas.height = rows
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.colorSpace = THREE.SRGBColorSpace
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.995, d * 0.995).rotateX(-Math.PI / 2).translate(0, 0.0265, 0), new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.9, toneMapped: false }))
+  plane.raycast = () => {}
+  plane.userData.own = true
+  group.add(plane)
+  const g = canvas.getContext('2d')!
+  return (time: number) => {
+    const beat = (time * 124) / 60
+    const scene = Math.floor(beat / 16) % 3
+    for (let x = 0; x < cols; x++)
+      for (let y = 0; y < rows; y++) {
+        const h =
+          scene === 0 ? (x + y) / (cols + rows) + beat * 0.05 // diagonal rainbow chase
+          : scene === 1 ? ((x + y + Math.floor(beat)) % 2) * 0.5 + Math.floor(beat / 4) * 0.13 // flipping checkers
+          : Math.hypot(x - (cols - 1) / 2, y - (rows - 1) / 2) * 0.12 - beat * 0.1 // ripple from the middle
+        const l = scene === 1 ? 0.5 : 0.45 + 0.1 * Math.sin(beat * Math.PI)
+        g.fillStyle = `hsl(${((h % 1) + 1) % 1 * 360}, 100%, ${l * 100}%)`
+        g.fillRect(x, y, 1, 1)
+      }
+    texture.needsUpdate = true
+  }
+}
+
+/** Balloons along an arch: clusters of four, in the palette's colours, the same each time. */
+function balloonArch(group: THREE.Group, w: number, h: number, palette: string[], seed: string): THREE.InstancedMesh[] {
+  const rand = seeded(seed)
+  const r = 0.14
+  // A rounded arch: up the sides, over the top.
+  const point = (t: number) => {
+    const a = Math.PI * (1 - t)
+    return new THREE.Vector3((Math.cos(a) * w) / 2, Math.sin(a) * (h - r) + r * 0.6, 0)
+  }
+  let length = 0
+  for (let i = 0; i < 100; i++) length += point(i / 100).distanceTo(point((i + 1) / 100))
+  const steps = Math.max(8, Math.round(length / (r * 1.3)))
+  const placed: Array<{ at: THREE.Vector3; colour: number; size: number }> = []
+  for (let i = 0; i <= steps; i++) {
+    const c = point(i / steps)
+    const next = point(Math.min(1, i / steps + 0.01))
+    const along = next.clone().sub(c).normalize()
+    const side = new THREE.Vector3(0, 0, 1).cross(along).normalize()
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2 + i * 0.7
+      const off = side.clone().multiplyScalar(Math.cos(a) * r * 0.9).add(new THREE.Vector3(0, 0, Math.sin(a) * r * 0.9))
+      placed.push({ at: c.clone().add(off), colour: (i + k) % palette.length, size: r * (0.85 + rand() * 0.3) })
+    }
+  }
+  const sphere = new THREE.SphereGeometry(1, 14, 10)
+  return palette.map((hex, ci) => {
+    const list = placed.filter((b) => b.colour === ci)
+    const mesh = new THREE.InstancedMesh(sphere, new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.25, metalness: hex === '#d4af37' || hex === '#c9ccd2' ? 0.6 : 0.05 }), list.length)
+    const m = new THREE.Matrix4()
+    list.forEach((b, i) => mesh.setMatrixAt(i, m.compose(b.at, new THREE.Quaternion(), new THREE.Vector3(b.size, b.size * 1.1, b.size))))
+    mesh.userData.own = true
+    group.add(mesh)
+    return mesh
+  })
+}
+
+/** Glowing words for a neon sign, on a transparent canvas. */
+function neonTexture(text: string, colour: string): THREE.Texture | null {
+  // No page (tests in Node): the sign is drawn without its words.
+  if (typeof document === 'undefined') return null
+  const canvas = document.createElement('canvas')
+  canvas.width = 1024
+  canvas.height = 410
+  const g = canvas.getContext('2d')!
+  const lines = (text.trim() || 'Let’s Party').split(/\n|\\n/).slice(0, 3)
+  let size = 180
+  const font = () => `italic 600 ${size}px "Brush Script MT", "Snell Roundhand", cursive`
+  g.font = font()
+  while (size > 30 && (Math.max(...lines.map((l) => g.measureText(l).width)) > canvas.width * 0.9 || size * lines.length * 1.1 > canvas.height * 0.85)) {
+    size -= 6
+    g.font = font()
+  }
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  // A wide soft glow, then the bright tube on top.
+  for (const [blur, style, width] of [[40, colour, 10], [12, colour, 6], [0, '#ffffff', 2.5]] as const) {
+    g.shadowColor = colour
+    g.shadowBlur = blur
+    g.strokeStyle = style
+    g.lineWidth = width
+    lines.forEach((l, i) => g.strokeText(l, canvas.width / 2, canvas.height / 2 + (i - (lines.length - 1) / 2) * size * 1.1))
+  }
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
 }
 
 /** The 3D model of one structure, at the origin (the caller places and turns it). */
@@ -604,6 +709,7 @@ export function buildStructure(s: Structure): THREE.Group {
       parts.box(surface(finish), p.width, 0.025, p.depth, 0, 0.0125, 0)
       const tile = 3 * FT
       const y = 0.027
+      if (p.led) group.userData.tick = ledFloor(group, p.width, p.depth, tile)
       for (let x = -p.width / 2 + tile; x < p.width / 2 - 0.01; x += tile) lines.push(x, y, -p.depth / 2, x, y, p.depth / 2)
       for (let z = -p.depth / 2 + tile; z < p.depth / 2 - 0.01; z += tile) lines.push(-p.width / 2, y, z, p.width / 2, y, z)
       break
@@ -612,6 +718,7 @@ export function buildStructure(s: Structure): THREE.Group {
       const h = (p.width * 9) / 16
       const b = p.bottom ?? 0
       parts.box(surface(0xf4f4f6, true), p.width, h, 0.01, 0, b + h / 2, 0)
+      group.userData.screen = { w: p.width, h, at: [0, b + h / 2, 0.006], brightness: 0.85 }
       // Black border and legs behind.
       for (const [w, hh, x, y] of [[p.width + 0.1, 0.05, 0, b + h + 0.025], [p.width + 0.1, 0.05, 0, b - 0.025], [0.05, h, -p.width / 2 - 0.025, b + h / 2], [0.05, h, p.width / 2 + 0.025, b + h / 2]] as const) parts.box(cabinet, w, hh, 0.02, x, y, -0.01)
       for (const sx of [-1, 1]) {
@@ -623,6 +730,7 @@ export function buildStructure(s: Structure): THREE.Group {
     case 'ledWall': {
       const b = p.bottom ?? 0
       parts.box(ledPanel, p.width, p.height, 0.08, 0, b + p.height / 2, 0)
+      group.userData.screen = { w: p.width, h: p.height, at: [0, b + p.height / 2, 0.041], brightness: 1 }
       for (let x = -p.width / 2 + 0.5; x < p.width / 2 - 0.01; x += 0.5) lines.push(x, b, 0.042, x, b + p.height, 0.042)
       for (let y = b + 0.5; y < b + p.height - 0.01; y += 0.5) lines.push(-p.width / 2, y, 0.042, p.width / 2, y, 0.042)
       // Ground support: feet and back braces.
@@ -630,6 +738,63 @@ export function buildStructure(s: Structure): THREE.Group {
         parts.box(darkMetal, 0.08, 0.04, 0.9, x, 0.02, -0.2)
         parts.tube(darkMetal, 0.02, v(x, 0.04, -0.6), v(x, b + p.height * 0.7, -0.05), 6)
         if (b > 0) parts.tube(darkMetal, 0.025, v(x, 0, -0.05), v(x, b, -0.05), 6)
+      }
+      break
+    }
+    case 'tv': {
+      const [w, h] = tvSize(p.size)
+      const b = p.bottom ?? 0
+      const y = Math.max(b, 0.06) + h / 2
+      parts.box(cabinet, w + 0.02, h + 0.02, 0.045, 0, y, 0)
+      parts.box(ledPanel, w, h, 0.002, 0, y, 0.0235)
+      group.userData.screen = { w, h, at: [0, y, 0.0255], brightness: 1 }
+      if (b > 0.15) {
+        // A floor stand: a pole on a wide foot.
+        parts.box(darkMetal, 0.7, 0.03, 0.55, 0, 0.015, -0.05)
+        parts.tube(darkMetal, 0.03, v(0, 0.03, -0.05), v(0, y + h * 0.2, -0.05), 10)
+      } else {
+        for (const sx of [-1, 1]) parts.box(darkMetal, 0.04, 0.06, 0.22, sx * w * 0.38, 0.03, 0)
+      }
+      break
+    }
+    case 'balloonArch': {
+      group.userData.instanced = balloonArch(group, p.width, p.height, BALLOON_PALETTES[p.palette ?? 0]?.[1] ?? BALLOON_PALETTES[0][1], s.id)
+      for (const sx of [-1, 1]) parts.box(darkMetal, 0.35, 0.03, 0.35, (sx * p.width) / 2, 0.015, 0)
+      break
+    }
+    case 'photoBooth': {
+      const r = ((p.size ?? 39) * IN) / 2
+      parts.add(surface(0xf2f2f4), new THREE.CylinderGeometry(r, r, 0.1, 40).translate(0, 0.05, 0))
+      // The turning arm: from the middle under the platform out past its edge, a pole up, a phone and a ring light.
+      const arm = new THREE.Group()
+      const armMat = darkMetal
+      const reach = r + 0.35
+      const pieces = [
+        new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, reach).translate(0, 0.02, reach / 2), armMat),
+        new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.45, 8).translate(0, 0.75, reach), armMat),
+        new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 0.01).translate(0, 1.45, reach - 0.02), cabinet),
+        new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.015, 8, 32).translate(0, 1.45, reach - 0.03), new THREE.MeshBasicMaterial({ color: 0xfff6ea, toneMapped: false }))
+      ]
+      pieces[3].userData.own = true
+      for (const m of pieces) arm.add(m)
+      group.add(arm)
+      // It turns slowly, like it does at a party.
+      group.userData.tick = (time: number) => (arm.rotation.y = time * 0.9)
+      break
+    }
+    case 'neonSign': {
+      const w = p.width
+      const h = w * 0.4
+      const b = p.bottom ?? 0
+      const colour = NEON_COLOURS[p.tint ?? 0]?.[1] ?? NEON_COLOURS[0][1]
+      // A clear acrylic panel, the glowing words on it.
+      group.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.008).translate(0, b + h / 2, 0), new THREE.MeshStandardMaterial({ color: 0xaab4c0, transparent: true, opacity: 0.12, roughness: 0.1 })))
+      const words = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.96, h * 0.92).translate(0, b + h / 2, 0.006), new THREE.MeshBasicMaterial({ map: neonTexture(p.text ?? '', colour), transparent: true, toneMapped: false, depthWrite: false }))
+      words.userData.own = true
+      group.add(words)
+      if (b > 0.05) for (const sx of [-1, 1]) {
+        parts.tube(metal, 0.012, v(sx * w * 0.35, 0, -0.02), v(sx * w * 0.35, b + h * 0.5, -0.02), 8)
+        parts.box(darkMetal, 0.25, 0.02, 0.3, sx * w * 0.35, 0.01, -0.02)
       }
       break
     }
@@ -715,9 +880,15 @@ export function buildStructure(s: Structure): THREE.Group {
   return group
 }
 
-/** What a structure's model depends on: rebuild only when this changes. */
+/** What a structure's model depends on: rebuild only when this changes (a screen's picture isn't part of its shape). */
 export function shapeKey(s: Structure): string {
-  return `${s.kind}:${JSON.stringify(paramsOf(s))}`
+  const { content: _c, media: _m, mediaName: _n, ...shape } = paramsOf(s)
+  void _c, void _m, void _n
+  if (SCREEN_KINDS.includes(s.kind)) {
+    delete shape.text
+    delete shape.tint
+  }
+  return `${s.kind}:${JSON.stringify(shape)}`
 }
 
 /** One structure in the scene: its model, placed and turned, and a selection outline. */
@@ -733,6 +904,9 @@ export class StructureRig {
     this.update(s)
   }
 
+  /** What a screen shows, laid over its face. */
+  private screen: ScreenSurface | null = null
+
   update(s: Structure): void {
     const key = shapeKey(s)
     if (key !== this.key) {
@@ -740,16 +914,31 @@ export class StructureRig {
         this.root.remove(this.model)
         disposeGroup(this.model)
       }
+      this.screen?.dispose()
+      this.screen = null
       this.model = buildStructure(s)
       this.root.add(this.model)
+      const face = this.model.userData.screen as { w: number; h: number; at: [number, number, number]; brightness: number } | undefined
+      if (face) {
+        this.screen = new ScreenSurface(face.w, face.h, face.brightness)
+        this.screen.mesh.position.set(...face.at)
+        this.model.add(this.screen.mesh)
+      }
       this.key = key
       if (this.outline) {
         this.setSelected(false)
         this.setSelected(true)
       }
     }
+    this.screen?.set(paramsOf(s))
     this.root.position.set(...s.position)
     this.root.rotation.y = (s.rotation * Math.PI) / 180
+  }
+
+  /** Every frame: moving pictures, light-up floors, a turning photo booth arm. */
+  tick(time: number): void {
+    this.screen?.tick(time)
+    ;(this.model?.userData.tick as ((t: number) => void) | undefined)?.(time)
   }
 
   setSelected(on: boolean): void {
@@ -776,6 +965,7 @@ export class StructureRig {
 
   dispose(): void {
     if (this.model) disposeGroup(this.model)
+    this.screen?.dispose()
     this.setSelected(false)
   }
 }
@@ -783,7 +973,13 @@ export class StructureRig {
 function disposeGroup(g: THREE.Object3D): void {
   g.traverse((o) => {
     if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose()
-    // Materials are shared between structures; they live as long as the app.
+    // Materials are shared between structures and live as long as the app, except the
+    // few made for one object (a neon sign's words, a dance floor's tiles, balloons).
+    if (o instanceof THREE.Mesh && o.userData.own) {
+      const m = o.material as THREE.MeshBasicMaterial
+      m.map?.dispose()
+      m.dispose()
+    }
   })
 }
 

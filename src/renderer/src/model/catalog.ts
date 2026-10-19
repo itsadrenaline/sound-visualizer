@@ -31,6 +31,7 @@ export type LookKind =
   | 'fog' // fog or haze machine: a box with a nozzle
   | 'twinbar' // two bars of LEDs side by side, each tilting on its own motor (BeamZ Double Helix, 8-beam "spiders")
   | 'curtain' // LED curtain / starcloth: LEDs scattered over a black drape hung from a truss
+  | 'sphere' // a ball covered in lenses on a base, throwing beams all round as it turns (ADJ Starburst)
 
 /** How a fixture's cells sit on its face, for looks that draw cells (cluster, panel). */
 export interface CellLayout {
@@ -107,7 +108,8 @@ export const LOOK_DEFAULTS: Record<LookKind, { size: [number, number, number]; b
   fog: { size: [0.25, 0.2, 0.5], beam: [30, 30] },
   string: { size: [3.0, 0.3, 0.06], beam: [180, 180] },
   twinbar: { size: [0.28, 0.16, 0.15], beam: [6, 6] },
-  curtain: { size: [2.0, 1.0, 0.02], beam: [120, 120] }
+  curtain: { size: [2.0, 1.0, 0.02], beam: [120, 120] },
+  sphere: { size: [0.32, 0.41, 0.32], beam: [1, 1] }
 }
 
 export interface FixtureSpec {
@@ -129,6 +131,8 @@ export interface FixtureSpec {
   output: number
   /** LEDs on the face, for wash looks: how many to draw. */
   leds?: number
+  /** For lasers: how many apertures (separate fans of beams). */
+  apertures?: number
   /** For movers: a ring of LEDs around the lens (BPM-Spots, Aura). */
   halo?: boolean
   /** How it's usually rigged. */
@@ -207,6 +211,14 @@ const CATALOG: Entry[] = [
   {
     match: /spider\s*wash|wash\s*24/i,
     spec: { look: 'spider', size: [0.285, 0.22, 0.19], beam: [20, 20], output: 0.6, leds: 24, mount: 'floor', note: 'Both Lighting Spider Wash (WASH24): 24 × 12 W RGBWA+UV LEDs in separately coloured groups, 20° beams.' }
+  },
+  {
+    match: /\bstarbu?r?st\b/i,
+    spec: { look: 'sphere', size: [0.318, 0.4125, 0.318], beam: [1, 1], output: 0.55, leds: 56, mount: 'floor', note: 'ADJ Starburst: a ball covered in lenses on a base; five 15 W six-colour LEDs throw many 1° beams through them while a motor turns the ball.' }
+  },
+  {
+    match: /\bEL-?900\s*RGB/i,
+    spec: { look: 'laser', size: [0.34, 0.12, 0.26], beam: [40, 40], output: 0.5, apertures: 4, mount: 'hanging', note: 'Laserworld EL-900RGB: a full-colour (RGB) laser with four apertures in a curved front, each steered by its own pair of motors. Size estimated.' }
   },
   {
     match: /double\s*helix|mhl\s*-?820/i,

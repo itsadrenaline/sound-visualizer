@@ -173,7 +173,9 @@ function channelTable(fx: OflFixture, mode: OflMode): Map<string, Resolved> {
 
 const COLOR_FN: Record<string, HeadFunction> = {
   Red: 'red', Green: 'green', Blue: 'blue', White: 'white', 'Warm White': 'white', 'Cold White': 'white',
-  Amber: 'amber', UV: 'uv', Lime: 'green', Indigo: 'blue'
+  Amber: 'amber', UV: 'uv', Lime: 'green', Indigo: 'blue',
+  // Six-colour LEDs that print yellow and purple (ADJ Starburst): the nearest we draw.
+  Yellow: 'amber', Purple: 'uv'
 }
 
 function hexToRgb(hex: string | undefined): [number, number, number] | null {
@@ -215,6 +217,7 @@ interface Classified {
   goboSlots?: GoboSlot[]
   goboSpin?: SpinRange[]
   prismSpin?: SpinRange[]
+  rotationSpin?: SpinRange[]
   moveSpeed?: SpinRange[]
   /** Pan/tilt travel in degrees, or zoom beam angles. */
   angle?: [number, number]
@@ -239,6 +242,7 @@ function classify(key: string, def: OflChannel, fx: OflFixture): Classified {
   const goboSlots: GoboSlot[] = []
   const goboSpin: SpinRange[] = []
   const prismSpin: SpinRange[] = []
+  const rotationSpin: SpinRange[] = []
   const moveSpeed: SpinRange[] = []
   let angle: [number, number] | undefined
   let colorFn: HeadFunction | undefined
@@ -293,7 +297,8 @@ function classify(key: string, def: OflChannel, fx: OflFixture): Classified {
         if (isColorWheel) {
           vote('colorWheel', c)
           const rgb = slot?.type === 'Open' ? ([1, 1, 1] as [number, number, number]) : mixColors(slot?.colors)
-          if (rgb) wheelSlots.push({ lo, hi, rgb })
+          const each = (slot?.colors ?? []).map(hexToRgb).filter((x): x is [number, number, number] => !!x)
+          if (rgb) wheelSlots.push(each.length > 1 ? { lo, hi, rgb, colours: each } : { lo, hi, rgb })
         } else if (wheel) {
           vote('gobo', c)
           goboSlots.push({ lo, hi, slot: slot?.type === 'Open' || !slot ? 0 : Math.floor(c.slotNumber ?? 1) - 1 })
@@ -307,6 +312,12 @@ function classify(key: string, def: OflChannel, fx: OflFixture): Classified {
           vote('gobo', c)
           goboSlots.push({ lo, hi, slot: Math.floor(c.slotNumber ?? 1) - 1 })
         }
+        break
+      }
+      case 'Rotation': {
+        // The whole effect turning (a derby, a Starburst's ball).
+        vote('rotation', c)
+        rotationSpin.push({ lo, hi, from: spinSpeed(c.speedStart ?? c.speed), to: spinSpeed(c.speedEnd ?? c.speed) })
         break
       }
       case 'PrismRotation': {
@@ -337,7 +348,9 @@ function classify(key: string, def: OflChannel, fx: OflFixture): Classified {
         const rgb = mixColors(c.colors)
         if (rgb) {
           vote('colorWheel', c)
-          wheelSlots.push({ lo, hi, rgb })
+          // Several colours at once (a laser's "red + green"): each beam shows one of them.
+          const each = (c.colors ?? []).map(hexToRgb).filter((x): x is [number, number, number] => !!x)
+          wheelSlots.push(each.length > 1 ? { lo, hi, rgb, colours: each } : { lo, hi, rgb })
         }
         break
       }
@@ -354,6 +367,7 @@ function classify(key: string, def: OflChannel, fx: OflFixture): Classified {
     goboSlots: fn === 'gobo' && goboSlots.length ? goboSlots : undefined,
     goboSpin: fn === 'goboRotation' && goboSpin.length ? goboSpin : undefined,
     prismSpin: fn === 'prismRotation' && prismSpin.length ? prismSpin : undefined,
+    rotationSpin: fn === 'rotation' && rotationSpin.length ? rotationSpin : undefined,
     moveSpeed: fn === 'moveSpeed' && moveSpeed.length ? moveSpeed : undefined,
     angle
   }
@@ -471,6 +485,7 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
       if (c.shutter) head.shutter = c.shutter
       if (c.goboSlots) head.goboSlots = c.goboSlots
       if (c.goboSpin) head.goboSpin = c.goboSpin
+      if (c.rotationSpin) head.rotationSpin = c.rotationSpin
       if (c.prismSpin) head.prismSpin = c.prismSpin
       if (c.moveSpeed) head.moveSpeed = c.moveSpeed
       if (c.fn === 'pan' && c.angle) panRange = Math.abs(c.angle[1] - c.angle[0])

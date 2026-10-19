@@ -37,6 +37,11 @@ export interface Fixture {
    * follows the structure.
    */
   mount?: { structure: string; point: string; t?: number }
+  /**
+   * Clamped to the front of a truss (or a leg, a facade) on its back, so its face
+   * points out at the audience instead of up. Only while it's attached there.
+   */
+  faceOut?: boolean
   /** Fixture group, as in SoundSwitch (1 = Group 1). Missing or 0 = no group. */
   group?: number
   /** For fixtures imported from SoundSwitch: how to recognise it there, e.g. "U2.160 Modern Consoles DJ Booth LED Strip". */

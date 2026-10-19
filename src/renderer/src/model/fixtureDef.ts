@@ -10,7 +10,7 @@
  * Open Fixture Library file for sharing.
  */
 import type { FixtureType } from './fixtureTypes'
-import { channelListFromHeads, type ChannelRef, type HeadDef, type HeadFunction, type HeadRole, type ProgramPattern } from './heads'
+import { channelListFromHeads, slotFrom, type WheelSlot, type ChannelRef, type HeadDef, type HeadFunction, type HeadRole, type ProgramPattern } from './heads'
 import { hasOwnStand, LOOK_DEFAULTS, type CellLayout, type FixtureSpec, type LookKind } from './catalog'
 
 // ---------------------------------------------------------------------------
@@ -177,6 +177,8 @@ export interface LookDef {
   stand?: boolean
   /** LEDs drawn on the face (a 12x12 PAR has 12). Missing: from the name, or the cells. */
   leds?: number
+  /** Lasers: how many apertures (separate fans of beams). */
+  apertures?: number
   /** A photo of the real light, shown beside the twin (data URL). */
   photo?: string
 }
@@ -666,7 +668,8 @@ function applyRanges(h: HeadDef, ch: ChannelDef): void {
     }
     case 'colorWheel':
     case 'colorMacro': {
-      const slots = r.filter((x) => x.color).map((x) => ({ lo: x.lo, hi: x.hi, rgb: rgbOf(x.color)! }))
+      // A range named for several colours ("Red + Green", "Multicolour") shows them all.
+      const slots: WheelSlot[] = r.filter((x) => x.color).map((x) => slotFrom(x.lo, x.hi, x.label ?? '', rgbOf(x.color)!)!)
       // Colour presets: "off" ranges show black so the mixed colour shows through.
       if (ch.fn === 'colorMacro') for (const x of r) if (x.kind === 'off') slots.push({ lo: x.lo, hi: x.hi, rgb: [0, 0, 0] })
       if (slots.length) h.colorWheel = slots
@@ -712,6 +715,7 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
     speed: moving ? 220 : undefined,
     output: look.output,
     leds: look.leds ?? (pixels > 1 ? pixels : undefined),
+    apertures: look.apertures,
     halo: heads.some((h) => h.role === 'halo') || undefined,
     mount: look.mount,
     stand: look.shape === 'gigbar' ? !!look.stand : undefined,
@@ -763,7 +767,7 @@ function kindFromType(t: FixtureType): FixtureKind {
   if (look === 'strobe') return 'strobe'
   if (look === 'uplight') return 'uplight'
   if (look === 'fog') return 'fog'
-  if (look === 'twinbar') return 'effect'
+  if (look === 'twinbar' || look === 'sphere') return 'effect'
   if (look === 'curtain') return 'panel'
   if (t.body === 'bar') return 'bar'
   return 'par'
@@ -839,7 +843,8 @@ export function defFromTypes(types: FixtureType[], meta: { name: string; manufac
       mount: spec?.mount ?? KINDS[kind].mount,
       // An existing fixture keeps the stand it's drawn with until you untick it.
       stand: spec?.look === 'gigbar' ? hasOwnStand(spec) : undefined,
-      leds: spec?.leds
+      leds: spec?.leds,
+      apertures: spec?.apertures
     },
     parts,
     modes,

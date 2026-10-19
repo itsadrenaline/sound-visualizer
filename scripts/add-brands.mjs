@@ -38,7 +38,8 @@ const LOOKS = {
   'qlc/Chauvet/Chauvet-Hive': ['effect', 'derby', 'floor'],
   'qlc/Chauvet/Chauvet-Wash-FX-Hex': ['par', 'flood', 'floor'],
   'qlc/Chauvet/Chauvet-Wash-FX2': ['par', 'flood', 'floor'],
-  'qlc/beamZ/beamZ-SparkleWall': ['panel', 'curtain', 'hanging']
+  'qlc/beamZ/beamZ-SparkleWall': ['panel', 'curtain', 'hanging'],
+  'qlc/American_DJ/American-DJ-Starburst': ['effect', 'sphere', 'floor']
 }
 let fixed = 0
 for (const key of REPLACED) {
