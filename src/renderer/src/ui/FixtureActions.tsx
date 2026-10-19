@@ -11,7 +11,7 @@ import { useStore } from '../state/store'
 import { useMix } from '../state/mix'
 import { useFixtureMenu } from '../state/fixtureMenu'
 import { useViewSettings } from '../state/viewSettings'
-import { autoPlaceFixtures, deleteFixtures, detachFixtures, distributeFixtures, duplicateArray, duplicateFixtures, mirrorFixtures, mountFixtures, orientFixtures, selectSameType, updateFixtures } from '../state/commands'
+import { autoPlaceFixtures, deleteFixtures, detachFixtures, distributeFixtures, duplicateArray, duplicateFixtures, mirrorFixtures, mountFixtures, orientFixtures, hangFromCeiling, selectSameType, updateFixtures } from '../state/commands'
 import { notify } from '../state/notices'
 import { attachOptions } from './StructureActions'
 import { nearestMount } from '../model/physics'
@@ -213,7 +213,15 @@ export function FixtureMenu() {
         )}
         {info.chosen.some((f) => f.mount) && <Item label="Detach (stand on the floor)" onClick={run(() => detachFixtures(ids))} />}
         <Item label="Upright (totem mode)" check={info.hanging === 'off' ? '✓' : info.hanging === 'mixed' ? '–' : ''} onClick={run(() => orient(ids, 'floor'))} />
-        <Item label={hangTarget ? `Hanging (truss mode): under ${hangTarget.structure.name}` : 'Hanging (truss mode)'} check={info.hanging === 'on' ? '✓' : info.hanging === 'mixed' ? '–' : ''} onClick={run(() => orient(ids, 'hanging'))} />
+        <Item label={hangTarget ? `Hanging (truss mode): under ${hangTarget.structure.name}` : 'Hanging (truss mode)'} check={info.hanging === 'on' && !info.chosen.every((f) => f.onCeiling) ? '✓' : info.hanging === 'mixed' ? '–' : ''} onClick={run(() => orient(ids, 'hanging'))} />
+        <Item
+          label="Hanging from the ceiling"
+          check={info.chosen.every((f) => f.onCeiling && f.mounting === 'hanging') ? '✓' : info.chosen.some((f) => f.onCeiling) ? '–' : ''}
+          title="Upside down on a ceiling hook, right above where it is (turn the ceiling on under Room)"
+          onClick={run(() => {
+            if (!hangFromCeiling(ids)) notify('error', 'This room has no ceiling: turn it on under Room first.')
+          })}
+        />
         {attach.map((o) => (
           <Item key={o.structure.id + o.point.id} label={`${o.point.label}: ${o.structure.name}`} onClick={run(() => mountFixtures(ids, o.structure.id, o.point.id, o.t))} />
         ))}

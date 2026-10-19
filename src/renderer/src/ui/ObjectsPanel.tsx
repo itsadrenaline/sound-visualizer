@@ -183,6 +183,7 @@ export function Icon({ kind }: { kind: StructureKind }) {
     balloonArch: <><path d="M4 21V12a8 8 0 0116 0v9" {...s} /><circle cx="5" cy="13" r="1.8" {...s} /><circle cx="7" cy="8" r="1.8" {...s} /><circle cx="12" cy="5" r="1.8" {...s} /><circle cx="17" cy="8" r="1.8" {...s} /><circle cx="19" cy="13" r="1.8" {...s} /></>,
     photoBooth: <><ellipse cx="12" cy="18" rx="8" ry="2.5" {...s} /><path d="M12 18V9l7-3" {...s} /><circle cx="19" cy="6" r="2" {...s} /></>,
     neonSign: <><rect x="2" y="6" width="20" height="10" rx="2" {...s} /><path d="M6 13V9l3 4V9M12 9v4h2M16 9h2v4h-2" {...s} /><path d="M8 16v5M16 16v5" {...s} /></>,
+    discoBall: <><path d="M12 2v5" {...s} /><circle cx="12" cy="14" r="7" {...s} /><path d="M5 14h14M12 7v14M7 9.5c3 1.5 7 1.5 10 0M7 18.5c3-1.5 7-1.5 10 0" {...s} /></>,
     crowd: <><circle cx="7" cy="7" r="2" {...s} /><circle cx="17" cy="7" r="2" {...s} /><circle cx="12" cy="10" r="2" {...s} /><path d="M3 18c0-3 2-6 4-6s4 3 4 6M13 18c0-3 2-6 4-6s4 3 4 6M8 21c0-3 2-6 4-6s4 3 4 6" {...s} /></>
   }
   return (

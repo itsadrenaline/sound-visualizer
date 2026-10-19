@@ -35,7 +35,7 @@ export type StructureKind =
   // Room
   | 'wall' | 'danceFloor' | 'screen' | 'ledWall' | 'backdrop' | 'stanchions' | 'plant' | 'pillar'
   // Party
-  | 'tv' | 'balloonArch' | 'photoBooth' | 'neonSign'
+  | 'tv' | 'balloonArch' | 'photoBooth' | 'neonSign' | 'discoBall'
   // People
   | 'person' | 'crowd'
 
@@ -51,6 +51,11 @@ export interface Structure {
   rotation: number
   /** Size and options; which ones depend on the kind (see STRUCTURE_KINDS). */
   params: StructureParams
+  /**
+   * A disco ball hanging from a truss bar or the ceiling (worked out by physics.ts):
+   * `position[1]` is then the point it hangs from. Missing: it stands (on a totem, a table, the floor).
+   */
+  hang?: 'truss' | 'ceiling'
 }
 
 export interface StructureParams {
@@ -99,7 +104,14 @@ export interface StructureParams {
   led?: boolean
   /** Balloon arch: colours, from BALLOON_PALETTES. */
   palette?: number
+  /** Disco ball: length of the chain it hangs on (or the rod it stands on), metres. */
+  drop?: number
+  /** Disco ball: motor speed, turns per minute (0 = still). */
+  rpm?: number
 }
+
+/** A disco ball's radius from its diameter in inches. */
+export const discoRadius = (size = 16) => (size * IN) / 2
 
 /** What a screen can show. */
 export type ScreenContent = 'off' | 'colours' | 'visuals' | 'image' | 'video' | 'text'
@@ -568,6 +580,16 @@ export const STRUCTURE_KINDS: Record<StructureKind, KindInfo> = {
     defaults: { size: 39 },
     fields: [{ key: 'size', label: 'Platform', kind: 'choice', options: [['31 in', 31], ['39 in', 39], ['45 in', 45]] }]
   },
+  discoBall: {
+    label: 'Disco ball', category: 'Party', surface: false,
+    description: 'A mirror ball on a motor. It hangs from the ceiling, under a truss bar it is put beneath, or sits on a totem or stand. Point a pin spot or a moving head at it and its reflections fly round the room.',
+    defaults: { size: 16, drop: 0.5, rpm: 2 },
+    fields: [
+      { key: 'size', label: 'Size', kind: 'choice', options: [['8 in', 8], ['12 in', 12], ['16 in', 16], ['20 in', 20], ['24 in', 24], ['30 in', 30], ['40 in', 40]] },
+      { key: 'drop', label: 'Chain or rod length', kind: 'length', min: 0.05, max: 4, presets: [0.5, 1, 2, 3, 5] },
+      { key: 'rpm', label: 'Turning', kind: 'choice', options: [['Still', 0], ['Slow', 1], ['Normal', 2], ['Fast', 4]] }
+    ]
+  },
   neonSign: {
     label: 'Neon sign', category: 'Party', surface: false,
     description: 'Glowing words on a clear panel, on a stand or a wall: "Happy Birthday", a name, the venue.',
@@ -681,6 +703,7 @@ export function footprint(s: Structure): [number, number] {
     case 'balloonArch': return [p.width + 0.5, 0.5]
     case 'photoBooth': return [Math.max(1.4, (p.size ?? 39) * IN + 0.5), Math.max(1.4, (p.size ?? 39) * IN + 0.5)]
     case 'neonSign': return [p.width, 0.35]
+    case 'discoBall': return [Math.max(0.2, discoRadius(p.size) * 2), Math.max(0.2, discoRadius(p.size) * 2)]
     case 'backdrop': return [p.width, 0.6]
     case 'stanchions': return [Math.max(1, (p.count ?? 2) - 1) * p.width, 0.35]
     case 'plant': return [Math.max(0.35, p.height * 0.35), Math.max(0.35, p.height * 0.35)]
@@ -719,6 +742,7 @@ export function heightOf(s: Structure): number {
     case 'balloonArch': return p.height + 0.3
     case 'photoBooth': return 0.1
     case 'neonSign': return (p.bottom ?? 0) + p.width * 0.4
+    case 'discoBall': return s.hang ? 0 : 0.1 + (p.drop ?? 0.5) + discoRadius(p.size) * 2
     case 'stanchions': return 0.95
     case 'crowd': return 1.8
   }
@@ -810,7 +834,8 @@ export function mountPoints(s: Structure): MountPoint[] {
         // On their backs on the front of the truss, facing the audience.
         facingOut(bar('x', 'face', '', p.width - t * 2, p.height - t / 2, t / 2 + 0.01, 0), 'frontOut', 'Front of the crossbar, facing out'),
         facingOut(leg('x', '', -p.width / 2, t / 2 + 0.01, 0.3, p.height - t - 0.1), 'legLOut', 'Front of the left leg, facing out'),
-        facingOut(leg('x', '', p.width / 2, t / 2 + 0.01, 0.3, p.height - t - 0.1), 'legROut', 'Front of the right leg, facing out')
+        facingOut(leg('x', '', p.width / 2, t / 2 + 0.01, 0.3, p.height - t - 0.1), 'legROut', 'Front of the right leg, facing out'),
+        facingOut(bar('x', 'face', '', p.width - t * 2, p.height - t / 2, -t / 2 - 0.01, 180), 'backOut', 'Back of the crossbar, facing out')
       ]
     case 'trussBox':
       return [
@@ -915,6 +940,7 @@ export function defaultName(kind: StructureKind, params: StructureParams): strin
     case 'balloonArch': return `Balloon arch ${ft(p.width)} ft`
     case 'photoBooth': return '360 photo booth'
     case 'neonSign': return `Neon sign “${(p.text ?? '').slice(0, 20)}”`
+    case 'discoBall': return `Disco ball ${p.size ?? 16} in`
     case 'ledWall': return `LED wall ${ft(p.width)} × ${ft(p.height)} ft`
     case 'stanchions': return `Stanchions × ${p.count}`
     case 'crowd': return `Crowd ${ft(p.width)} × ${ft(p.depth)} ft`
@@ -986,6 +1012,9 @@ export const STRUCTURE_PRESETS: Array<{ name: string; kind: StructureKind; param
   { name: 'Balloon arch', kind: 'balloonArch', params: {} },
   { name: '360 photo booth', kind: 'photoBooth', params: {} },
   { name: 'Neon sign', kind: 'neonSign', params: {} },
+  { name: 'Disco ball 12 in', kind: 'discoBall', params: { size: 12 } },
+  { name: 'Disco ball 20 in', kind: 'discoBall', params: { size: 20 } },
+  { name: 'Disco ball 30 in', kind: 'discoBall', params: { size: 30, drop: 1 } },
   // Screens
   { name: 'Projection screen 12 ft', kind: 'screen', params: {} },
   { name: 'LED wall 4 × 2.5 m', kind: 'ledWall', params: {} },

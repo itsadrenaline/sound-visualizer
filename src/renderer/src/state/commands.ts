@@ -10,7 +10,7 @@ import { defaultProject, footprint, newId, nextFreeAddress, planPatch, roomOf, t
 import { defaultName, footprint as structureFootprint, mountPoints, STRUCTURE_KINDS, type Structure, type StructureKind, type StructureParams } from '../model/structures'
 import { projectFromSoundSwitch, soundswitchKeyOf, syncKey, typeIdFor } from '../model/soundswitchImport'
 import { autoLayout, distribute, type Shape, type Where } from '../model/layout'
-import { nearestMount } from '../model/physics'
+import { ceilingOf, nearestMount } from '../model/physics'
 import { fixFor, patchProblems, type PatchProblem } from '../model/patchCheck'
 import { alignUnits, applyDeltas, lineUp, movingRoots, placeGroup, spaceEvenly, stageArea, unitsOf, withRiders, type Area, type Delta, type Edge, type Place, type Unit } from '../model/arrange'
 import type { SoundSwitchFixture } from '../../../shared/soundswitch'
@@ -565,6 +565,7 @@ export function planMount(p: Project, list: Fixture[], structure: string, point:
         mounting: m.kind === 'under' ? ('hanging' as const) : ('floor' as const),
         mount: { structure: s.id, point: m.id, ...(m.to ? { t: Math.round(Math.max(0, Math.min(1, raw[i] + shift)) * 1e6) / 1e6 } : {}) },
         faceOut: m.out ? true : undefined,
+        onCeiling: undefined,
         ...(facing !== undefined ? { rotation: facing } : {}),
         ...(m.aim !== undefined ? { aimTilt: m.aim } : {})
       }
@@ -608,7 +609,14 @@ export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[]
       continue
     }
     if (to === 'hanging') {
+      // Under a truss right above it, else from the ceiling right above it, else under the nearest truss.
+      // Under the nearest truss; with no truss at all, from the ceiling.
+      const ceiling = ceilingOf(p)
       const hang = nearestMount(pieces, f.position, ['under'], 1e4)
+      if (!hang && ceiling !== null) {
+        changes.set(f.id, { mounting: 'hanging', mount: undefined, faceOut: undefined, onCeiling: true, position: [f.position[0], ceiling, f.position[2]] })
+        continue
+      }
       if (!hang) {
         stuck.push(f.name)
         continue
@@ -617,14 +625,29 @@ export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[]
       if (plan) changes.set(f.id, plan.get(f.id)!)
     } else {
       // Off the truss and standing on whatever is below.
-      changes.set(f.id, { mounting: 'floor', mount: undefined, position: [f.position[0], 0, f.position[2] + (f.mount ? 0.8 : 0)] })
+      changes.set(f.id, { mounting: 'floor', mount: undefined, onCeiling: undefined, position: [f.position[0], 0, f.position[2] + (f.mount ? 0.8 : 0)] })
     }
   }
   if (changes.size) {
-    const label = to === 'hanging' ? 'Hang from the truss' : 'Stand upright'
+    const label = to === 'hanging' ? 'Hang upside down' : 'Stand upright'
     updateFixtures([...changes.keys()], label, (f) => ({ ...f, ...changes.get(f.id) }))
   }
   return stuck
+}
+
+/**
+ * Hang fixtures upside down from the ceiling, right above where they are (a Starburst
+ * or a PAR on a ceiling hook). Returns false when the room has no ceiling.
+ */
+export function hangFromCeiling(ids: string[]): boolean {
+  const ceiling = ceilingOf(store().project)
+  if (ceiling === null) return false
+  updateFixtures(ids, ids.length === 1 ? 'Hang from the ceiling' : `Hang ${ids.length} fixtures from the ceiling`, (f) => {
+    const { mount: _m, faceOut: _o, ...rest } = f
+    void _m, void _o
+    return { ...rest, mounting: 'hanging', onCeiling: true, position: [f.position[0], ceiling, f.position[2]] }
+  })
+  return true
 }
 
 /** Make this show follow a SoundSwitch project (all its fixtures), and bring them in now. */

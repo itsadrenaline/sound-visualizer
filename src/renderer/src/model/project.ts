@@ -42,6 +42,8 @@ export interface Fixture {
    * points out at the audience instead of up. Only while it's attached there.
    */
   faceOut?: boolean
+  /** Hung upside down from the ceiling (not a truss), right above its position. */
+  onCeiling?: boolean
   /** Fixture group, as in SoundSwitch (1 = Group 1). Missing or 0 = no group. */
   group?: number
   /** For fixtures imported from SoundSwitch: how to recognise it there, e.g. "U2.160 Modern Consoles DJ Booth LED Strip". */

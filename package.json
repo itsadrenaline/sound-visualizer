@@ -1,7 +1,7 @@
 {
   "name": "sound-visualizer",
   "productName": "Sound Visualizer",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "A learning project: a 3D visualizer that follows your SoundSwitch rig and show over Art-Net.",
   "private": true,
   "type": "module",
