@@ -10,8 +10,8 @@
  * Open Fixture Library file for sharing.
  */
 import type { FixtureType } from './fixtureTypes'
-import { channelListFromHeads, slotFrom, type WheelSlot, type ChannelRef, type HeadDef, type HeadFunction, type HeadRole, type ProgramPattern } from './heads'
-import { hasOwnStand, LOOK_DEFAULTS, type CellLayout, type FixtureSpec, type LookKind } from './catalog'
+import { channelListFromHeads, shareWithMovers, slotFrom, type WheelSlot, type ChannelRef, type HeadDef, type HeadFunction, type HeadRole, type ProgramPattern } from './heads'
+import { catalogSpec, hasOwnStand, LOOK_DEFAULTS, type CellLayout, type FixtureSpec, type LookKind } from './catalog'
 
 // ---------------------------------------------------------------------------
 // What a channel can do
@@ -709,11 +709,15 @@ function applyRanges(h: HeadDef, ch: ChannelDef): void {
 
 export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
   const mode = def.modes[Math.max(0, Math.min(def.modes.length - 1, modeIndex))] ?? { id: 'empty', name: 'Empty', channels: [] }
-  const { heads } = headsFromDef(def, mode)
+  const look = def.look
+  const canMove = def.modes.some((m) => m.channels.some((c) => c.fn === 'pan' || c.fn === 'tilt'))
+  const built = headsFromDef(def, mode).heads
+  // Several movers on one bar sharing a colour, dimmer or speed part (Hydrabeam).
+  const heads = look.shape === 'mover' || look.shape === 'moverWash' ? shareWithMovers(built, canMove) : built
   const moving = heads.some((h) => h.ch.pan || h.ch.tilt)
   const pixels = heads.filter((h) => h.role === 'pixel').length
   const zoom = mode.channels.some((c) => c.fn === 'zoom')
-  const look = def.look
+  const known = catalogSpec(def.name)
   const spec: FixtureSpec = {
     look: look.shape,
     size: look.size,
@@ -726,6 +730,8 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
     output: look.output,
     leds: look.leds ?? (pixels > 1 ? pixels : undefined),
     apertures: look.apertures,
+    movers: known?.movers,
+    speedRising: known?.speedRising,
     halo: heads.some((h) => h.role === 'halo') || undefined,
     mount: look.mount,
     stand: look.shape === 'gigbar' ? !!look.stand : undefined,

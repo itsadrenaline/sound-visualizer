@@ -289,8 +289,8 @@ function speedOf(raw: number | undefined, ranges: SpinRange[] | undefined): numb
 /** Decode every head of a fixture from its universe's levels. */
 export function decodeHeads(type: FixtureType, levels: Uint8Array, address: number, time: number): HeadState[] {
   const heads = headsOf(type)
-  const master = heads.find((h) => h.role === 'master')
-  const masterDim = master ? (read(levels, address, master.ch.dimmer) ?? 1) * shutterFactor(read(levels, address, master.ch.shutter), master.shutter, time) : 1
+  // Every master part dims the whole fixture (a Hydrabeam's shared "All" dimmer and strobe).
+  const masterDim = heads.filter((h) => h.role === 'master').reduce((dim, m) => dim * (read(levels, address, m.ch.dimmer) ?? 1) * shutterFactor(read(levels, address, m.ch.shutter), m.shutter, time), 1)
   const [narrow, wide] = type.zoomRange
   // Nothing sent to this fixture at all (every channel 0): it's dark. Without this, parts
   // that light up "by default" (a strobe whose 0 means open, a wheel whose first slot is a
@@ -423,4 +423,45 @@ function runProgram(head: HeadDef, heads: HeadDef[], index: number, levels: Uint
     default:
       return { level: 1, color: tint }
   }
+}
+
+/** Colour channels a part can share with the moving heads. */
+const COLOUR_FNS: HeadFunction[] = ['red', 'green', 'blue', 'white', 'amber', 'uv', 'cyan', 'magenta', 'yellow']
+
+/**
+ * Several moving heads on one fixture with some controls shared (Cameo Hydrabeam): a
+ * "Main" or "All" part with no pan or tilt holds the colour, dimmer, strobe or speed for
+ * every head. Each head without its own colour or speed takes the shared one, and the
+ * shared dimmer and strobe dim them all (the part becomes a master, not a light of its own).
+ */
+export function shareWithMovers(heads: HeadDef[], canMove: boolean): HeadDef[] {
+  // A mover in a mode with no pan or tilt (the heads stay put): "Main" and "All" are one light.
+  const main = heads.find((h) => h.name === 'Main')
+  const all = heads.find((h) => /^all$/i.test(h.name))
+  if (canMove && main && all && !heads.some((h) => h.ch.pan || h.ch.tilt)) {
+    const merged: HeadDef = { ...all, ...main, name: 'Main', role: 'beam', ch: { ...all.ch, ...main.ch } }
+    for (const k of ['colorWheel', 'shutter', 'moveSpeed', 'goboSlots'] as const) if (!main[k] && all[k]) (merged as unknown as Record<string, unknown>)[k] = all[k]
+    return heads.filter((h) => h !== all).map((h) => (h === main ? merged : h))
+  }
+  const movers = heads.filter((h) => h.ch.pan || h.ch.tilt)
+  if (!movers.length) return heads
+  // Only a part that's nothing but shared controls: one with its own gobo, zoom or effect is a light of its own.
+  const SHAREABLE = new Set<string>([...COLOUR_FNS, 'colorWheel', 'dimmer', 'shutter', 'moveSpeed'])
+  const shared = heads.filter((h) => !h.ch.pan && !h.ch.tilt && (h.name === 'Main' || /^all$/i.test(h.name)) && h.role !== 'laser' && h.role !== 'derby' && h.role !== 'halo' && Object.keys(h.ch).length > 0 && Object.keys(h.ch).every((f) => SHAREABLE.has(f)))
+  if (!shared.length) return heads
+  const out = heads.map((h) => (movers.includes(h) ? { ...h, ch: { ...h.ch } } : h))
+  for (const g of shared) {
+    for (const m of out.filter((h) => h.ch.pan || h.ch.tilt)) {
+      if (!COLOUR_FNS.some((f) => m.ch[f]) && COLOUR_FNS.some((f) => g.ch[f])) for (const f of COLOUR_FNS) if (g.ch[f]) m.ch[f] = g.ch[f]
+      if (!m.ch.colorWheel && g.ch.colorWheel) {
+        m.ch.colorWheel = g.ch.colorWheel
+        m.colorWheel = g.colorWheel
+      }
+      if (!m.ch.moveSpeed && g.ch.moveSpeed) {
+        m.ch.moveSpeed = g.ch.moveSpeed
+        m.moveSpeed = g.moveSpeed
+      }
+    }
+  }
+  return out.map((h) => (shared.includes(h) ? { ...h, role: 'master' as const } : h))
 }

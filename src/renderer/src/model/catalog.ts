@@ -140,6 +140,11 @@ export interface FixtureSpec {
   speedRising?: boolean
   /** For lasers: how many apertures (separate fans of beams). */
   apertures?: number
+  /**
+   * Several moving heads on one fixture (a Hydrabeam has four). In modes where they all
+   * move together they're still drawn as that many heads.
+   */
+  movers?: number
   /** For movers: a ring of LEDs around the lens (BPM-Spots, Aura). */
   halo?: boolean
   /** How it's usually rigged. */
@@ -224,8 +229,16 @@ const CATALOG: Entry[] = [
     spec: { look: 'acrylic', size: [0.5, 1.2, 0.04], beam: [160, 160], output: 0.35, bodyColor: '#ececee', mount: 'floor', note: 'LED acrylic panel: a frosted acrylic panel in a frame, lit from its edges by an RGBW LED strip inside.' }
   },
   {
+    match: /hydra\s*beam\s*-?\s*300/i,
+    spec: { look: 'mover', size: [0.62, 0.25, 0.13], pan: 540, tilt: 270, beam: [4.5, 4.5], speed: 330, output: 0.4, speedRising: true, movers: 3, mount: 'hanging', note: 'Cameo Hydrabeam 300: three small beam moving heads on one bar (540° pan, 270° tilt, 4.5° beams; size estimated). Its head speed channels go slow to fast.' }
+  },
+  {
+    match: /hydra\s*beam\s*-?\s*4\d\d/i,
+    spec: { look: 'mover', size: [0.81, 0.25, 0.13], pan: 540, tilt: 270, beam: [4.5, 4.5], speed: 330, output: 0.5, speedRising: true, movers: 4, mount: 'hanging', note: 'Cameo Hydrabeam: four small beam moving heads on one bar (540° pan, 270° tilt, 4.5° beams). Its head speed channels go slow to fast.' }
+  },
+  {
     match: /hydra\s*beam/i,
-    spec: { look: 'mover', size: [0.81, 0.25, 0.13], pan: 540, tilt: 270, beam: [4.5, 4.5], speed: 330, output: 0.5, speedRising: true, mount: 'hanging', note: 'Cameo Hydrabeam: four small beam moving heads on one bar (540° pan, 270° tilt, 4.5° beams). Its head speed channels go slow to fast.' }
+    spec: { look: 'mover', size: [0.81, 0.25, 0.13], pan: 540, tilt: 270, beam: [4.5, 4.5], speed: 330, output: 0.5, speedRising: true, mount: 'hanging', note: 'Cameo Hydrabeam: small beam moving heads on one bar (540° pan, 270° tilt, 4.5° beams). Its head speed channels go slow to fast.' }
   },
   {
     match: /\bstarbu?r?st\b/i,

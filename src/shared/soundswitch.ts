@@ -75,6 +75,8 @@ export interface SoundSwitchFixture {
   definition: string
   manufacturer: string
   mode: SoundSwitchMode
+  /** Every mode its definition has (the patch uses `mode`). */
+  modes?: SoundSwitchMode[]
   /** 0-based universe as SoundSwitch counts them (0 = "Universe One"). */
   universe: number
   /** 1-based DMX start address. */
@@ -151,8 +153,11 @@ function findDefinitionSpans(r: Reader): Array<{ id: number; start: number; end:
   return spans.filter((s) => (seen.has(s.start) ? false : (seen.add(s.start), true)))
 }
 
-/** Mode names look like "Mode 1", "19 Channel Mode", "3 Ch". Head names ("Cell 1", "Main") don't. */
-const MODE_NAME = /mode|channel|\bch\b/i
+/**
+ * Mode names look like "Mode 1", "19 Channel Mode", "3 Ch", "56CH", "DMX 8" or
+ * "Extended". Head names ("Cell 1", "Head 2", "Main") don't.
+ */
+export const MODE_NAME = /mode|channel|\bch\b|\d\s*-?\s*ch(?:s|an)?\b|\bdmx\b|^(?:basic|standard|extended|advanced|simple|compact|full|normal|expert|default)\b/i
 
 /**
  * A mode's channel count. The count stored with it, or (stored as 0) the highest
@@ -321,6 +326,7 @@ export function parseSoundSwitchVenue(bytes: Uint8Array): SoundSwitchVenue {
       definition: definition.name.trim(),
       manufacturer: definition.manufacturer,
       mode,
+      modes: definition.modes,
       universe: Math.floor(abs / 512),
       address: (abs % 512) + 1,
       wheels: definition.wheels,

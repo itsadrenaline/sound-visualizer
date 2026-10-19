@@ -8,7 +8,7 @@
  */
 import type { SoundSwitchAttribute, SoundSwitchFixture, SoundSwitchHead } from '../../../shared/soundswitch'
 import { plainName, type FixtureType } from './fixtureTypes'
-import { channelListFromHeads, slotFrom, type SpinRange, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
+import { channelListFromHeads, shareWithMovers, slotFrom, type SpinRange, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type WheelSlot } from './heads'
 import type { Fixture, Project } from './project'
 import { catalogSpec, ledsFromName, LOOK_DEFAULTS, specFor, type FixtureSpec, type LookKind } from './catalog'
 import { autoLayout } from './layout'
@@ -182,6 +182,12 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
   const coloured = heads.filter((h) => h.role === 'beam' && !h.ch.pan && !h.ch.tilt && COLOUR.some((fn) => h.ch[fn]))
   if (!fixtureHasMover && coloured.length > 1) for (const h of coloured) h.role = 'pixel'
 
+  // Several movers on one bar sharing a colour, dimmer or speed part (a Hydrabeam).
+  const lookAhead = catalogSpec(f.definition)?.look
+  if (fixtureHasMover && (lookAhead ? lookAhead === 'mover' || lookAhead === 'moverWash' : heads.filter((h) => h.ch.pan || h.ch.tilt).length > 1)) {
+    heads.splice(0, heads.length, ...shareWithMovers(heads, true))
+  }
+
   // A flat channel list too, for the fader panel and the universe view.
   const channels = channelListFromHeads(f.mode.channels, heads)
 
@@ -216,8 +222,17 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
     source: 'SoundSwitch',
     heads,
     spec,
-    lookGuessed: !known
+    lookGuessed: !known,
+    ...(f.modes && f.modes.length > 1
+      ? { family: { mode: Math.max(0, f.modes.findIndex((m) => m.name === f.mode.name)), soundswitch: { definitionId: f.definitionId, definition: f.definition, manufacturer: f.manufacturer, wheels: f.wheels, modes: f.modes } } }
+      : {})
   }
+}
+
+/** A SoundSwitch fixture's type in another of its definition's modes. */
+export function soundswitchModeType(family: NonNullable<FixtureType['family']>['soundswitch'] & object, mode: number): FixtureType {
+  const { modes, ...definition } = family
+  return fixtureTypeFromMode({ ...definition, mode: modes[mode], modes, universe: 0, address: 1 })
 }
 
 /** Two bars that only tilt, each on its own motor (8-beam spiders): drawn as such. */

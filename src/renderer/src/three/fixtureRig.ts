@@ -661,17 +661,27 @@ export class FixtureRig {
 
     // Several moving heads on one fixture (Hydrabeam, Crazy Pocket, Duo Q-Beam): one small
     // mover for each, side by side, each following its own pan and tilt.
-    const moverHeads = this.headIndex((x) => !!(x.ch.pan || x.ch.tilt))
-    if ((s.look === 'mover' || s.look === 'moverWash') && moverHeads.length > 1) {
-      const n = moverHeads.length
+    // In a mode where they all move together (one pan and tilt) they're still drawn as
+    // that many heads, all following it.
+    const moving = this.headIndex((x) => !!(x.ch.pan || x.ch.tilt))
+    // A mode with no pan or tilt at all: the heads stay put, lit by the main part.
+    const moverHeads = moving.length ? moving : beamHeads.slice(0, 1)
+    const drawn = Math.max(moverHeads.length, moverHeads.length ? (s.movers ?? 1) : 0)
+    if ((s.look === 'mover' || s.look === 'moverWash') && drawn > 1) {
+      const n = drawn
       const step = w / n
       const each: [number, number, number] = [step * 0.95, h, Math.min(d, step * 1.1)]
-      moverHeads.forEach((i, k) => {
+      const beams = new Map<number, Emitter[]>()
+      for (let k = 0; k < n; k++) {
+        const i = moverHeads[moverHeads.length === n ? k : Math.floor((k * moverHeads.length) / n)]
         const x = -w / 2 + step * (k + 0.5)
         const tilt = this.buildMover(this.mount, i, each, x, s.look === 'moverWash')
         const headLen = s.look === 'moverWash' ? h * 0.32 : h * 0.55
-        this.emitters[i] = new BeamEmitter(tilt, this.root, Math.min(each[0], each[2]) * 0.24, headLen / 2 + 0.002, candela / n, 0)
-      })
+        beams.set(i, [...(beams.get(i) ?? []), new BeamEmitter(tilt, this.root, Math.min(each[0], each[2]) * 0.24, headLen / 2 + 0.002, candela / n, 0)])
+      }
+      for (const [i, list] of beams) {
+        this.emitters[i] = list.length === 1 ? list[0] : { update: (st, haze, time) => list.forEach((e) => e.update(st, haze, time)), dispose: () => list.forEach((e) => e.dispose()) }
+      }
       return
     }
 

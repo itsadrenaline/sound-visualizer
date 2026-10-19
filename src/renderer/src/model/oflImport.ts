@@ -9,7 +9,7 @@
  * Matrix fixtures (pixel bars, multi-cell washes) get one head per pixel.
  */
 import type { FixtureType } from './fixtureTypes'
-import { channelListFromHeads, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type SpinRange, type WheelSlot } from './heads'
+import { channelListFromHeads, shareWithMovers, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type SpinRange, type WheelSlot } from './heads'
 import { catalogSpec, LOOK_DEFAULTS, type FixtureSpec, type LookKind } from './catalog'
 
 // --- The parts of the OFL format we read -------------------------------------------------
@@ -510,6 +510,7 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
   // Fixtures researched by hand (catalog.ts) keep that look; everything else is worked out.
   const known = catalogSpec(fx.name)
   const look = known?.look ?? lookFor(fx, heads, hasMovement, size)
+  if (look === 'mover' || look === 'moverWash') heads = shareWithMovers(heads, [...Object.keys(fx.availableChannels ?? {}), ...Object.keys(fx.templateChannels ?? {})].some((k) => /^(pan|tilt)\b/i.test(k)))
   const lens = fx.physical?.lens?.degreesMinMax
   const beam: [number, number] = zoom ?? (lens ? [Math.min(...lens), Math.max(...lens)] : DEFAULT_BEAM(look))
   const pixelCount = heads.filter((h) => h.role === 'pixel').length
@@ -518,7 +519,11 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
 
   // The manual says this one's speed goes slow to fast, whatever the fixture file says (the Hydrabeam's does it the wrong way round).
   if (known?.speedRising) for (const h of heads) if (h.ch.moveSpeed) h.moveSpeed = h.name === 'Main' || !h.moveSpeed?.some((r) => r.hi <= 10) ? [{ lo: 0, hi: 255, from: 0.05, to: 1 }] : [{ lo: 0, hi: 10, from: 1, to: 1 }, { lo: 11, hi: 255, from: 0.05, to: 1 }]
-  const spec: FixtureSpec = known ? { ...known, leds: pixelCount > 1 ? pixelCount : known.leds } : {
+  // A fixture whose pixels each pan and tilt (in some mode) has that many heads, in every mode.
+  const pixelMovers = fx.matrix && Object.keys(fx.templateChannels ?? {}).some((k) => /^(pan|tilt)\b/i.test(k)) ? pixelKeys(fx).length : 0
+  const movers = pixelMovers > 1 ? pixelMovers : known?.movers
+  const spec: FixtureSpec = known ? { ...known, leds: pixelCount > 1 ? pixelCount : known.leds, movers } : {
+    movers,
     look,
     size: size ?? DEFAULT_SIZE(look),
     pan: hasMovement ? panRange || 540 : undefined,
@@ -545,6 +550,7 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
     cells: Math.max(1, pixelCount),
     source: 'Open Fixture Library',
     heads,
-    spec
+    spec,
+    family: { library: key, mode: fx.modes.indexOf(mode) }
   }
 }
