@@ -131,6 +131,11 @@ export interface FixtureSpec {
   output: number
   /** LEDs on the face, for wash looks: how many to draw. */
   leds?: number
+  /**
+   * The pan/tilt speed channel goes slow to fast (0 = slowest), the opposite of most
+   * movers (Cameo Hydrabeam). Used when a fixture file doesn't say which way it goes.
+   */
+  speedRising?: boolean
   /** For lasers: how many apertures (separate fans of beams). */
   apertures?: number
   /** For movers: a ring of LEDs around the lens (BPM-Spots, Aura). */
@@ -211,6 +216,10 @@ const CATALOG: Entry[] = [
   {
     match: /spider\s*wash|wash\s*24/i,
     spec: { look: 'spider', size: [0.285, 0.22, 0.19], beam: [20, 20], output: 0.6, leds: 24, mount: 'floor', note: 'Both Lighting Spider Wash (WASH24): 24 × 12 W RGBWA+UV LEDs in separately coloured groups, 20° beams.' }
+  },
+  {
+    match: /hydra\s*beam/i,
+    spec: { look: 'mover', size: [0.81, 0.25, 0.13], pan: 540, tilt: 270, beam: [4.5, 4.5], speed: 330, output: 0.5, speedRising: true, mount: 'hanging', note: 'Cameo Hydrabeam: four small beam moving heads on one bar (540° pan, 270° tilt, 4.5° beams). Its head speed channels go slow to fast.' }
   },
   {
     match: /\bstarbu?r?st\b/i,
