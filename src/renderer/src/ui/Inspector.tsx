@@ -12,6 +12,9 @@ import { mirrorsOf } from '../model/patchCheck'
 import { SelectionProblems } from './PatchProblems'
 import { getFixtureType, isOverridden } from '../model/fixtureTypes'
 import { useStudio } from '../state/studio'
+import { useLibrary } from '../state/library'
+import { modeChoices, setFixtureMode } from '../state/modes'
+import { originalFixtureType } from '../model/fixtureTypes'
 import { ArrangePanel } from './ArrangePanel'
 import { ArrangeButtons } from './ArrangeMenu'
 import { FixtureMount, NumberField, StructureInspector } from './StructureActions'
@@ -48,6 +51,7 @@ export function Inspector() {
         </p>
       )}
       {selected.length === 1 && <TypeInfo fixture={selected[0]} />}
+      <ModeField fixtures={selected} />
       <FixtureMount fixtures={selected} />
       <ArrangeButtons ids={selection} />
       <PanelSection fixtures={selected} />
@@ -161,6 +165,47 @@ function TypeInfo({ fixture }: { fixture: Fixture }) {
         Open in Fixture Studio
       </button>
     </div>
+  )
+}
+
+/**
+ * Every DMX mode the fixture comes in (from its Library entry or its SoundSwitch
+ * definition), to switch to another one.
+ */
+function ModeField({ fixtures }: { fixtures: Fixture[] }) {
+  const entries = useLibrary((s) => s.entries)
+  useEffect(() => void useLibrary.getState().load(), [])
+  const typeId = fixtures[0]?.typeId
+  if (!typeId || fixtures.some((f) => f.typeId !== typeId)) return null
+  void entries
+  const choices = modeChoices(originalFixtureType(typeId))
+  if (!choices || choices.modes.length < 2) return null
+  const fromSoundSwitch = fixtures.some((f) => f.soundswitchKey)
+  return (
+    <label className="field">
+      <span className="label">DMX mode</span>
+      <select
+        value={choices.current}
+        disabled={fromSoundSwitch}
+        onChange={(e) => {
+          const mode = Number(e.target.value)
+          void setFixtureMode(fixtures.map((f) => f.id), mode).then((t) => {
+            if (!t) notify('error', 'That mode could not be loaded from the Library.')
+          })
+        }}
+      >
+        {choices.modes.map((m, i) => (
+          <option key={i} value={i}>
+            {m.name} ({m.channels} ch)
+          </option>
+        ))}
+      </select>
+      <span className="sub">
+        {fromSoundSwitch
+          ? `All ${choices.modes.length} modes it comes in. SoundSwitch sets which one: change it in SoundSwitch's patch and it updates here.`
+          : `It comes in ${choices.modes.length} modes. A mode with more channels may overlap the next fixture's address.`}
+      </span>
+    </label>
   )
 }
 

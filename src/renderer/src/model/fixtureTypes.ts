@@ -8,6 +8,7 @@
 /** What a channel controls. `fine` channels hold the low byte of a 16-bit value. */
 import type { HeadDef } from './heads'
 import { catalogSpec, type FixtureSpec } from './catalog'
+import type { SoundSwitchMode, SoundSwitchRange } from '../../../shared/soundswitch'
 
 export type ChannelFunction =
   | 'pan' | 'panFine'
@@ -47,6 +48,18 @@ export interface FixtureType {
   lookGuessed?: boolean
   /** Made or edited in Fixture Studio: the id of its definition there. */
   studioId?: string
+  /**
+   * Where the fixture's other DMX modes are: its Library entry, or (from SoundSwitch)
+   * every mode of its SoundSwitch definition. `mode` is which one this type is.
+   */
+  family?: FixtureFamily
+}
+
+export interface FixtureFamily {
+  mode: number
+  /** A Library key ("cameo/hydrabeam-400-rgbw", "qlc/…"). */
+  library?: string
+  soundswitch?: { definitionId: number; definition: string; manufacturer: string; wheels: Record<string, SoundSwitchRange[]>; modes: SoundSwitchMode[] }
 }
 
 export const FIXTURE_TYPES: Record<string, FixtureType> = {

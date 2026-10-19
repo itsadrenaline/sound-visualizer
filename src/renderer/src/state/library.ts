@@ -148,7 +148,8 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const def = defs[key]
     if (def) {
       remember()
-      return typeFromDef(def, modeIndex)
+      const type = typeFromDef(def, modeIndex)
+      return entry.source === 'mine' ? type : { ...type, family: { library: key, mode: modeIndex } }
     }
     if (entry.source === 'qlc') {
       // Not fetched yet: fetch it for next time (the row's click or drag usually has already).

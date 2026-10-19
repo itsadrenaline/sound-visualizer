@@ -8,6 +8,8 @@
  * step there; "Back to the original" removes the edit from the show.
  */
 import { create } from 'zustand'
+import { soundswitchModeType } from '../model/soundswitchImport'
+import { familyOf } from './modes'
 import { normaliseDef, blankDef, defaultRanges, defFromTypes, FN, makeChannel, studioTypeId, typeFromDef, newKey, type ChannelDef, type ChannelFn, type FixtureDef, type FixtureKind, type PartDef } from '../model/fixtureDef'
 import { checkDef } from '../model/fixtureChecks'
 import { restValue } from '../model/fixtureTests'
@@ -127,13 +129,33 @@ export const useStudio = create<StudioState>((set, get) => ({
       get().openDef(structuredClone(mine), [], { typeIds: [type.id] })
       return
     }
-    const def = defFromTypes([original], {
+    const report = original.lookGuessed ? ['Its look was worked out from its channels: choose its real shape and size under Look.'] : []
+    const meta = {
       name: original.name.replace(/\s*\([^()]*(\([^()]*\))?[^()]*\)\s*$/, ''),
       manufacturer: original.manufacturer || 'Unknown',
-      source: { kind: original.source === 'SoundSwitch' ? 'soundswitch' : 'library', label: original.source ?? 'This show' }
-    })
-    const report = original.lookGuessed ? ['Its look was worked out from its channels: choose its real shape and size under Look.'] : []
-    get().openDef(def, report, { typeIds: [type.id] })
+      source: { kind: original.source === 'SoundSwitch' ? ('soundswitch' as const) : ('library' as const), label: original.source ?? 'This show' }
+    }
+    // Every mode the fixture comes in, not just the one in the show.
+    const family = original.family
+    if (family?.library || original.id.startsWith('ofl-')) {
+      void (async () => {
+        await useLibrary.getState().load()
+        const from = familyOf(original)
+        const full = from?.library ? await useLibrary.getState().defFor(from.library) : null
+        if (full && from) {
+          get().openDef(structuredClone(full), [], { typeIds: [type.id] })
+          if (from.mode < full.modes.length) get().setMode(from.mode)
+        } else get().openDef(defFromTypes([original], meta), report, { typeIds: [type.id] })
+      })()
+      return
+    }
+    if (family?.soundswitch) {
+      const all = family.soundswitch.modes.map((_, i) => (i === family.mode ? original : soundswitchModeType(family.soundswitch!, i)))
+      get().openDef(defFromTypes(all, { ...meta, modeNames: family.soundswitch.modes.map((m) => m.name) }), report, { typeIds: [type.id] })
+      get().setMode(family.mode)
+      return
+    }
+    get().openDef(defFromTypes([original], meta), report, { typeIds: [type.id] })
   },
 
   close(force = false) {
