@@ -4,14 +4,15 @@
  * and folder handles, which only IndexedDB can keep between visits.
  */
 const DB = 'sound-visualizer'
-const TABLES = ['settings', 'myFixtures', 'imported', 'folders'] as const
+const TABLES = ['settings', 'myFixtures', 'imported', 'folders', 'media'] as const
 export type Table = (typeof TABLES)[number]
 
 let opening: Promise<IDBDatabase> | null = null
 
 function db(): Promise<IDBDatabase> {
   opening ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB, 1)
+    // Version 2 added "media" (videos shown on screens).
+    const request = indexedDB.open(DB, 2)
     request.onupgradeneeded = () => {
       for (const t of TABLES) if (!request.result.objectStoreNames.contains(t)) request.result.createObjectStore(t)
     }

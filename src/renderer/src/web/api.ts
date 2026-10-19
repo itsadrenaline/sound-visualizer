@@ -98,6 +98,17 @@ export const webApi: VisualizerApi = {
   setTitle(name, path, edited) {
     document.title = `${edited ? '• ' : ''}${path ?? name} — Sound Visualizer`
   },
+  /** Videos for screens: kept in this browser (IndexedDB), named by their content. */
+  async saveMedia(name, data) {
+    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data as BufferSource))
+    const ext = (/\.(mp4|m4v|mov|webm)$/i.exec(name)?.[1] ?? 'mp4').toLowerCase()
+    const id = `${[...hash.slice(0, 10)].map((b) => b.toString(16).padStart(2, '0')).join('')}.${ext}`
+    await idb.set('media', id, data)
+    return id
+  },
+  async readMedia(id) {
+    return (await idb.get<Uint8Array>('media', id)) ?? null
+  },
   async saveImage(dataUrl, name) {
     const blob = await (await fetch(dataUrl)).blob()
     const saved = await saveData(`${safeName(name)}.png`, [{ name: 'PNG image', extensions: ['png'] }], blob)
