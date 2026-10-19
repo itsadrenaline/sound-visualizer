@@ -16,6 +16,7 @@ import { cellPositions, ledsFromName, specFor, type FixtureSpec } from '../model
 import { createBeamMaterial } from './beamMaterial'
 import { projectors } from './projectors'
 import { goboCell } from './gobos'
+import { PANEL_BORDERS } from '../model/project'
 import { spotRays } from './discoBalls'
 
 const BEAM_LENGTH = 16
@@ -163,6 +164,38 @@ class BeamEmitter implements Emitter {
 }
 
 /** Meshes that glow in the head's colour: pixel cells, LED dots, strip segments. */
+/**
+ * How an edge-lit acrylic panel glows: brightest along its four edges, where the LED strip
+ * shines in, softer towards the middle. (Null outside a browser.)
+ */
+function edgeGlowTexture(w: number, h: number): THREE.Texture | null {
+  if (typeof document === 'undefined') return null
+  const scale = 96 / Math.max(w, h)
+  const cw = Math.max(8, Math.round(w * scale))
+  const ch = Math.max(8, Math.round(h * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = cw
+  canvas.height = ch
+  const g = canvas.getContext('2d')
+  if (!g) return null
+  const image = g.createImageData(cw, ch)
+  const falloff = Math.min(w, h) * 0.18
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      const dx = Math.min(x + 0.5, cw - x - 0.5) / scale
+      const dy = Math.min(y + 0.5, ch - y - 0.5) / scale
+      const v = 0.3 + 0.7 * Math.max(Math.exp(-dx / falloff), Math.exp(-dy / falloff))
+      const i = (y * cw + x) * 4
+      image.data[i] = image.data[i + 1] = image.data[i + 2] = Math.round(v * 255)
+      image.data[i + 3] = 255
+    }
+  }
+  g.putImageData(image, 0, 0)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 class GlowEmitter implements Emitter {
   private material = glowMaterial()
   constructor(meshes: THREE.Mesh[], private gain = 2.5, private tint: [number, number, number] = [1, 1, 1]) {
@@ -544,6 +577,8 @@ export class FixtureRig {
 
   /** The type object it was built from; a re-import replaces it, so the rig is rebuilt. */
   readonly typeVersion: FixtureType
+  /** The fixture's own look settings it was built with (an acrylic panel's size and frame): rebuilt when they change. */
+  readonly lookKey: string
 
   constructor(fixture: Fixture, private type: FixtureType) {
     this.typeVersion = type
@@ -553,6 +588,15 @@ export class FixtureRig {
     this.heads = headsOf(type)
     this.spec = type.spec ?? specFor(type.name, type.body === 'movingHead')
     if (!type.spec && type.body === 'bar') this.spec = specFor('pixel tube', false)
+    // An LED acrylic panel can have its own size and frame colour.
+    this.lookKey = JSON.stringify(fixture.panel ?? null)
+    if (this.spec.look === 'acrylic' && fixture.panel) {
+      const [w, h, d] = this.spec.size
+      this.spec = { ...this.spec, size: [fixture.panel.width ?? w, fixture.panel.height ?? h, d], bodyColor: fixture.panel.border ? PANEL_BORDERS[fixture.panel.border] : this.spec.bodyColor }
+    }
+    if (this.spec.look === 'acrylic' && this.spec.bodyColor === PANEL_BORDERS.silver) Object.assign(this.body, { metalness: 0.45, roughness: 0.35 })
+    // A white frame reads white even in a dark room.
+    if (this.spec.look === 'acrylic' && this.spec.bodyColor === PANEL_BORDERS.white && 'emissive' in this.body) (this.body as THREE.MeshStandardMaterial).emissive.set(0x3a3a3c)
     if (this.spec.bodyColor) this.body.color.set(this.spec.bodyColor)
     this.emitters = this.heads.map(() => null)
     this.root.add(this.mount)
@@ -997,6 +1041,64 @@ export class FixtureRig {
         const light = this.headIndex((x) => hasMix(x) || !!x.ch.dimmer)[0] ?? 0
         // Every other lens throws a beam (a beam from all of them is a lot to draw).
         this.emitters[light] = new BurstEmitter(ball, dirs.filter((_, i) => i % 2 === 0), R, new GlowEmitter(discs, 3))
+        break
+      }
+      case 'acrylic': {
+        // A frame round a frosted acrylic panel, standing up and facing the audience (+z).
+        // The LED strip inside the frame lights the panel from its edges: brightest at the
+        // edges, softer in the middle.
+        const f = Math.max(0.012, Math.min(0.035, Math.min(w, h) * 0.06))
+        const bar = (bw: number, bh: number, x: number, y: number) => {
+          const m = box(bw, bh, d, this.body)
+          m.position.set(x, y, 0)
+          this.mount.add(m)
+        }
+        bar(w, f, 0, f / 2)
+        bar(w, f, 0, h - f / 2)
+        bar(f, h - 2 * f, -w / 2 + f / 2, h / 2)
+        bar(f, h - 2 * f, w / 2 - f / 2, h / 2)
+        const iw = w - 2 * f
+        const ih = h - 2 * f
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(iw, ih))
+        face.position.set(0, h / 2, 0)
+        const rimWidth = Math.min(iw, ih) * 0.035
+        const outline = new THREE.Shape([new THREE.Vector2(-iw / 2, -ih / 2), new THREE.Vector2(iw / 2, -ih / 2), new THREE.Vector2(iw / 2, ih / 2), new THREE.Vector2(-iw / 2, ih / 2)])
+        outline.holes.push(new THREE.Path([new THREE.Vector2(-iw / 2 + rimWidth, -ih / 2 + rimWidth), new THREE.Vector2(-iw / 2 + rimWidth, ih / 2 - rimWidth), new THREE.Vector2(iw / 2 - rimWidth, ih / 2 - rimWidth), new THREE.Vector2(iw / 2 - rimWidth, -ih / 2 + rimWidth)]))
+        const rims = [1, -1].map((side) => {
+          const rim = new THREE.Mesh(new THREE.ShapeGeometry(outline))
+          rim.position.set(0, h / 2, side * 0.002)
+          if (side < 0) rim.rotation.y = Math.PI
+          return rim
+        })
+        this.mount.add(face, ...rims)
+        const light = this.headIndex((x) => hasMix(x) || !!x.ch.dimmer)[0] ?? 0
+        const panel = new GlowEmitter([face], 2.4)
+        const edges = new GlowEmitter(rims, 3.2)
+        const faceMaterial = face.material as THREE.MeshBasicMaterial
+        faceMaterial.side = THREE.DoubleSide
+        // Frosted acrylic: bright along the edges where the strip is, fading to a soft glow in the middle.
+        const glowMap = edgeGlowTexture(iw, ih)
+        if (glowMap) {
+          faceMaterial.map = glowMap
+          faceMaterial.needsUpdate = true
+        }
+        const root = this.root
+        const output = this.spec.output
+        this.emitters[light] = {
+          update: (st) => {
+            edges.update(st)
+            panel.update(st)
+            // It washes the floor and whatever is in front of it with its colour.
+            if (st.intensity > 0.02) {
+              root.updateMatrixWorld(true)
+              const position = new THREE.Vector3(0, h / 2, 0.05).applyMatrix4(face.parent!.matrixWorld)
+              const direction = new THREE.Vector3(0, -0.35, 1).normalize().transformDirection(face.parent!.matrixWorld)
+              const k = st.intensity * output
+              projectors.add({ position, direction, right: new THREE.Vector3(1, 0, 0).transformDirection(face.parent!.matrixWorld), tanHalf: 2.2, color: [st.color[0] * k, st.color[1] * k, st.color[2] * k], goboCell: 0, goboTurn: 0, prismSpread: 0, prismTurn: 0 })
+            }
+          },
+          dispose: () => (glowMap?.dispose(), panel.dispose(), edges.dispose())
+        }
         break
       }
       case 'twinbar': {

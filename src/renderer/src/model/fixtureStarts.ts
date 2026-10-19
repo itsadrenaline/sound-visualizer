@@ -152,6 +152,12 @@ const SPECS: Record<FixtureKind, Spec[]> = {
     { label: '5 × 5 cells × RGBW', cells: { n: 25, per: RGBW, layout: { kind: 'grid', cols: 5 } } },
     { label: '6 × 6 cells × RGB', cells: { n: 36, per: RGB, layout: { kind: 'grid', cols: 6 } } }
   ],
+  acrylic: [
+    { label: 'RGBW (4 channels)', fns: RGBW, common: true },
+    { label: 'Dimmer, RGBW', fns: [D, ...RGBW], common: true },
+    { label: 'Dimmer, RGBW, strobe', fns: [D, ...RGBW, S] },
+    { label: 'RGB (3 channels)', fns: RGB }
+  ],
   cluster: [
     { label: 'Whole light RGBWA+UV', fns: RGBWAUV, common: true },
     { label: 'Whole light + dimmer, strobe', fns: [...RGBWAUV, D, S], common: true },
@@ -506,6 +512,7 @@ export function guessKind(def: FixtureDef): FixtureKind {
   const fns = new Set(chs.map((c) => c.fn))
   const cells = new Set(def.parts.filter((p) => p.role === 'pixel').map((p) => p.cell)).size
   if (def.look.shape === 'string') return 'string'
+  if (def.look.shape === 'acrylic') return 'acrylic'
   if (fns.has('fog')) return 'fog'
   if (fns.has('specialFx')) return 'sfx'
   if (cells > 1 && chs.filter((c) => c.part).every((c) => c.fn === 'dimmer')) return 'dimmer'

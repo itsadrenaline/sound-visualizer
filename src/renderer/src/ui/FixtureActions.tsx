@@ -11,7 +11,7 @@ import { useStore } from '../state/store'
 import { useMix } from '../state/mix'
 import { useFixtureMenu } from '../state/fixtureMenu'
 import { useViewSettings } from '../state/viewSettings'
-import { autoPlaceFixtures, deleteFixtures, detachFixtures, distributeFixtures, duplicateArray, duplicateFixtures, mirrorFixtures, mountFixtures, orientFixtures, hangFromCeiling, selectSameType, updateFixtures } from '../state/commands'
+import { autoPlaceFixtures, deleteFixtures, detachFixtures, distributeFixtures, duplicateArray, duplicateFixtures, mirrorFixtures, mountFixtures, orientFixtures, hangFromCeiling, selectSameType, updateFixtures, isAcrylicPanel, joinPanels, setPanel } from '../state/commands'
 import { notify } from '../state/notices'
 import { attachOptions } from './StructureActions'
 import { nearestMount } from '../model/physics'
@@ -225,6 +225,19 @@ export function FixtureMenu() {
         {attach.map((o) => (
           <Item key={o.structure.id + o.point.id} label={`${o.point.label}: ${o.structure.name}`} onClick={run(() => mountFixtures(ids, o.structure.id, o.point.id, o.t))} />
         ))}
+        {info.chosen.some(isAcrylicPanel) && (
+          <>
+            <hr />
+            {info.chosen.filter(isAcrylicPanel).length > 1 && (
+              <Item label="Join panels side by side" title="Line the panels up edge to edge in a row, from the leftmost one: one wall of panels, like the front of a DJ booth" onClick={run(() => joinPanels(ids))} />
+            )}
+            {(['white', 'black', 'silver'] as const).map((b) => {
+              const panels = info.chosen.filter(isAcrylicPanel)
+              const on = panels.filter((f) => (f.panel?.border ?? 'white') === b).length
+              return <Item key={b} label={`${b[0].toUpperCase()}${b.slice(1)} frame`} check={on === panels.length ? '✓' : on ? '–' : ''} onClick={run(() => setPanel(panels.map((f) => f.id), { border: b }))} />
+            })}
+          </>
+        )}
         <hr />
         <ArrangeMenu ids={all} run={run} />
         {ids.length > 1 && <Item label="Spread along the truss" onClick={run(() => distributeFixtures(ids, 'line', 'truss'))} />}

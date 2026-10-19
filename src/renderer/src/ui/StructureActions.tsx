@@ -264,7 +264,7 @@ function NameField({ structure }: { structure: Structure }) {
   )
 }
 
-function NumberField({ label, value, onCommit, step = 0.5 }: { label: string; value: number | null; onCommit: (v: number) => void; step?: number }) {
+export function NumberField({ label, value, onCommit, step = 0.5 }: { label: string; value: number | null; onCommit: (v: number) => void; step?: number }) {
   const shown = value === null ? '' : String(value)
   const [draft, setDraft] = useState(shown)
   useEffect(() => setDraft(shown), [shown])

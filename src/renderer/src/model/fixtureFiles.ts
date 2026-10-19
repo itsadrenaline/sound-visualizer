@@ -274,7 +274,7 @@ const OFL_CATEGORY: Record<FixtureDef['kind'], string[]> = {
   par: ['Color Changer'], uplight: ['Color Changer'], wash: ['Moving Head', 'Color Changer'], spot: ['Moving Head'], beam: ['Moving Head'],
   bar: ['Pixel Bar', 'Color Changer'], tube: ['Pixel Bar'], panel: ['Matrix', 'Color Changer'], cluster: ['Color Changer', 'Blinder'],
   gigbar: ['Effect', 'Color Changer'], strip: ['Color Changer'], strobe: ['Strobe'], laser: ['Laser'], effect: ['Effect'],
-  fog: ['Smoke'], sfx: ['Other'], dimmer: ['Dimmer'], string: ['Pixel Bar'], other: ['Other']
+  fog: ['Smoke'], sfx: ['Other'], dimmer: ['Dimmer'], string: ['Pixel Bar'], acrylic: ['Color Changer'], other: ['Other']
 }
 
 function spinText(v: number): string {

@@ -29,7 +29,7 @@ export const CATEGORIES: Array<{ id: string; label: string; match: (c: string[])
 const KIND_CATEGORY: Record<FixtureDef['kind'], string[]> = {
   par: ['Color Changer'], uplight: ['Color Changer'], wash: ['Moving Head'], spot: ['Moving Head'], beam: ['Moving Head'], bar: ['Pixel Bar'],
   tube: ['Pixel Bar'], panel: ['Matrix'], cluster: ['Color Changer', 'Blinder'], gigbar: ['Effect'], strip: ['Color Changer'], strobe: ['Strobe'], laser: ['Laser'], effect: ['Effect'],
-  fog: ['Smoke'], sfx: ['Other'], dimmer: ['Dimmer'], string: ['Pixel Bar'], other: ['Other']
+  fog: ['Smoke'], sfx: ['Other'], dimmer: ['Dimmer'], string: ['Pixel Bar'], acrylic: ['Color Changer'], other: ['Other']
 }
 
 export function entryForDef(def: FixtureDef): LibraryEntry {
