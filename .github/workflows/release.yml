@@ -18,6 +18,10 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Which Mac to build on (macos-15-intel when GitHub has no Apple Silicon Macs free)
+        default: macos-latest
 
 permissions:
   contents: write
@@ -28,7 +32,9 @@ concurrency:
 
 jobs:
   mac:
-    runs-on: macos-latest
+    # Apple Silicon by default. GitHub sometimes has none free for hours; an Intel Mac
+    # builds the same universal app.
+    runs-on: ${{ inputs.runner || 'macos-latest' }}
     timeout-minutes: 40
     env:
       HAS_CERT: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 != '' }}
