@@ -154,3 +154,67 @@ describe('BeamZ SparkleWall (151.202)', () => {
     expect(typeFromDef(def, 0).spec!.look).toBe('curtain')
   })
 })
+
+describe('Equinox Fusion Orbit MKII (from the manual)', () => {
+  const def = () => expandDef(qlc.fixtures['qlc/Equinox/Equinox-Fusion-Orbit-MKII'], 'qlc-orbit', { kind: 'library', label: 'QLC+', url: '' })
+  const at = (mode: number, values: number[], time = 0) => {
+    const type = typeFromDef(def(), mode)
+    return { type, states: decodeHeads(type, levels(1, values), 1, time) }
+  }
+
+  it('has the 2, 7, 16 and 37 channel modes', () => {
+    expect(def().modes.map((m) => m.channels.length)).toEqual([2, 7, 16, 37])
+    expect(qlc.entries.find((e: { key: string }) => e.key === 'qlc/Equinox/Equinox-Fusion-Orbit-MKII').modes.map((m: { channels: number }) => m.channels)).toEqual([2, 7, 16, 37])
+  })
+
+  it('16 channels: pans and tilts, and the beam is the head itself, in RGBW', () => {
+    const { type, states } = at(2, [255, 0, 255, 255, 0, 255, 0, 0, 0])
+    expect(type.body).toBe('movingHead')
+    expect(type.panRange).toBe(540)
+    expect(type.tiltRange).toBe(210)
+    const beam = states[0]
+    expect(beam.pan).toBeCloseTo(270)
+    expect(beam.tilt).toBeCloseTo(-105)
+    expect(beam.intensity).toBeCloseTo(1)
+    expect(beam.color).toEqual([1, 0, 0])
+    // The ring is its own part round the lens.
+    expect(type.heads![1].role).toBe('halo')
+  })
+
+  it('37 channels: fine pan and tilt, and the ring in six segments under one ring dimmer', () => {
+    const v = new Array(37).fill(0)
+    v[0] = 128; v[2] = 128; v[5] = 255; v[8] = 255 // pan, tilt at centre; beam red
+    v[12] = 255 // ring dimmer
+    v[17] = 255 // ring segment 1 red (channel 18)
+    v[24] = 255 // ring segment 3 green (channel 25)
+    const { type, states } = at(3, v)
+    const ring = type.heads!.filter((h) => h.role === 'halo')
+    expect(ring.map((h) => h.name)).toEqual(['Ring 1', 'Ring 2', 'Ring 3', 'Ring 4', 'Ring 5', 'Ring 6'])
+    expect(type.heads![0].ch.pan!.fine).toBe(1)
+    const seg = (n: number) => states[type.heads!.findIndex((h) => h.name === `Ring ${n}`)]
+    expect(seg(1).color).toEqual([1, 0, 0])
+    expect(seg(1).intensity).toBeCloseTo(1)
+    expect(seg(3).color).toEqual([0, 1, 0])
+    // The ring dimmer at 0 turns every segment off.
+    v[12] = 0
+    const off = at(3, v)
+    expect(off.states.filter((_, i) => off.type.heads![i].role === 'halo').every((s) => s.intensity === 0)).toBe(true)
+  })
+
+  it('7 channels: moves on its own in its pan/tilt programs, still with the program off', () => {
+    const moving = [at(1, [40, 255, 30], 1).states[0], at(1, [40, 255, 30], 3).states[0]]
+    expect(moving[0].pan).not.toBeCloseTo(moving[1].pan)
+    const still = at(1, [0, 255, 30], 3).states[0]
+    expect(still.pan).toBe(0)
+    expect(still.color).toEqual([1, 0, 0]) // colour macro 2: red
+  })
+
+  it('2 channels: the shows move the head too (not show 4, which faces forward)', () => {
+    expect(at(0, [40, 0], 2).states[0].pan).not.toBe(0)
+    expect(at(0, [180, 0], 2).states[0].pan).toBe(0)
+  })
+
+  it('SoundSwitch’s Fusion Orbit gets the same look', () => {
+    expect(catalogSpec('Equinox Fusion Orbit MKII')).toMatchObject({ look: 'mover', halo: true, pan: 540, tilt: 210 })
+  })
+})

@@ -692,7 +692,14 @@ export class FixtureRig {
         const tilt = this.buildMover(this.mount, main, s.size, 0, s.look === 'moverWash')
         const headLen = s.look === 'moverWash' ? h * 0.32 : h * 0.55
         const lensR = Math.min(w, d) * (s.look === 'moverWash' ? 0.42 : 0.24)
-        this.emitters[main] = new BeamEmitter(tilt, this.root, lensR, headLen / 2 + 0.002, candela, s.look === 'mover' ? 3 : 0)
+        // The light can come from parts of the head (its LED cells) rather than the head
+        // that moves: then the beam is their colour together.
+        const mainHead = this.type.heads?.[main]
+        const LIGHT = ['dimmer', 'shutter', 'red', 'green', 'blue', 'white', 'amber', 'uv', 'colorWheel', 'cyan', 'magenta', 'yellow'] as const
+        const lightParts = this.headIndex((x) => x.role === 'pixel')
+        const beam = new BeamEmitter(tilt, this.root, lensR, headLen / 2 + 0.002, candela, s.look === 'mover' ? 3 : 0)
+        if (mainHead && !LIGHT.some((f) => mainHead.ch[f]) && !mainHead.program && lightParts.length) this.extraBeam = { emitter: beam, heads: lightParts }
+        else this.emitters[main] = beam
         if (s.look === 'moverWash') {
           // The 19 LED lenses, glowing in the beam colour.
           const count = s.leds ?? ledsFromName(this.type.name) ?? 19
@@ -715,14 +722,20 @@ export class FixtureRig {
           }
         }
         // A halo ring around the lens: its own head if the fixture has one, else follows the beam.
-        if (s.halo) {
-          const ring = new THREE.Mesh(new THREE.TorusGeometry(lensR * 1.15, lensR * 0.08, 8, 40))
-          ring.rotation.x = Math.PI / 2
-          ring.position.y = headLen / 2 + 0.003
-          tilt.add(ring)
-          const halo = this.headIndex((x) => x.role === 'halo')[0]
-          if (halo !== undefined) this.emitters[halo] = new GlowEmitter([ring], 2)
-          else ring.material = this.body
+        // A ring in segments (each with its own colour) is drawn as that many arcs.
+        const halos = this.headIndex((x) => x.role === 'halo')
+        if (s.halo || halos.length) {
+          const n = Math.max(1, halos.length)
+          const arcs = Array.from({ length: n }, (_, k) => {
+            const arc = new THREE.Mesh(new THREE.TorusGeometry(lensR * 1.15, lensR * 0.08, 8, Math.max(8, Math.round(40 / n)), (Math.PI * 2) / n - (n > 1 ? 0.06 : 0)))
+            arc.rotation.x = Math.PI / 2
+            arc.rotation.z = (k * Math.PI * 2) / n
+            arc.position.y = headLen / 2 + 0.003
+            tilt.add(arc)
+            return arc
+          })
+          if (halos.length) halos.forEach((hi, k) => (this.emitters[hi] = new GlowEmitter([arcs[k]], 2)))
+          else arcs.forEach((a) => (a.material = this.body))
         }
         break
       }
