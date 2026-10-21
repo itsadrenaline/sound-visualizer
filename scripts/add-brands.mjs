@@ -7,6 +7,7 @@
  * build-library.mjs does the same when it rebuilds everything.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
+import { equinoxReplacements } from './equinox.mjs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { manualFixtures } from './manual-fixtures.mjs'
@@ -42,6 +43,13 @@ const LOOKS = {
   'qlc/American_DJ/American-DJ-Starburst': ['effect', 'sphere', 'floor']
 }
 let fixed = 0
+// Fixtures rewritten from the manufacturer's manual, in place of QLC+'s.
+for (const [key, def] of Object.entries(equinoxReplacements)) {
+  qlc.fixtures[key] = def
+  const entry = qlc.entries.find((e) => e.key === key)
+  if (entry) entry.modes = def.o.map(([name, channels]) => ({ name, channels: channels.length }))
+  fixed++
+}
 for (const key of REPLACED) {
   if (qlc.fixtures[key]) fixed++
   delete qlc.fixtures[key]

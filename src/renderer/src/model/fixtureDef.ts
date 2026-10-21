@@ -10,7 +10,7 @@
  * Open Fixture Library file for sharing.
  */
 import type { FixtureType } from './fixtureTypes'
-import { channelListFromHeads, shareWithMovers, slotFrom, type WheelSlot, type ChannelRef, type HeadDef, type HeadFunction, type HeadRole, type ProgramPattern } from './heads'
+import { channelListFromHeads, shareGroupParts, shareWithMovers, slotFrom, type WheelSlot, type ChannelRef, type HeadDef, type HeadFunction, type HeadRole, type ProgramPattern } from './heads'
 import { catalogSpec, hasOwnStand, LOOK_DEFAULTS, type CellLayout, type FixtureSpec, type LookKind } from './catalog'
 
 // ---------------------------------------------------------------------------
@@ -657,6 +657,18 @@ export function headsFromDef(def: FixtureDef, mode: ModeDef): { heads: HeadDef[]
       h.program = { ref, ranges, speed: speedCh ? { coarse: index.get(speedCh.id)! } : undefined, group: pc.id }
     })
   })
+  // A moving head moves on its own in its pan/tilt programs, and in its shows and sound modes.
+  if (def.look.shape === 'mover' || def.look.shape === 'moverWash') {
+    const fx = mode.channels.find((c) => c.fn === 'positionFx') ?? mode.channels.find((c) => c.fn === 'program' && c.part === null)
+    const movers = heads.filter((h) => h.ch.pan || h.ch.tilt)
+    const targets = movers.length ? movers : heads.slice(partHead.get(null) ?? 0, (partHead.get(null) ?? 0) + 1)
+    if (fx && targets.length) {
+      const speedCh = mode.channels.find((c) => c.fn === 'programSpeed' && c.part === null)
+      const listed = fx.ranges.filter((r) => r.kind === 'program' || (r.pattern && r.pattern !== 'none') || (fx.fn === 'positionFx' && r.kind !== 'off' && !/no function|^off$/i.test(r.label)))
+      const ranges = (listed.length ? listed : [{ lo: 1, hi: 255, label: '' }]).map((r, k) => ({ lo: r.lo, hi: r.hi, index: k, ...(/forward|front[- ]facing|static|still|no move/i.test(r.label) ? { still: true } : {}) }))
+      for (const h of targets) h.autoMove = { ref: { coarse: index.get(fx.id)! }, ranges, speed: speedCh ? { coarse: index.get(speedCh.id)! } : undefined }
+    }
+  }
   return { heads, partHead }
 }
 
@@ -713,8 +725,9 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
   const canMove = def.modes.some((m) => m.channels.some((c) => c.fn === 'pan' || c.fn === 'tilt'))
   const built = headsFromDef(def, mode).heads
   // Several movers on one bar sharing a colour, dimmer or speed part (Hydrabeam).
-  const heads = look.shape === 'mover' || look.shape === 'moverWash' ? shareWithMovers(built, canMove) : built
-  const moving = heads.some((h) => h.ch.pan || h.ch.tilt)
+  const heads = shareGroupParts(look.shape === 'mover' || look.shape === 'moverWash' ? shareWithMovers(built, canMove) : built)
+  // A moving head is one in every mode, even one where it only moves by its own programs.
+  const moving = heads.some((h) => h.ch.pan || h.ch.tilt || h.autoMove) || (canMove && (look.shape === 'mover' || look.shape === 'moverWash'))
   const pixels = heads.filter((h) => h.role === 'pixel').length
   const zoom = mode.channels.some((c) => c.fn === 'zoom')
   const known = catalogSpec(def.name)

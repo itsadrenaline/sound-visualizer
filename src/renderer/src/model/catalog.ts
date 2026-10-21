@@ -229,6 +229,10 @@ const CATALOG: Entry[] = [
     spec: { look: 'acrylic', size: [0.5, 1.2, 0.04], beam: [160, 160], output: 0.35, bodyColor: '#ececee', mount: 'floor', note: 'LED acrylic panel: a frosted acrylic panel in a frame, lit from its edges by an RGBW LED strip inside.' }
   },
   {
+    match: /fusion\s*orbit/i,
+    spec: { look: 'mover', size: [0.172, 0.238, 0.146], pan: 540, tilt: 210, beam: [4, 4], speed: 300, output: 0.75, halo: true, speedRising: true, mount: 'hanging', note: 'Equinox Fusion Orbit MKII: a 60 W RGBW beam moving head with a ring of 12 RGB LEDs round the lens (540° pan, 210° tilt, 4° beam). Its pan/tilt speed goes slow to fast.' }
+  },
+  {
     match: /hydra\s*beam\s*-?\s*300/i,
     spec: { look: 'mover', size: [0.62, 0.25, 0.13], pan: 540, tilt: 270, beam: [4.5, 4.5], speed: 330, output: 0.4, speedRising: true, movers: 3, mount: 'hanging', note: 'Cameo Hydrabeam 300: three small beam moving heads on one bar (540° pan, 270° tilt, 4.5° beams; size estimated). Its head speed channels go slow to fast.' }
   },

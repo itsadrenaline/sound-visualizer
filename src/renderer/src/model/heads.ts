@@ -114,9 +114,21 @@ export interface SpinRange {
   to: number
 }
 
+/**
+ * Built-in movement (a mover's "pan/tilt programs", or a show that moves the head):
+ * while the channel is in one of these ranges the head moves on its own.
+ */
+export interface AutoMoveDef {
+  ref: ChannelRef
+  ranges: Array<{ lo: number; hi: number; index: number; still?: boolean }>
+  speed?: ChannelRef
+}
+
 export interface HeadDef {
   name: string
   role: HeadRole
+  /** Movement the fixture makes on its own (pan/tilt programs, shows). */
+  autoMove?: AutoMoveDef
   ch: Partial<Record<HeadFunction, ChannelRef>>
   colorWheel?: WheelSlot[]
   shutter?: ShutterRange[]
@@ -348,8 +360,13 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
       else if (!hasColor || black) color = head.whiteTint ?? [1, 1, 1]
     }
 
-    const pan = head.ch.pan ? ((r('pan') ?? 0.5) - 0.5) * type.panRange : 0
-    const tilt = head.ch.tilt ? ((r('tilt') ?? 0.5) - 0.5) * type.tiltRange : 0
+    let pan = head.ch.pan ? ((r('pan') ?? 0.5) - 0.5) * type.panRange : 0
+    let tilt = head.ch.tilt ? ((r('tilt') ?? 0.5) - 0.5) * type.tiltRange : 0
+    const auto = head.autoMove ? autoMovement(head.autoMove, levels, address, time) : null
+    if (auto) {
+      pan = auto[0] * type.panRange
+      tilt = auto[1] * type.tiltRange
+    }
     const zoom = r('zoom')
     const beamAngle = zoom === undefined ? narrow : narrow + zoom * (wide - narrow)
     const goboRaw = r('gobo') ?? 0
@@ -361,7 +378,8 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const prismSpin = spinOf(r('prismRotation'), head.prismSpin)
     // A head without its own speed channel moves at the fixture's (a Hydrabeam's "head speed").
     const speedHead = head.ch.moveSpeed ? head : heads.find((h) => h.ch.moveSpeed)
-    const moveSpeed = speedHead ? speedOf(read(levels, address, speedHead.ch.moveSpeed), speedHead.moveSpeed) : 1
+    // Moving on its own: the head follows the program, not the speed channel.
+    const moveSpeed = auto ? 1 : speedHead ? speedOf(read(levels, address, speedHead.ch.moveSpeed), speedHead.moveSpeed) : 1
     const prism = (r('prism') ?? 0) * 255 > 20
     // A motor with known ranges turns at their speed (minus = the other way); otherwise the raw level.
     const rotation = head.rotationSpin?.length ? spinOf(r('rotation'), head.rotationSpin) : r('rotation') ?? r('laser') ?? 0
@@ -371,6 +389,30 @@ export function decodeHeads(type: FixtureType, levels: Uint8Array, address: numb
     const colours = wheel && slot?.colours && !program ? slot.colours : undefined
     return { intensity, color, pan, tilt, beamAngle, gobo, goboSpin, prismSpin, moveSpeed, prism, rotation, fog, mix, colours }
   })
+}
+
+/**
+ * Where a head is in its own movement program, as fractions of its pan and tilt range
+ * (null when the program is off). Each program is a different shape: circles,
+ * figure-eights, sweeps and wandering, so program 1 and program 2 look different.
+ */
+function autoMovement(m: AutoMoveDef, levels: Uint8Array, address: number, time: number): [number, number] | null {
+  const v = Math.round((read(levels, address, m.ref) ?? 0) * 255)
+  if (v === 0) return null
+  const range = m.ranges.find((x) => v >= x.lo && v <= x.hi)
+  if (!range || range.still) return null
+  const speed = m.speed ? 0.3 + (read(levels, address, m.speed) ?? 0.5) * 1.7 : 1
+  const t = time * 0.45 * speed + range.index * 1.7
+  switch (range.index % 4) {
+    case 0: // a circle
+      return [Math.sin(t) * 0.18, 0.12 + Math.cos(t) * 0.18]
+    case 1: // a figure-eight
+      return [Math.sin(t) * 0.22, 0.12 + Math.sin(2 * t) * 0.14]
+    case 2: // a sweep across the room
+      return [Math.sin(t * 0.8) * 0.3, 0.18]
+    default: // wandering
+      return [Math.sin(t * 0.7) * 0.2 + Math.sin(t * 1.9) * 0.08, 0.12 + Math.sin(t * 1.3) * 0.16]
+  }
 }
 
 const PALETTE: Array<[number, number, number]> = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]]
@@ -465,3 +507,31 @@ export function shareWithMovers(heads: HeadDef[], canMove: boolean): HeadDef[] {
   }
   return out.map((h) => (shared.includes(h) ? { ...h, role: 'master' as const } : h))
 }
+
+/**
+ * A part that dims, strobes or colours a set of numbered parts ("Ring" for "Ring 1" to
+ * "Ring 6", the segments of a mover's LED ring): each of them takes its dimmer, strobe
+ * and colour macro. With nothing else of its own, the group part isn't a light itself.
+ */
+export function shareGroupParts(heads: HeadDef[]): HeadDef[] {
+  const SHARED = ['dimmer', 'shutter', 'colorWheel'] as const
+  const out = heads.map((h) => ({ ...h, ch: { ...h.ch } }))
+  const drop = new Set<HeadDef>()
+  for (const g of out) {
+    const name = g.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    if (/\d$/.test(g.name)) continue
+    const members = out.filter((h) => h !== g && new RegExp(`^${name}\\s+\\d+$`, 'i').test(h.name))
+    if (members.length < 2 || !SHARED.some((f) => g.ch[f])) continue
+    for (const m of members) {
+      for (const f of SHARED) {
+        if (!g.ch[f] || m.ch[f]) continue
+        m.ch[f] = g.ch[f]
+        if (f === 'shutter') m.shutter = g.shutter
+        if (f === 'colorWheel') m.colorWheel = g.colorWheel
+      }
+    }
+    if ((Object.keys(g.ch) as string[]).every((f) => (SHARED as readonly string[]).includes(f))) drop.add(g)
+  }
+  return out.filter((h) => !drop.has(h))
+}
+
