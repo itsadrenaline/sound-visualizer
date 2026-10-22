@@ -47,6 +47,8 @@ let window: BrowserWindow | null = null
 let socket: Socket | null = null
 const sockets: Socket[] = []
 let status: ArtNetStatus = { listening: false, address: '' }
+/** When the page last crashed (to notice it crashing again and again). */
+let crashes: number[] = []
 
 function createWindow(): void {
   window = new BrowserWindow({
@@ -88,7 +90,23 @@ function createWindow(): void {
     if (/^https:\/\//.test(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
-  window.webContents.on('render-process-gone', (_e, details) => log('error', 'The page crashed', details))
+  // The page crashed (out of memory, the graphics driver, a show it can't open): load it
+  // again instead of leaving an empty window. If it crashes again straight after
+  // loading, open it in safe mode: the last show is put aside, so the app can start.
+  window.webContents.on('render-process-gone', (_e, details) => {
+    log('error', 'The page crashed', details)
+    if (details.reason === 'clean-exit' || !window || window.isDestroyed()) return
+    const now = Date.now()
+    crashes = crashes.filter((t) => now - t < 60_000)
+    crashes.push(now)
+    if (crashes.length > 3) {
+      log('error', 'The page keeps crashing: not reloading it again')
+      return
+    }
+    const safe = crashes.length > 1
+    if (process.env.ELECTRON_RENDERER_URL && !app.isPackaged) window.loadURL(process.env.ELECTRON_RENDERER_URL + (safe ? '?safe=1' : ''))
+    else window.loadFile(join(here, '../renderer/index.html'), safe ? { query: { safe: '1' } } : undefined)
+  })
   // A project double-clicked in Finder before the window was ready.
   window.webContents.once('did-finish-load', () => {
     if (pendingOpen) sendOpen(pendingOpen)
@@ -291,6 +309,10 @@ handle('soundswitch-profile-browse', () => browseProfile())
 listen('soundswitch-profile-use', (_e, path: string) => useProfile(path))
 
 catchCrashes()
+// The graphics process or another helper stopping is logged too (Help ▸ Open Log Folder).
+app.on('child-process-gone', (_e, details) => {
+  if (details.reason !== 'clean-exit') log('error', `The ${details.type} process stopped`, details)
+})
 app.whenReady().then(() => {
   log('info', `Starting Sound Visualizer ${app.getVersion()}, build ${BUILD} (${process.arch}, macOS ${process.getSystemVersion()})`)
   hardenApp()

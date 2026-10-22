@@ -44,8 +44,20 @@ export interface BatchMark {
   past: HistoryEntry[]
 }
 
+/**
+ * Safe mode: the page crashed twice in a row, maybe on the show it was opening. The
+ * last show is put aside (kept under another key, not lost) and the app starts empty.
+ */
+export const safeMode = typeof location !== 'undefined' && /[?&]safe=1/.test(location.search)
+
 function loadProject(): Project {
   try {
+    if (safeMode) {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) localStorage.setItem(`${STORAGE_KEY}:before-crash`, saved)
+      localStorage.removeItem(STORAGE_KEY)
+      return settle(blankProject())
+    }
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const project = JSON.parse(saved) as Project

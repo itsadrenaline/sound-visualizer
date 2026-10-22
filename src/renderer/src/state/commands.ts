@@ -72,11 +72,27 @@ export function updateFixtures(ids: string[], label: string, change: (f: Fixture
 export function deleteFixtures(ids: string[]): void {
   if (ids.length === 0) return
   const set = new Set(ids)
-  // Fixtures from SoundSwitch would come back on the next sync, so remember to leave them out.
+  // Fixtures from SoundSwitch would come back on the next sync, so this show remembers to
+  // leave them out. (It's kept in the show itself: Undo brings them back, and it works
+  // whatever the show or its SoundSwitch project is called.)
   const imported = store().project.fixtures.filter((f) => set.has(f.id) && f.soundswitchKey).map((f) => f.soundswitchKey!)
-  if (imported.length && typeof window !== 'undefined' && window.api) window.api.excludeSoundSwitchFixtures(store().project.name, imported)
   const label = ids.length === 1 ? 'Delete fixture' : `Delete ${ids.length} fixtures`
-  store().apply(label, (p) => ({ ...p, fixtures: p.fixtures.filter((f) => !set.has(f.id)) }))
+  store().apply(label, (p) => {
+    const fixtures = p.fixtures.filter((f) => !set.has(f.id))
+    if (!imported.length) return { ...p, fixtures }
+    // Only keys no fixture left in the show still uses (copies on the same patch keep theirs).
+    const gone = imported.filter((k) => !fixtures.some((f) => f.soundswitchKey === k))
+    const link = p.soundswitch ?? { link: true }
+    return {
+      ...p,
+      fixtures,
+      soundswitch: {
+        ...link,
+        exclude: [...new Set([...(link.exclude ?? []), ...gone])].sort(),
+        ...(link.include ? { include: link.include.filter((k) => !gone.includes(k)) } : {})
+      }
+    }
+  })
   store().select([])
 }
 
@@ -115,7 +131,8 @@ export function syncFromSoundSwitch(fixtures: SoundSwitchFixture[], projectName:
     // A show that doesn't follow SoundSwitch, or follows a different SoundSwitch project, is left alone.
     const link = p.soundswitch
     if (link && (!link.link || (link.profile && link.profile !== projectName))) return p
-    const chosen = link?.include ? fixtures.filter((f) => link.include!.includes(soundswitchKeyOf(f))) : fixtures
+    const left = link?.exclude?.length ? fixtures.filter((f) => !link.exclude!.includes(soundswitchKeyOf(f))) : fixtures
+    const chosen = link?.include ? left.filter((f) => link.include!.includes(soundswitchKeyOf(f))) : left
     const next = projectFromSoundSwitch(chosen, p, link?.profile ? p.name : projectName)
     // Nothing changed: skip, so automatic syncs don't fill the undo history.
     const same =
@@ -878,3 +895,15 @@ export function joinPanels(ids: string[]): boolean {
 export function setPanel(ids: string[], change: NonNullable<Fixture['panel']>): void {
   updateFixtures(ids, 'Change panel', (f) => ({ ...f, panel: { ...f.panel, ...change } }))
 }
+
+/** Bring back the SoundSwitch fixtures deleted from this show: the next sync adds them again. */
+export function restoreSoundSwitchFixtures(): void {
+  store().apply('Bring back deleted SoundSwitch fixtures', (p) => {
+    if (!p.soundswitch?.exclude?.length) return p
+    const { exclude: _gone, ...link } = p.soundswitch
+    void _gone
+    return { ...p, soundswitch: link }
+  })
+  void import('./soundswitchLink').then((m) => m.useSoundSwitch.getState().syncNow())
+}
+

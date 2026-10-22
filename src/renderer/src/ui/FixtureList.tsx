@@ -11,7 +11,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useStore } from '../state/store'
 import { useMix } from '../state/mix'
 import { useFixtureMenu } from '../state/fixtureMenu'
-import { renameGroup, updateFixtures } from '../state/commands'
+import { renameGroup, restoreSoundSwitchFixtures, updateFixtures } from '../state/commands'
 import { footprint, type Fixture } from '../model/project'
 import { ProblemsBanner, useProblemIndex } from './PatchProblems'
 import { getFixtureType, plainName } from '../model/fixtureTypes'
@@ -52,6 +52,7 @@ interface Section {
 export function FixtureList() {
   const fixtures = useStore((s) => s.project.fixtures)
   const names = useStore((s) => s.project.groupNames)
+  const deletedFromSoundSwitch = useStore((s) => s.project.soundswitch?.exclude?.length ?? 0)
   const selection = useStore((s) => s.selection)
   const select = useStore((s) => s.select)
   const mix = useMix()
@@ -155,6 +156,11 @@ export function FixtureList() {
           {mix.hidden.length > 0 && (
             <button className="mini" onClick={() => mix.clear('hidden')} title="Show the fixtures you hid">
               Show all
+            </button>
+          )}
+          {deletedFromSoundSwitch > 0 && (
+            <button className="mini" onClick={() => restoreSoundSwitchFixtures()} title={`${deletedFromSoundSwitch} fixture${deletedFromSoundSwitch === 1 ? '' : 's'} from SoundSwitch deleted from this show. Bring them back on the next sync.`}>
+              Bring back deleted ({deletedFromSoundSwitch})
             </button>
           )}
         </div>
