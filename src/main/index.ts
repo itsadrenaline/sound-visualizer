@@ -15,6 +15,7 @@ import { buildMenu } from './menu'
 import { readMedia, saveMedia } from './media'
 import { claudeRequest, claudeStatus, clearClaudeKey, setClaudeKey } from './claude'
 import { checkInstall, freshStart } from './install'
+import { guardStartup, noteGpuLaunchFailure } from './macGuard'
 import { openFile, saveFile } from './files'
 import { browseProfile, excludeFixtures, listProfiles, readProfile, refreshSoundSwitch, startSoundSwitch, useProfile } from './soundswitch'
 import { createSocket, type Socket } from 'node:dgram'
@@ -309,9 +310,12 @@ handle('soundswitch-profile-browse', () => browseProfile())
 listen('soundswitch-profile-use', (_e, path: string) => useProfile(path))
 
 catchCrashes()
+guardStartup()
 // The graphics process or another helper stopping is logged too (Help ▸ Open Log Folder).
 app.on('child-process-gone', (_e, details) => {
   if (details.reason !== 'clean-exit') log('error', `The ${details.type} process stopped`, details)
+  // The graphics helper couldn't even start (blocked by macOS): next launch, draw without it.
+  if (details.type === 'GPU' && details.reason === 'launch-failed') noteGpuLaunchFailure()
 })
 app.whenReady().then(() => {
   log('info', `Starting Sound Visualizer ${app.getVersion()}, build ${BUILD} (${process.arch}, macOS ${process.getSystemVersion()})`)
