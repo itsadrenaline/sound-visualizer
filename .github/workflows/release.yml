@@ -101,7 +101,7 @@ jobs:
           if grep -q "Build: notarized" dist/verification.txt; then
             first="Open it like any app."
           else
-            first='This build is not notarized by Apple, so the first time macOS says it "can'"'"'t be opened". Click Done, then open Terminal and run:\n\n```\nxattr -cr "/Applications/Sound Visualizer.app"\n```\n\nand open it again. (Or System Settings > Privacy & Security > Open Anyway.)'
+            first='This build is not notarized by Apple, so the first time macOS says it "can'"'"'t be opened". Click Done, then open Terminal and run:\n\n```\nxattr -cr "/Applications/Sound Visualizer.app"\n```\n\nand open it again. On macOS 26 Tahoe this step is needed: "Open Anyway" in System Settings lets the app open but can leave parts of it blocked, and it then quits by itself. (If you used Open Anyway, the app offers to unblock itself the next time it opens.)'
           fi
           notes="$(printf '%s\n\n## How to install\n\n1. Download **%s** below (works on Apple Silicon and Intel Macs, macOS 12 or newer).\n2. Open it and drag **Sound Visualizer** into **Applications**.\n3. %b\n\n4. When it asks to find devices on your local network, click **Allow** (that is how SoundSwitch reaches it).\n' "$body" "$(cd dist && ls *.dmg | head -1)" "$first")"
           gh release edit "$tag" --notes "$notes"
