@@ -25,7 +25,7 @@ import { Faders } from './ui/Faders'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { FixtureStudio } from './ui/studio/FixtureStudio'
 import { useStudio } from './state/studio'
-import { useStore } from './state/store'
+import { safeMode, useStore } from './state/store'
 import { dmxBus } from './state/dmxBus'
 import { homeFixtures } from './state/demo'
 import { useMix } from './state/mix'
@@ -66,8 +66,14 @@ export function App() {
     window.api.requestArtNetStatus()
     window.api.refreshSoundSwitch()
     // Errors in the page end up in the log file too.
-    const onError = (e: ErrorEvent) => window.api?.log('error', e.message, `${e.filename}:${e.lineno}`)
+    const onError = (e: ErrorEvent) => window.api?.log('error', e.message, `${e.filename}:${e.lineno} ${e.error?.stack ?? ''}`)
+    const onRejection = (e: PromiseRejectionEvent) => window.api?.log('error', 'Unhandled rejection in the page', String(e.reason?.stack ?? e.reason))
     window.addEventListener('error', onError)
+    window.addEventListener('unhandledrejection', onRejection)
+    if (safeMode) {
+      window.api?.log('warn', 'Started in safe mode after the page crashed')
+      notify('error', 'Sound Visualizer crashed twice, so it started with an empty show. Your last show was put aside: open a saved show from Shows, or send the log (Help ▸ Open Log Folder) so the crash can be fixed.')
+    }
     return () => {
       offDmx()
       offStatus()
@@ -76,6 +82,7 @@ export function App() {
       offOpened()
       offNotice()
       window.removeEventListener('error', onError)
+      window.removeEventListener('unhandledrejection', onRejection)
     }
   }, [])
 
