@@ -45,10 +45,29 @@ export function guardStartup(): void {
   } catch {
     fallback = false
   }
-  if (blocked || fallback) {
+  // The last start never got as far as the graphics running (it quit first): don't rely on the helper this time.
+  const pending = join(app.getPath('userData'), 'gpu-starting')
+  const quitBeforeGpu = existsSync(pending)
+  if (quitBeforeGpu) {
+    log('warn', 'Last time the app quit before its graphics started')
+    rmSync(pending, { force: true })
+    noteGpuLaunchFailure()
+  }
+  if (blocked || fallback || quitBeforeGpu) {
     // Graphics run inside the main program: no helper to block.
     app.commandLine.appendSwitch('in-process-gpu')
     log('warn', blocked ? 'The app is quarantined by macOS: drawing in the main program' : 'The graphics helper failed last time: drawing in the main program')
+  } else {
+    // Noted now, cleared once the graphics helper is running.
+    try {
+      writeFileSync(pending, new Date().toISOString())
+    } catch {
+      // Best effort.
+    }
+    const clear = () => rmSync(pending, { force: true })
+    app.once('gpu-info-update', clear)
+    // Still running half a minute in: the graphics are fine.
+    setTimeout(clear, 30_000).unref?.()
   }
   if (!blocked) return
   app.whenReady().then(() => {
