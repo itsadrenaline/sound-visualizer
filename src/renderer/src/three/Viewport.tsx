@@ -37,7 +37,7 @@ import { setProjectors } from './roomMaterial'
 import { roomOf, type RoomSettings } from '../model/project'
 import { useFixtureMenu } from '../state/fixtureMenu'
 import { FixtureHud, FixtureMenu } from '../ui/FixtureActions'
-import { FixtureRig } from './fixtureRig'
+import { FixtureRig, lookKeyOf } from './fixtureRig'
 import { useStudio } from '../state/studio'
 
 export function Viewport() {
@@ -199,7 +199,7 @@ export function Viewport() {
         seen.add(fixture.id)
         let rig = rigs.get(fixture.id)
         // Rebuild if the kind of fixture changed; otherwise just move it.
-        if (rig && (rig.typeId !== fixture.typeId || rig.mounting !== fixture.mounting || rig.typeVersion !== getFixtureType(fixture.typeId) || rig.lookKey !== JSON.stringify(fixture.panel ?? null))) {
+        if (rig && (rig.typeId !== fixture.typeId || rig.mounting !== fixture.mounting || rig.typeVersion !== getFixtureType(fixture.typeId) || rig.lookKey !== lookKeyOf(fixture))) {
           scene.remove(rig.root)
           rig.dispose()
           rig = undefined

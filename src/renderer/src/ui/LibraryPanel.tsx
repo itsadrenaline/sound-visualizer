@@ -174,7 +174,7 @@ function Row({ entry, picked, onPick, showMaker }: { entry: LibraryEntry; picked
       <div className="lib-name">{showMaker ? `${entry.manufacturer} ${entry.name}` : entry.name}</div>
       <div className="sub">
         {kindOf(entry.categories)} · {entry.modes.length} mode{entry.modes.length === 1 ? '' : 's'}
-        {entry.source === 'qlc' ? ' · QLC+' : entry.source === 'mine' ? ' · yours' : ''}
+        {entry.source === 'qlc' ? ' · QLC+' : entry.source === 'mine' ? ' · yours' : entry.source === 'catalog' ? ' · set up from the manual' : ''}
       </div>
     </div>
   )
@@ -250,7 +250,14 @@ function Details({ entry }: { entry: LibraryEntry }) {
   }
   const openInStudio = async () => {
     const def = await useLibrary.getState().defFor(entry.key)
-    if (def) useStudio.getState().openDef(structuredClone(def), entry.source === 'mine' ? [] : [`Opened from the Library: ${entry.manufacturer} ${entry.name}. Test it on the twin; changes make your own copy.`])
+    if (!def) return
+    const report =
+      entry.source === 'mine'
+        ? []
+        : entry.source === 'catalog'
+          ? [`${entry.manufacturer} ${entry.name}: its look and modes are filled in. Set what each channel does from the manual${def.manualUrl ? ` (${def.manualUrl})` : ''}, or ask Claude in the Studio to fill them in from it. Then save it and add it to your show.`]
+          : [`Opened from the Library: ${entry.manufacturer} ${entry.name}. Test it on the twin; changes make your own copy.`]
+    useStudio.getState().openDef(structuredClone(def), report)
   }
 
   return (
@@ -305,12 +312,17 @@ function Details({ entry }: { entry: LibraryEntry }) {
             : `Patched ${first.universe + 1}.${first.address} to ${last.universe + 1}.${last.address + channels - 1}${last.universe !== first.universe ? ' (continues into the next universe)' : ''}.`
           : 'No room to patch these.'}
       </p>
+      {entry.source === 'catalog' && (
+        <p className="hint">
+          We know how it looks and its modes, but not yet what each channel does. Open it in Fixture Studio, fill in the channels from its manual (or let Claude read the manual), and save: then add it to your show.
+        </p>
+      )}
       <div className="lib-actions">
-        <button className="primary" disabled={!plan.length} onClick={() => void add()} title="Add them to the show, patched where the line above says">
+        {entry.source !== 'catalog' && <button className="primary" disabled={!plan.length} onClick={() => void add()} title="Add them to the show, patched where the line above says">
           Add {count > 1 ? `${count} fixtures` : 'to rig'}
-        </button>
-        <button onClick={() => void openInStudio()} title="See every channel on a 3D twin and run its tests, before or after adding it">
-          Open in Fixture Studio
+        </button>}
+        <button className={entry.source === 'catalog' ? 'primary' : undefined} onClick={() => void openInStudio()} title="See every channel on a 3D twin and run its tests, before or after adding it">
+          {entry.source === 'catalog' ? 'Set it up in Fixture Studio' : 'Open in Fixture Studio'}
         </button>
       </div>
       {entry.source === 'ofl' || !entry.source ? (
@@ -319,6 +331,8 @@ function Details({ entry }: { entry: LibraryEntry }) {
         </a>
       ) : entry.source === 'qlc' ? (
         <span className="lib-link">From the QLC+ fixture library</span>
+      ) : entry.source === 'catalog' ? (
+        <span className="lib-link">Look and modes from the Show-Designer fixture catalogue</span>
       ) : null}
     </div>
   )

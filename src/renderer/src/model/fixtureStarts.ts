@@ -152,6 +152,28 @@ const SPECS: Record<FixtureKind, Spec[]> = {
     { label: '5 × 5 cells × RGBW', cells: { n: 25, per: RGBW, layout: { kind: 'grid', cols: 5 } } },
     { label: '6 × 6 cells × RGB', cells: { n: 36, per: RGB, layout: { kind: 'grid', cols: 6 } } }
   ],
+  beeEye: [
+    { label: 'Basic: pan, tilt, RGBW, rotation', fns: [...PT16, D, S, ...RGBW, 'rotation'], common: true },
+    { label: '+ zoom', fns: [...PT16, D, S, ...RGBW, 'rotation', 'zoom'], common: true },
+    { label: '7 lenses × RGBW', cells: { n: 7, per: RGBW, shared: [...PT16, D, S, 'rotation', 'zoom'], layout: { kind: 'hex' } } },
+    { label: '19 lenses × RGBW', cells: { n: 19, per: RGBW, shared: [...PT16, D, S, 'rotation', 'zoom'], layout: { kind: 'hex' } } }
+  ],
+  movingBar: [
+    { label: 'All heads together', fns: ['tilt', 'panTiltSpeed', D, S, ...RGBW], common: true },
+    { label: '4 heads: tilt + RGBW each', cells: { n: 4, per: ['tilt', ...RGBW], shared: [D, S, 'panTiltSpeed'], layout: { kind: 'row' } }, common: true },
+    { label: '8 heads: tilt + RGBW each', cells: { n: 8, per: ['tilt', ...RGBW], shared: [D, S, 'panTiltSpeed'], layout: { kind: 'row' } } },
+    { label: '12 heads: tilt + RGBW each', cells: { n: 12, per: ['tilt', ...RGBW], shared: [D, S, 'panTiltSpeed'], layout: { kind: 'row' } } }
+  ],
+  scanner: [
+    { label: 'Basic', fns: [...PT, D, S, 'colorWheel', 'gobo'], common: true },
+    { label: '+ gobo spin, prism', fns: [...PT, 'panTiltSpeed', D, S, 'colorWheel', 'gobo', 'goboRotation', 'prism'], common: true },
+    { label: 'Fine pan/tilt, focus', fns: [...PT16, D, S, 'colorWheel', 'gobo', 'goboRotation', 'prism', 'focus'] }
+  ],
+  spark: [
+    { label: 'Height (1 channel)', fns: ['fog'], common: true },
+    { label: 'Height, fire', fns: ['fog', 'specialFx'] },
+    { label: 'Height, fire, program', fns: ['fog', 'specialFx', 'program'] }
+  ],
   acrylic: [
     { label: 'RGBW (4 channels)', fns: RGBW, common: true },
     { label: 'Dimmer, RGBW', fns: [D, ...RGBW], common: true },
@@ -513,6 +535,10 @@ export function guessKind(def: FixtureDef): FixtureKind {
   const cells = new Set(def.parts.filter((p) => p.role === 'pixel').map((p) => p.cell)).size
   if (def.look.shape === 'string') return 'string'
   if (def.look.shape === 'acrylic') return 'acrylic'
+  if (def.look.shape === 'beeEye') return 'beeEye'
+  if (def.look.shape === 'movingBar') return 'movingBar'
+  if (def.look.shape === 'scanner') return 'scanner'
+  if (def.look.shape === 'spark') return 'spark'
   if (fns.has('fog')) return 'fog'
   if (fns.has('specialFx')) return 'sfx'
   if (cells > 1 && chs.filter((c) => c.part).every((c) => c.fn === 'dimmer')) return 'dimmer'

@@ -35,7 +35,7 @@ export type StructureKind =
   // Room
   | 'wall' | 'danceFloor' | 'screen' | 'ledWall' | 'backdrop' | 'stanchions' | 'plant' | 'pillar'
   // Party
-  | 'tv' | 'balloonArch' | 'photoBooth' | 'neonSign' | 'discoBall' | 'photoBackdrop'
+  | 'tv' | 'balloonArch' | 'photoBooth' | 'neonSign' | 'discoBall' | 'photoBackdrop' | 'marqueeLetters' | 'monogram'
   // Room lights (not part of the show)
   | 'chandelier' | 'pendantLights' | 'ceilingDrape' | 'wallSconce'
   // People
@@ -114,6 +114,8 @@ export interface StructureParams {
   rpm?: number
   /** Room lights (chandeliers, sconces, fairy lights, a photo booth's lamps): switched on. Missing = on. */
   lightOn?: boolean
+  /** Monogram projection: on a wall rather than the floor. */
+  onWall?: boolean
   /** Room lights: dim and brighten with the room's light (Room ▸ light). Missing = yes. */
   followRoom?: boolean
 }
@@ -121,7 +123,7 @@ export interface StructureParams {
 /** Things that hang from a truss bar above them or the ceiling (or sit on a stand): see physics.ts. */
 export const HANGING_KINDS: StructureKind[] = ['discoBall', 'chandelier', 'pendantLights']
 /** Lights that are part of the room, not the show: they follow the room's light and can be switched off. */
-export const ROOM_LIGHT_KINDS: StructureKind[] = ['chandelier', 'pendantLights', 'ceilingDrape', 'wallSconce', 'photoBackdrop']
+export const ROOM_LIGHT_KINDS: StructureKind[] = ['chandelier', 'pendantLights', 'ceilingDrape', 'wallSconce', 'photoBackdrop', 'marqueeLetters', 'monogram']
 const ROOM_LIGHT_FIELDS: ParamField[] = [
   { key: 'lightOn', label: 'Light on', kind: 'boolean' },
   { key: 'followRoom', label: 'Dims with the room light', kind: 'boolean' }
@@ -659,6 +661,29 @@ export const STRUCTURE_KINDS: Record<StructureKind, KindInfo> = {
     defaults: { bottom: 6 * FT, lightOn: true },
     fields: [{ key: 'bottom', label: 'Height', kind: 'length', min: 0.5, max: 4, presets: [5, 6, 7, 8] }, ...ROOM_LIGHT_FIELDS]
   },
+  marqueeLetters: {
+    label: 'Marquee letters', category: 'Party', surface: false,
+    description: 'Big light-up letters with bulbs: LOVE, initials, a name, a number. They follow the room light, or switch them on and off.',
+    defaults: { text: 'LOVE', height: 4 * FT, cover: 'white', lightOn: true, followRoom: false },
+    fields: [
+      { key: 'text', label: 'Letters', kind: 'text' },
+      { key: 'height', label: 'Letter height', kind: 'length', min: 0.3, max: 2.4, presets: [3, 4, 5] },
+      { key: 'cover', label: 'Letters', kind: 'cover', coverNames: { none: 'Gold', white: 'White', black: 'Black' } },
+      ...ROOM_LIGHT_FIELDS
+    ]
+  },
+  monogram: {
+    label: 'Monogram projection', category: 'Party', surface: false,
+    description: 'Initials or a name projected on the dance floor or a wall, in a frame: the couple’s monogram, the venue’s logo text.',
+    defaults: { text: 'A & J', width: 8 * FT, tint: 2, onWall: false, lightOn: true, followRoom: false },
+    fields: [
+      { key: 'text', label: 'Words', kind: 'text' },
+      { key: 'tint', label: 'Colour', kind: 'choice', options: NEON_COLOURS.map(([name], i) => [name, i] as [string, number]) },
+      { key: 'width', label: 'Size', kind: 'length', min: 0.5, max: 6, presets: [6, 8, 10, 12] },
+      { key: 'onWall', label: 'On a wall (not the floor)', kind: 'boolean' },
+      ...ROOM_LIGHT_FIELDS
+    ]
+  },
   neonSign: {
     label: 'Neon sign', category: 'Party', surface: false,
     description: 'Glowing words on a clear panel, on a stand or a wall: "Happy Birthday", a name, the venue.',
@@ -772,6 +797,8 @@ export function footprint(s: Structure): [number, number] {
     case 'balloonArch': return [p.width + 0.5, 0.5]
     case 'photoBooth': return [Math.max(1.4, (p.size ?? 39) * IN + 0.5), Math.max(1.4, (p.size ?? 39) * IN + 0.5)]
     case 'neonSign': return [p.width, 0.35]
+    case 'marqueeLetters': return [Math.max(0.4, (p.text ?? 'LOVE').replace(/\s/g, '').length * p.height * 0.72), 0.3]
+    case 'monogram': return p.onWall ? [p.width, 0.1] : [p.width, p.width]
     case 'discoBall': return [Math.max(0.2, discoRadius(p.size) * 2), Math.max(0.2, discoRadius(p.size) * 2)]
     case 'photoBackdrop': return [p.width + 0.6, 2.6]
     case 'chandelier': return [(p.size ?? 36) * IN, (p.size ?? 36) * IN]
@@ -816,6 +843,8 @@ export function heightOf(s: Structure): number {
     case 'balloonArch': return p.height + 0.3
     case 'photoBooth': return 0.1
     case 'neonSign': return (p.bottom ?? 0) + p.width * 0.4
+    case 'marqueeLetters': return p.height
+    case 'monogram': return p.onWall ? (p.bottom ?? 1) + p.width : 0.01
     case 'discoBall': return s.hang ? 0 : 0.1 + (p.drop ?? 0.5) + discoRadius(p.size) * 2
     case 'photoBackdrop': return p.height
     case 'chandelier': case 'pendantLights': return s.hang ? 0 : (p.drop ?? 0.5) + 0.8

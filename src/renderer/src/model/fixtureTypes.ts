@@ -109,7 +109,7 @@ export function registerFixtureTypes(types: FixtureType[] | undefined): void {
  */
 function withKnownLook(type: FixtureType): FixtureType {
   if (type.source !== 'SoundSwitch') return type
-  const known = catalogSpec(type.name)
+  const known = catalogSpec(type.name, type.manufacturer)
   if (!known) return type
   // Speed channels that go slow to fast (a Hydrabeam): saved without their ranges, it crawled.
   const heads = known.speedRising ? type.heads?.map((h) => (h.ch.moveSpeed && !h.moveSpeed ? { ...h, moveSpeed: [{ lo: 0, hi: 255, from: 0.05, to: 1 }] } : h)) : type.heads

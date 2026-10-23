@@ -10,6 +10,7 @@
     "noUnusedParameters": true,
     "skipLibCheck": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "types": ["node"]
   },
   "include": ["src", "tests", "electron.vite.config.ts"]

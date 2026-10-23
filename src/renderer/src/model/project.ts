@@ -48,6 +48,8 @@ export interface Fixture {
   faceOut?: boolean
   /** Hung upside down from the ceiling (not a truss), right above its position. */
   onCeiling?: boolean
+  /** Its housing colour ("#rrggbb"), when it's a white, silver or other version of its type. */
+  housing?: string
   /** LED acrylic panels: this panel's own size (metres) and frame colour, over its type's. */
   panel?: { width?: number; height?: number; border?: PanelBorder }
   /** Fixture group, as in SoundSwitch (1 = Group 1). Missing or 0 = no group. */

@@ -11,6 +11,8 @@
  *  - Rockville: Pixel Hybrid Bar
  */
 
+import looksDb from './looksDb.json'
+
 export type LookKind =
   | 'mover' // base + yoke + round head
   | 'moverWash' // mover with a wide, flat LED face (and optional aura ring)
@@ -33,6 +35,10 @@ export type LookKind =
   | 'curtain' // LED curtain / starcloth: LEDs scattered over a black drape hung from a truss
   | 'sphere' // a ball covered in lenses on a base, throwing beams all round as it turns (ADJ Starburst)
   | 'acrylic' // LED acrylic panel: a frosted panel in a frame, lit from its edges by an LED strip inside
+  | 'beeEye' // moving head with a round face of big lenses (bee eye), often turning, often with a ring
+  | 'movingBar' // a bar of small heads that tilt on the bar's long axis (moving beam bar)
+  | 'scanner' // a box with a moving mirror at the front that throws the beam
+  | 'spark' // cold spark machine: a fountain of sparks from a nozzle on top
 
 /** How a fixture's cells sit on its face, for looks that draw cells (cluster, panel). */
 export interface CellLayout {
@@ -111,7 +117,11 @@ export const LOOK_DEFAULTS: Record<LookKind, { size: [number, number, number]; b
   twinbar: { size: [0.28, 0.16, 0.15], beam: [6, 6] },
   curtain: { size: [2.0, 1.0, 0.02], beam: [120, 120] },
   sphere: { size: [0.32, 0.41, 0.32], beam: [1, 1] },
-  acrylic: { size: [0.5, 1.2, 0.04], beam: [160, 160] }
+  acrylic: { size: [0.5, 1.2, 0.04], beam: [160, 160] },
+  beeEye: { size: [0.3, 0.4, 0.26], beam: [4, 40] },
+  movingBar: { size: [1.0, 0.2, 0.12], beam: [4, 4] },
+  scanner: { size: [0.22, 0.2, 0.45], beam: [14, 14] },
+  spark: { size: [0.21, 0.27, 0.21], beam: [10, 10] }
 }
 
 export interface FixtureSpec {
@@ -120,6 +130,10 @@ export interface FixtureSpec {
   layout?: CellLayout
   /** Housing colour, e.g. "#18191c" (black) or "#d8d8d8" (white). */
   bodyColor?: string
+  /** The housing colours it's sold in, first the usual one: [name, "#rrggbb"]. */
+  housings?: Array<[string, string]>
+  /** Runs on a battery (wireless uplights and the like). */
+  battery?: boolean
   /** Overall size: width (left-right), height, depth, metres. */
   size: [number, number, number]
   /** Movement range in degrees (movers only). */
@@ -189,7 +203,7 @@ const CATALOG: Entry[] = [
     spec: { look: 'mover', size: [0.3, 0.43, 0.28], pan: 540, tilt: 270, beam: [14, 14], speed: 200, output: 1.0, halo: true, mount: 'floor', note: 'Both Lighting BPM-Spots 100: 100 W LED spot with an RGB halo ring (21 LEDs), battery and wireless DMX.' }
   },
   {
-    match: /19x15w|aura/i,
+    match: /aura|19x15w(?!.*bee)/i,
     spec: { look: 'moverWash', size: [0.32, 0.38, 0.21], pan: 540, tilt: 240, beam: [8, 58], speed: 220, output: 1.2, leds: 19, halo: true, mount: 'hanging', note: 'Both Lighting Aura 19x15W: 19 RGBW LEDs with zoom, plus 30 RGB aura LEDs behind the lenses.' }
   },
   {
@@ -270,13 +284,133 @@ const GENERIC_MOVER: FixtureSpec = { look: 'mover', size: [0.3, 0.42, 0.24], pan
 const GENERIC_PAR: FixtureSpec = { look: 'par', size: [0.2, 0.25, 0.2], beam: [20, 45], output: 0.6, mount: 'floor', note: 'Generic PAR.' }
 
 /** The researched spec for a fixture name, if there is one. */
-export function catalogSpec(name: string): FixtureSpec | undefined {
-  return CATALOG.find((e) => e.match.test(name))?.spec
+/**
+ * What's known about a fixture by its name (and maker, when known): first the
+ * fixtures researched by hand above, then the looks catalogue (real sizes, LEDs and
+ * housing colours of about 2,500 DJ fixtures).
+ */
+export function catalogSpec(name: string, manufacturer?: string): FixtureSpec | undefined {
+  return CATALOG.find((e) => e.match.test(name))?.spec ?? looksSpec(name, manufacturer)
 }
 
 /** The spec for a fixture by its name, or a sensible generic one. */
-export function specFor(definitionName: string, isMover: boolean): FixtureSpec {
-  return CATALOG.find((e) => e.match.test(definitionName))?.spec ?? (isMover ? GENERIC_MOVER : GENERIC_PAR)
+export function specFor(definitionName: string, isMover: boolean, manufacturer?: string): FixtureSpec {
+  return catalogSpec(definitionName, manufacturer) ?? (isMover ? GENERIC_MOVER : GENERIC_PAR)
+}
+
+// --- The looks catalogue -----------------------------------------------------------
+
+export interface LookEntry {
+  /** Its id in the catalogue. */
+  i: string
+  b: string
+  n: string
+  k: string[]
+  l: LookKind
+  s: [number, number, number]
+  w?: [number, number]
+  p?: number
+  t?: number
+  c?: number
+  y?: CellLayout['kind']
+  o?: number
+  h?: Array<[string, string]>
+  m?: number
+  r?: 1
+  a?: 1
+  u?: FixtureSpec['mount']
+  /** Its DMX modes' channel counts. */
+  ch?: number[]
+  /** LED colours, e.g. "RGBWA+UV". */
+  f?: string
+  /** The catalogue's kind ("mh-spot", "uplight"…). */
+  z?: string
+  /** The maker's product page. */
+  q?: string
+  /** Weight, kg. */
+  g?: number
+}
+
+/** Every fixture in the looks catalogue. */
+export function allLooks(): LookEntry[] {
+  return (looksDb as unknown as { looks: LookEntry[] }).looks
+}
+
+/** The catalogue's maker names, by brand key. */
+export function lookBrandName(brand: string): string {
+  const names: Record<string, string> = { eurolite: 'Eurolite', adj: 'American DJ', chauvet: 'Chauvet DJ', cameo: 'Cameo', lightmaxx: 'LightmaXX', stairville: 'Stairville', apelabs: 'Ape Labs', both: 'Both Lighting', shehds: 'SHEHDS', blizzard: 'Blizzard Lighting', uking: "U'King" }
+  return names[brand] ?? brand
+}
+
+/** The spec the catalogue gives a fixture (its real look). */
+export function specOfLook(e: LookEntry): FixtureSpec {
+  return lookSpecOf(e)
+}
+
+const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+let looksIndex: Map<string, LookEntry[]> | null = null
+function index(): Map<string, LookEntry[]> {
+  if (looksIndex) return looksIndex
+  looksIndex = new Map()
+  for (const e of (looksDb as unknown as { looks: LookEntry[] }).looks) {
+    for (const k of e.k) {
+      const list = looksIndex.get(k)
+      if (list) list.push(e)
+      else looksIndex.set(k, [e])
+    }
+  }
+  return looksIndex
+}
+
+/** The catalogue's brand for a maker's name ("American DJ" is ADJ), or null. */
+function brandOf(manufacturer: string | undefined): string | null {
+  if (!manufacturer) return null
+  const m = normName(manufacturer)
+  const brands = (looksDb as unknown as { brands: Record<string, string[]> }).brands
+  for (const [key, names] of Object.entries(brands)) if (names.some((n) => m === n || (n.length >= 4 && m.startsWith(n)))) return key
+  return null
+}
+
+/** The catalogue entry for a fixture: by its exact name (or SoundSwitch name), from its maker. */
+export function lookEntry(name: string, manufacturer?: string): LookEntry | undefined {
+  const brand = brandOf(manufacturer)
+  // "Intimidator Spot 260 (14 Channel)": the mode in brackets isn't part of the name.
+  const tries = [name, name.replace(/\s*\((?:[^()]*\b(?:ch|channel|mode)\b[^()]*)\)\s*$/i, ''), name.replace(/\s*\([^()]*\)\s*$/, '')]
+  for (const t of tries) {
+    const list = index().get(normName(t))
+    if (!list?.length) continue
+    // A maker we know must match; with no maker, only a name that means one fixture.
+    const mine = brand ? list.filter((e) => e.b === brand) : manufacturer ? [] : list
+    if (mine.length && mine.every((e) => e === mine[0])) return mine[0]
+  }
+  return undefined
+}
+
+function looksSpec(name: string, manufacturer?: string): FixtureSpec | undefined {
+  const e = lookEntry(name, manufacturer)
+  return e ? lookSpecOf(e) : undefined
+}
+
+function lookSpecOf(e: LookEntry): FixtureSpec {
+  const defaults = LOOK_DEFAULTS[e.l]
+  const moving = e.l === 'mover' || e.l === 'moverWash' || e.l === 'beeEye' || e.l === 'scanner'
+  return {
+    look: e.l,
+    size: e.s,
+    beam: e.w ?? defaults.beam,
+    ...(e.p ? { pan: e.p } : moving && e.l !== 'scanner' ? { pan: 540 } : {}),
+    ...(e.t ? { tilt: e.t } : moving || e.l === 'movingBar' ? { tilt: e.l === 'scanner' ? 90 : 270 } : {}),
+    ...(moving || e.l === 'movingBar' ? { speed: 220 } : {}),
+    output: e.o ?? 0.6,
+    ...(e.c ? { leds: e.c } : {}),
+    ...(e.y && e.c ? { layout: { kind: e.y } } : {}),
+    ...(e.h?.length ? { housings: e.h, bodyColor: e.h[0][1] } : {}),
+    ...(e.m ? { movers: e.m } : {}),
+    ...(e.r ? { halo: true } : {}),
+    ...(e.a ? { battery: true } : {}),
+    mount: e.u ?? 'floor',
+    note: `${e.n}: real size and look from the Show-Designer fixture catalogue (soundswitch.hochzeitdj.nrw).`
+  }
 }
 
 /**

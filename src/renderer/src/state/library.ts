@@ -11,6 +11,7 @@ import { typeFromDef, type FixtureDef } from '../model/fixtureDef'
 import { expandDef } from '../model/qxf'
 import { defFromOfl } from '../model/fixtureFiles'
 import { notify } from './notices'
+import { catalogEntries, defFromCatalog } from '../model/catalogFixtures'
 
 const RECENT_KEY = 'soundswitch-visualizer:library-recent'
 const RECENT_MAX = 12
@@ -29,7 +30,7 @@ export const CATEGORIES: Array<{ id: string; label: string; match: (c: string[])
 const KIND_CATEGORY: Record<FixtureDef['kind'], string[]> = {
   par: ['Color Changer'], uplight: ['Color Changer'], wash: ['Moving Head'], spot: ['Moving Head'], beam: ['Moving Head'], bar: ['Pixel Bar'],
   tube: ['Pixel Bar'], panel: ['Matrix'], cluster: ['Color Changer', 'Blinder'], gigbar: ['Effect'], strip: ['Color Changer'], strobe: ['Strobe'], laser: ['Laser'], effect: ['Effect'],
-  fog: ['Smoke'], sfx: ['Other'], dimmer: ['Dimmer'], string: ['Pixel Bar'], acrylic: ['Color Changer'], other: ['Other']
+  fog: ['Smoke'], sfx: ['Other'], dimmer: ['Dimmer'], string: ['Pixel Bar'], acrylic: ['Color Changer'], beeEye: ['Moving Head'], movingBar: ['Moving Head'], scanner: ['Scanner'], spark: ['Effect'], other: ['Other']
 }
 
 export function entryForDef(def: FixtureDef): LibraryEntry {
@@ -91,7 +92,10 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       const ofl = libraryIndex(library).map((e) => ({ ...e, source: 'ofl' as const }))
       const qlc = window.api ? await window.api.loadQlcLibrary() : null
       const qlcEntries = ((qlc?.entries ?? []) as LibraryEntry[]).map((e) => ({ ...e, source: 'qlc' as const }))
-      const entries = [...ofl, ...qlcEntries].sort((a, b) => a.manufacturer.localeCompare(b.manufacturer) || a.name.localeCompare(b.name))
+      const known = [...ofl, ...qlcEntries]
+      // Fixtures we only know the look and modes of (the looks catalogue): set up in Fixture Studio.
+      const catalog = catalogEntries(known)
+      const entries = [...known, ...catalog].sort((a, b) => a.manufacturer.localeCompare(b.manufacturer) || a.name.localeCompare(b.name))
       set({ library, entries: [...get().mine.map(entryForDef), ...entries], qlcCredit: qlc ? qlc.built : null, status: 'ready', error: undefined })
       void get().loadMine()
     } catch (error) {
@@ -123,6 +127,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   },
 
   async defFor(key) {
+    if (key.startsWith('cat/')) return defFromCatalog(key)
     const own = await get().loadDef(key)
     if (own) return own
     const { library, entries } = get()
@@ -151,6 +156,8 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       const type = typeFromDef(def, modeIndex)
       return entry.source === 'mine' ? type : { ...type, family: { library: key, mode: modeIndex } }
     }
+    // Catalogue fixtures have no channels yet: they're set up in Fixture Studio first.
+    if (entry.source === 'catalog') return null
     if (entry.source === 'qlc') {
       // Not fetched yet: fetch it for next time (the row's click or drag usually has already).
       void get().loadDef(key)

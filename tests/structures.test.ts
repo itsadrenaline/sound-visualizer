@@ -148,3 +148,20 @@ describe('physics', () => {
     expect(orientFixtures([mover], 'hanging').length).toBe(1)
   })
 })
+
+describe('party lights', () => {
+  it('sizes marquee letters by the word and lays a monogram on the floor or a wall', async () => {
+    const { buildStructure } = await import('../src/renderer/src/three/structures')
+    const love = addStructure('marqueeLetters', { text: 'LOVE' }, { at: [0, 0, -3] })
+    const mr = addStructure('marqueeLetters', { text: 'MR' }, { at: [3, 0, -3] })
+    const { footprint, heightOf } = await import('../src/renderer/src/model/structures')
+    expect(footprint(piece(love))[0]).toBeGreaterThan(footprint(piece(mr))[0])
+    expect(heightOf(piece(love))).toBeCloseTo(4 * FT)
+    const floor = addStructure('monogram', { text: 'A & J' }, { at: [0, 0, 2] })
+    expect(heightOf(piece(floor))).toBeLessThan(0.05)
+    setStructureParams([floor], { onWall: true })
+    expect(heightOf(piece(floor))).toBeGreaterThan(1)
+    // Both build without a page (no canvas): the letters fall back to a plain block.
+    for (const id of [love, floor]) expect(buildStructure(piece(id)).children.length).toBeGreaterThan(0)
+  })
+})
