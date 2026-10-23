@@ -159,7 +159,7 @@ export interface ModeDef {
   channels: ChannelDef[]
 }
 
-export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'bar' | 'tube' | 'panel' | 'acrylic' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight' | 'string' | 'fog' | 'sfx' | 'dimmer' | 'other'
+export type FixtureKind = 'par' | 'wash' | 'spot' | 'beam' | 'beeEye' | 'movingBar' | 'scanner' | 'spark' | 'bar' | 'tube' | 'panel' | 'acrylic' | 'cluster' | 'gigbar' | 'strip' | 'strobe' | 'laser' | 'effect' | 'uplight' | 'string' | 'fog' | 'sfx' | 'dimmer' | 'other'
 
 export interface LookDef {
   shape: LookKind
@@ -260,6 +260,42 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
       { title: 'Colour, gobo, prism', text: 'Like a spot, but the beam is tight: gobos look like shapes in the haze.', fns: ['colorWheel', 'gobo', 'prism'] },
       { title: 'Dimmer and shutter', text: 'Up and open, or the beam stays dark.', fns: ['dimmer', 'shutter'] },
       { title: 'LED ring', text: 'Some heads have a ring of LEDs around the lens with its own colour channels (and often its own effects). It’s a part of its own: + Add ▸ LED ring adds one.', fns: [] }
+    ]
+  },
+  beeEye: {
+    label: 'Bee-eye moving head', shape: 'beeEye', mount: 'hanging',
+    explain: 'A moving head with a round face of big lenses, each its own narrow beam. The lens plate often turns without end, and many have an LED ring round the face.',
+    concepts: [
+      { title: 'Pan and tilt', text: 'Like any moving head: pan turns it, tilt tips it.', fns: ['pan', 'tilt', 'panTiltSpeed'] },
+      { title: 'Lenses', text: 'All lenses one colour, or each lens (or ring of lenses) its own: then each is a part.', fns: ['red', 'green', 'blue', 'white'] },
+      { title: 'Lens rotation', text: 'Turns the lens plate: one way, stop, the other way, slow to fast.', fns: ['rotation'] },
+      { title: 'Zoom', text: 'From pencil beams to a wide wash.', fns: ['zoom'] }
+    ]
+  },
+  movingBar: {
+    label: 'Moving beam bar', shape: 'movingBar', mount: 'hanging',
+    explain: 'A bar of small heads that tilt on the bar’s long axis, each with a narrow beam: waves and fans across the room.',
+    concepts: [
+      { title: 'Tilt per head', text: 'Each head has its own tilt (or one tilt moves them all).', fns: ['tilt', 'panTiltSpeed'] },
+      { title: 'Colour per head', text: 'Each head its own colour channels: a part per head.', fns: ['red', 'green', 'blue', 'white'] },
+      { title: 'Dimmer and strobe', text: 'Shared at the start of the channel list.', fns: ['dimmer', 'shutter'] }
+    ]
+  },
+  scanner: {
+    label: 'Scanner (moving mirror)', shape: 'scanner', mount: 'hanging',
+    explain: 'A fixed body with a mirror at the front: the mirror moves and throws the beam around. Smaller range than a moving head, but fast.',
+    concepts: [
+      { title: 'Pan and tilt', text: 'Move the mirror, not the body: usually about 180° by 90°.', fns: ['pan', 'tilt'] },
+      { title: 'Colour and gobo', text: 'A colour wheel and gobos, like a spot.', fns: ['colorWheel', 'gobo'] },
+      { title: 'Dimmer and shutter', text: 'Up and open, or the beam stays dark.', fns: ['dimmer', 'shutter'] }
+    ]
+  },
+  spark: {
+    label: 'Cold spark machine', shape: 'spark', mount: 'floor',
+    explain: 'A machine that throws a fountain of cold sparks up from its nozzle: first dance, entrances, big drops. It needs to warm up before it fires.',
+    concepts: [
+      { title: 'Height', text: 'How high the sparks go: 0 is off.', fns: ['fog'] },
+      { title: 'Safety', text: 'Shows usually leave these alone: they fire when you say so.', fns: ['specialFx'] }
     ]
   },
   bar: {
@@ -390,7 +426,7 @@ export const KINDS: Record<FixtureKind, KindInfo> = {
   }
 }
 
-export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'bar', 'tube', 'cluster', 'panel', 'acrylic', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip', 'string', 'fog', 'sfx', 'dimmer', 'other']
+export const KIND_ORDER: FixtureKind[] = ['par', 'wash', 'spot', 'beam', 'beeEye', 'movingBar', 'scanner', 'bar', 'tube', 'cluster', 'panel', 'acrylic', 'gigbar', 'strobe', 'laser', 'effect', 'uplight', 'strip', 'string', 'fog', 'sfx', 'dimmer', 'other']
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -497,7 +533,7 @@ export function cellsDef(def: FixtureDef, cells: number, perCell: ChannelFn[], s
 export function blankDef(kind: FixtureKind, name = 'New fixture', manufacturer = 'Generic'): FixtureDef {
   const info = KINDS[kind]
   const defaults = LOOK_DEFAULTS[info.shape]
-  const moving = kind === 'wash' || kind === 'spot' || kind === 'beam'
+  const moving = kind === 'wash' || kind === 'spot' || kind === 'beam' || kind === 'beeEye' || kind === 'scanner'
   const base: FixtureDef = {
     format: 'sound-visualizer-fixture',
     formatVersion: 1,
@@ -525,6 +561,16 @@ export function blankDef(kind: FixtureKind, name = 'New fixture', manufacturer =
       return single(['red', 'green', 'blue'])
     case 'acrylic':
       return single(['red', 'green', 'blue', 'white'])
+    case 'beeEye':
+      return single(['pan', 'pan', 'tilt', 'tilt', 'panTiltSpeed', 'dimmer', 'shutter', 'red', 'green', 'blue', 'white', 'rotation', 'zoom'])
+    case 'scanner':
+      return single(['pan', 'tilt', 'dimmer', 'shutter', 'colorWheel', 'gobo'])
+    case 'spark':
+      return single(['fog'])
+    case 'movingBar': {
+      const d = withLayout(cellsDef(base, 4, ['tilt', 'red', 'green', 'blue', 'white'], ['dimmer', 'shutter', 'panTiltSpeed'], 'Head'), { kind: 'row' })
+      return d
+    }
     case 'wash':
       return single(['pan', 'pan', 'tilt', 'tilt', 'panTiltSpeed', 'dimmer', 'shutter', 'red', 'green', 'blue', 'white', 'zoom'])
     case 'spot':
@@ -721,21 +767,26 @@ function applyRanges(h: HeadDef, ch: ChannelDef): void {
 
 export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
   const mode = def.modes[Math.max(0, Math.min(def.modes.length - 1, modeIndex))] ?? { id: 'empty', name: 'Empty', channels: [] }
-  const look = def.look
+  const known = catalogSpec(def.name, def.manufacturer)
+  // A fixture straight from the Library (QLC+) is drawn as the real one looks, when the
+  // catalogue knows it; one made or edited in Fixture Studio keeps its own look.
+  const real = def.source.kind === 'library' ? known : undefined
+  const look = real ? { ...def.look, shape: real.look, size: real.size, beam: real.beam, leds: real.leds ?? def.look.leds, layout: def.look.layout ?? real.layout, bodyColor: real.bodyColor ?? def.look.bodyColor, pan: real.pan ?? def.look.pan, tilt: real.tilt ?? def.look.tilt } : def.look
   const canMove = def.modes.some((m) => m.channels.some((c) => c.fn === 'pan' || c.fn === 'tilt'))
   const built = headsFromDef(def, mode).heads
   // Several movers on one bar sharing a colour, dimmer or speed part (Hydrabeam).
-  const heads = shareGroupParts(look.shape === 'mover' || look.shape === 'moverWash' ? shareWithMovers(built, canMove) : built)
+  const heads = shareGroupParts(look.shape === 'mover' || look.shape === 'moverWash' || look.shape === 'beeEye' ? shareWithMovers(built, canMove) : built)
   // A moving head is one in every mode, even one where it only moves by its own programs.
-  const moving = heads.some((h) => h.ch.pan || h.ch.tilt || h.autoMove) || (canMove && (look.shape === 'mover' || look.shape === 'moverWash'))
+  const moving = heads.some((h) => h.ch.pan || h.ch.tilt || h.autoMove) || (canMove && (look.shape === 'mover' || look.shape === 'moverWash' || look.shape === 'beeEye'))
   const pixels = heads.filter((h) => h.role === 'pixel').length
   const zoom = mode.channels.some((c) => c.fn === 'zoom')
-  const known = catalogSpec(def.name)
   const spec: FixtureSpec = {
     look: look.shape,
     size: look.size,
     layout: look.layout,
     bodyColor: look.bodyColor,
+    ...(real?.housings ? { housings: real.housings } : {}),
+    ...(real?.battery ? { battery: true } : {}),
     pan: moving ? look.pan ?? 540 : undefined,
     tilt: moving ? look.tilt ?? 270 : undefined,
     beam: look.beam,
@@ -745,7 +796,7 @@ export function typeFromDef(def: FixtureDef, modeIndex = 0): FixtureType {
     apertures: look.apertures,
     movers: known?.movers,
     speedRising: known?.speedRising,
-    halo: heads.some((h) => h.role === 'halo') || undefined,
+    halo: heads.some((h) => h.role === 'halo') || real?.halo || undefined,
     mount: look.mount,
     stand: look.shape === 'gigbar' ? !!look.stand : undefined,
     note: `${def.manufacturer} ${def.name}, from Fixture Studio.`
@@ -798,6 +849,10 @@ function kindFromType(t: FixtureType): FixtureKind {
   if (look === 'fog') return 'fog'
   if (look === 'twinbar' || look === 'sphere') return 'effect'
   if (look === 'acrylic') return 'acrylic'
+  if (look === 'beeEye') return 'beeEye'
+  if (look === 'movingBar') return 'movingBar'
+  if (look === 'scanner') return 'scanner'
+  if (look === 'spark') return 'spark'
   if (look === 'curtain') return 'panel'
   if (t.body === 'bar') return 'bar'
   return 'par'

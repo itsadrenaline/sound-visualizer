@@ -6,6 +6,7 @@ import { beamzFixtures } from './beamz.mjs'
 import { laserworldFixtures } from './laserworld.mjs'
 import { adjFixtures } from './adj.mjs'
 import { genericFixtures } from './generic.mjs'
+import { chauvetDjFixtures, chauvetProFixtures } from './chauvet.mjs'
 
 export function manualFixtures() {
   return [
@@ -15,6 +16,8 @@ export function manualFixtures() {
     { maker: 'BeamZ', slug: 'beamz', fixtures: beamzFixtures() },
     { maker: 'Laserworld', slug: 'laserworld', fixtures: laserworldFixtures() },
     { maker: 'American DJ', slug: 'american-dj', fixtures: adjFixtures() },
-    { maker: 'Generic', slug: 'generic', fixtures: genericFixtures() }
+    { maker: 'Generic', slug: 'generic', fixtures: genericFixtures() },
+    { maker: 'Chauvet DJ', slug: 'chauvet-dj', fixtures: chauvetDjFixtures() },
+    { maker: 'Chauvet Professional', slug: 'chauvet-professional', fixtures: chauvetProFixtures() }
   ]
 }

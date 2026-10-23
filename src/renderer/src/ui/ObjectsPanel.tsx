@@ -182,6 +182,8 @@ export function Icon({ kind }: { kind: StructureKind }) {
     tv: <><rect x="2" y="4" width="20" height="12" rx="1" {...s} /><path d="M12 16v4M8 21h8" {...s} /></>,
     balloonArch: <><path d="M4 21V12a8 8 0 0116 0v9" {...s} /><circle cx="5" cy="13" r="1.8" {...s} /><circle cx="7" cy="8" r="1.8" {...s} /><circle cx="12" cy="5" r="1.8" {...s} /><circle cx="17" cy="8" r="1.8" {...s} /><circle cx="19" cy="13" r="1.8" {...s} /></>,
     photoBooth: <><ellipse cx="12" cy="18" rx="8" ry="2.5" {...s} /><path d="M12 18V9l7-3" {...s} /><circle cx="19" cy="6" r="2" {...s} /></>,
+    marqueeLetters: <><path d="M3 20V5h5v15M3 5h5M13 5v15h6" {...s} /><circle cx="5.5" cy="8" r="0.8" {...s} /><circle cx="5.5" cy="12" r="0.8" {...s} /><circle cx="5.5" cy="16" r="0.8" {...s} /><circle cx="15.5" cy="10" r="0.8" {...s} /><circle cx="15.5" cy="15" r="0.8" {...s} /></>,
+    monogram: <><ellipse cx="12" cy="15" rx="10" ry="5" {...s} /><path d="M9 16.5l2-4 2 4M10 15h2M14.5 12.5v3a1 1 0 0 1-2 .5" {...s} /><path d="M12 2v6" {...s} /></>,
     neonSign: <><rect x="2" y="6" width="20" height="10" rx="2" {...s} /><path d="M6 13V9l3 4V9M12 9v4h2M16 9h2v4h-2" {...s} /><path d="M8 16v5M16 16v5" {...s} /></>,
     discoBall: <><path d="M12 2v5" {...s} /><circle cx="12" cy="14" r="7" {...s} /><path d="M5 14h14M12 7v14M7 9.5c3 1.5 7 1.5 10 0M7 18.5c3-1.5 7-1.5 10 0" {...s} /></>,
     photoBackdrop: <><path d="M3 20V4h12v16" {...s} /><rect x="16" y="9" width="5" height="4" rx="1" {...s} /><path d="M18.5 13v8M16 21h5" {...s} /></>,

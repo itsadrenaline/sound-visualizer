@@ -52,6 +52,7 @@ export function Inspector() {
       )}
       {selected.length === 1 && <TypeInfo fixture={selected[0]} />}
       <ModeField fixtures={selected} />
+      <HousingField fixtures={selected} />
       <FixtureMount fixtures={selected} />
       <ArrangeButtons ids={selection} />
       <PanelSection fixtures={selected} />
@@ -205,6 +206,38 @@ function ModeField({ fixtures }: { fixtures: Fixture[] }) {
           ? `All ${choices.modes.length} modes it comes in. SoundSwitch sets which one: change it in SoundSwitch's patch and it updates here.`
           : `It comes in ${choices.modes.length} modes. A mode with more channels may overlap the next fixture's address.`}
       </span>
+    </label>
+  )
+}
+
+const STANDARD_HOUSINGS: Array<[string, string]> = [['Black', '#18191c'], ['White', '#e8e8ea'], ['Silver', '#b9bdc3']]
+
+/** The housing colour: the colours its type comes in (from the catalogue), or black, white and silver. */
+function HousingField({ fixtures }: { fixtures: Fixture[] }) {
+  if (!fixtures.length) return null
+  const specs = fixtures.map((f) => getFixtureType(f.typeId).spec)
+  if (specs.some((s) => !s || s.look === 'acrylic')) return null
+  const own = specs[0]!.housings ?? []
+  const options = [...own, ...STANDARD_HOUSINGS.filter(([, hex]) => !own.some(([, h]) => h.toLowerCase() === hex))]
+  const current = (f: Fixture) => (f.housing ?? specs[0]!.bodyColor ?? '#18191c').toLowerCase()
+  const value = fixtures.every((f) => current(f) === current(fixtures[0])) ? current(fixtures[0]) : ''
+  return (
+    <label className="field" title="The colour of its case: many lights come in black, white or silver">
+      <span className="label">Housing</span>
+      <select
+        value={options.some(([, h]) => h.toLowerCase() === value) ? value : ''}
+        onChange={(e) => {
+          const hex = e.target.value
+          if (hex) updateFixtures(fixtures.map((f) => f.id), 'Housing colour', (f) => ({ ...f, housing: hex }))
+        }}
+      >
+        {!options.some(([, h]) => h.toLowerCase() === value) && <option value="">{value ? 'Custom' : 'Mixed'}</option>}
+        {options.map(([name, hex]) => (
+          <option key={hex} value={hex.toLowerCase()}>
+            {name}
+          </option>
+        ))}
+      </select>
     </label>
   )
 }

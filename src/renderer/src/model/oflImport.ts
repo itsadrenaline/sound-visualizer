@@ -88,8 +88,8 @@ export interface LibraryEntry {
   weight?: number
   /** The light source, e.g. "100W LED + RGB halo ring". */
   bulb?: string
-  /** Where it comes from: the Open Fixture Library, QLC+, or My Fixtures (Fixture Studio). */
-  source?: 'ofl' | 'qlc' | 'mine'
+  /** Where it comes from: the Open Fixture Library, QLC+, My Fixtures (Fixture Studio), or the looks catalogue (look and modes only). */
+  source?: 'ofl' | 'qlc' | 'mine' | 'catalog'
 }
 
 // --- Matrix pixels ------------------------------------------------------------------------
@@ -508,7 +508,7 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
   const dims = fx.physical?.dimensions
   const size = dims && dims.every((v) => v > 0) ? (dims.map((v) => v / 1000) as [number, number, number]) : undefined
   // Fixtures researched by hand (catalog.ts) keep that look; everything else is worked out.
-  const known = catalogSpec(fx.name)
+  const known = catalogSpec(fx.name, manufacturer)
   const look = known?.look ?? lookFor(fx, heads, hasMovement, size)
   if (look === 'mover' || look === 'moverWash') heads = shareWithMovers(heads, [...Object.keys(fx.availableChannels ?? {}), ...Object.keys(fx.templateChannels ?? {})].some((k) => /^(pan|tilt)\b/i.test(k)))
   const lens = fx.physical?.lens?.degreesMinMax

@@ -101,7 +101,7 @@ describe('Open Fixture Library files', () => {
       expect(b.channels.length).toBe(a.channels.length)
       // Colour, movement and cells come through (effects on GigBars stay as one fixture in OFL).
       for (const fn of ['red', 'green', 'blue', 'pan', 'tilt', 'dimmer'] as const) expect(b.channels.filter((c) => c === fn).length).toBe(a.channels.filter((c) => c === fn).length)
-      if (kind !== 'gigbar') expect(b.cells).toBe(a.cells)
+      if (kind !== 'gigbar' && kind !== 'movingBar') expect(b.cells).toBe(a.cells)
     })
   }
 

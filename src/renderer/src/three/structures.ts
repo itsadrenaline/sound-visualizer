@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { ARRAY_BOX, ARRAY_SUB, BALLOON_PALETTES, cabinetOf, discoRadius, FT, IN, mountPoints, NEON_COLOURS, paramsOf, pointAt, SCREEN_KINDS, SUB_18, tvSize, type Cover, type Structure, type StructureParams } from '../model/structures'
+import { ARRAY_BOX, ARRAY_SUB, BALLOON_PALETTES, cabinetOf, discoRadius, footprint, FT, IN, mountPoints, NEON_COLOURS, paramsOf, pointAt, SCREEN_KINDS, SUB_18, tvSize, type Cover, type Structure, type StructureParams } from '../model/structures'
 import { projectors } from './projectors'
 import { ScreenSurface } from './screenContent'
 import { createRoomMaterial } from './roomMaterial'
@@ -324,6 +324,74 @@ function neonTexture(text: string, colour: string): THREE.Texture | null {
     g.lineWidth = width
     lines.forEach((l, i) => g.strokeText(l, canvas.width / 2, canvas.height / 2 + (i - (lines.length - 1) / 2) * size * 1.1))
   }
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
+/**
+ * Marquee letters: the letter faces (a canvas) and where the bulbs go on them
+ * (points inside the strokes, in the canvas's 0..1 space, y down).
+ */
+function marqueeCanvas(text: string, fill: string): { texture: THREE.Texture; bulbs: Array<[number, number]>; aspect: number } | null {
+  if (typeof document === 'undefined') return null
+  const word = (text.trim() || 'LOVE').toUpperCase().slice(0, 12)
+  const H = 256
+  const canvas = document.createElement('canvas')
+  const g = canvas.getContext('2d', { willReadFrequently: true })!
+  const font = `900 ${H * 0.92}px Montserrat, "Arial Black", Impact, sans-serif`
+  g.font = font
+  const W = Math.max(64, Math.ceil(g.measureText(word).width + H * 0.12 * word.length))
+  canvas.width = W
+  canvas.height = H
+  g.font = font
+  g.textBaseline = 'middle'
+  g.textAlign = 'center'
+  // Spread the letters a little, like free-standing letters.
+  const step = W / word.length
+  word.split('').forEach((c, i) => g.fillText(c, step * (i + 0.5), H * 0.53))
+  // Bulbs: a grid, kept where the letter is solid all round.
+  const data = g.getImageData(0, 0, W, H).data
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && data[(Math.round(y) * W + Math.round(x)) * 4 + 3] > 128
+  const bulbs: Array<[number, number]> = []
+  const gap = H * 0.085
+  const r = gap * 0.3
+  for (let y = gap / 2; y < H; y += gap)
+    for (let x = gap / 2; x < W; x += gap)
+      if (solid(x, y) && solid(x - r, y) && solid(x + r, y) && solid(x, y - r) && solid(x, y + r)) bulbs.push([x / W, y / H])
+  // Then the faces in their colour (the shape was drawn in black for sampling).
+  g.globalCompositeOperation = 'source-in'
+  g.fillStyle = fill
+  g.fillRect(0, 0, W, H)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return { texture, bulbs, aspect: W / H }
+}
+
+/** A projected monogram: words in a thin ring frame, white on transparent (tinted by the material). */
+function monogramTexture(text: string): THREE.Texture | null {
+  if (typeof document === 'undefined') return null
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 512
+  const g = canvas.getContext('2d')!
+  g.strokeStyle = g.fillStyle = '#ffffff'
+  g.shadowColor = '#ffffff'
+  g.shadowBlur = 12
+  g.lineWidth = 6
+  g.beginPath(); g.arc(256, 256, 232, 0, Math.PI * 2); g.stroke()
+  g.lineWidth = 2
+  g.beginPath(); g.arc(256, 256, 214, 0, Math.PI * 2); g.stroke()
+  const lines = (text.trim() || 'A & J').split(/\n|\\n/).slice(0, 3)
+  let size = 150
+  const font = () => `italic 600 ${size}px "Snell Roundhand", "Brush Script MT", Georgia, serif`
+  g.font = font()
+  while (size > 24 && (Math.max(...lines.map((l) => g.measureText(l).width)) > 360 || size * lines.length * 1.1 > 330)) {
+    size -= 4
+    g.font = font()
+  }
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  lines.forEach((l, i) => g.fillText(l, 256, 256 + (i - (lines.length - 1) / 2) * size * 1.1))
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   return texture
@@ -803,6 +871,64 @@ export function buildStructure(s: Structure): THREE.Group {
       group.add(arm)
       // It turns slowly, like it does at a party.
       group.userData.tick = (time: number) => (arm.rotation.y = time * 0.9)
+      break
+    }
+    case 'marqueeLetters': {
+      const h = p.height
+      const face = cover === 'white' ? '#f2efe8' : cover === 'black' ? '#1b1b1e' : '#c9a24a'
+      const art = marqueeCanvas(p.text ?? 'LOVE', face)
+      const depth = Math.min(0.2, h * 0.1)
+      const w = art ? h * art.aspect : footprint(s)[0]
+      if (!art) {
+        parts.box(brass, w, h, depth, 0, h / 2, 0)
+        break
+      }
+      const plane = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0)
+      const front = new THREE.Mesh(plane, new THREE.MeshStandardMaterial({ map: art.texture, alphaTest: 0.5, roughness: 0.45, metalness: cover === 'none' ? 0.6 : 0.05, side: THREE.DoubleSide }))
+      front.position.z = depth / 2
+      front.userData.own = true
+      group.add(front)
+      // The sides: a few dark layers behind the face give the letters their depth.
+      for (let k = 1; k <= 4; k++) {
+        const layer = new THREE.Mesh(plane, new THREE.MeshStandardMaterial({ map: art.texture, alphaTest: 0.5, color: 0x55524c, roughness: 0.6, side: THREE.DoubleSide }))
+        layer.position.z = depth / 2 - (depth * k) / 4
+        layer.userData.own = true
+        group.add(layer)
+      }
+      const glow = new THREE.MeshBasicMaterial({ color: 0xffd9a0, toneMapped: false })
+      const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(Math.max(0.012, h * 0.022), 8, 6), glow, Math.max(1, art.bulbs.length))
+      const m = new THREE.Matrix4()
+      art.bulbs.forEach(([x, y], i) => bulbs.setMatrixAt(i, m.makeTranslation((x - 0.5) * w, (1 - y) * h, depth / 2 + 0.01)))
+      bulbs.count = art.bulbs.length
+      bulbs.userData.own = true
+      group.add(bulbs)
+      group.userData.roomLight = {
+        glows: [{ mesh: bulbs, color: [1, 0.85, 0.6] }],
+        pools: [{ at: new THREE.Vector3(0, h * 0.5, depth), dir: new THREE.Vector3(0, -0.35, 1).normalize(), tanHalf: 1.4, color: [1, 0.8, 0.5], power: 0.4 }]
+      }
+      break
+    }
+    case 'monogram': {
+      const size = p.width
+      const disc = new THREE.Mesh(
+        new THREE.PlaneGeometry(size, size),
+        new THREE.MeshBasicMaterial({ map: monogramTexture(p.text ?? ''), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 })
+      )
+      if (p.onWall) disc.position.set(0, (p.bottom ?? 1) + size / 2, 0.01)
+      else {
+        disc.rotation.x = -Math.PI / 2
+        disc.position.y = 0.012
+      }
+      disc.userData.own = true
+      disc.raycast = () => {}
+      group.add(disc)
+      // Something to click and move it by: a thin outline of where it lands.
+      const pick = new THREE.Mesh(disc.geometry, new THREE.MeshBasicMaterial({ visible: false }))
+      pick.position.copy(disc.position)
+      pick.rotation.copy(disc.rotation)
+      group.add(pick)
+      const colour = new THREE.Color(NEON_COLOURS[p.tint ?? 2]?.[1] ?? '#ffffff')
+      group.userData.roomLight = { glows: [{ mesh: disc, color: [colour.r, colour.g, colour.b] }], pools: [] }
       break
     }
     case 'neonSign': {

@@ -49,6 +49,8 @@ function functionOf(a: SoundSwitchAttribute, wheels: ImportedFixture['wheels']):
   // "Rotating Gobo Wheel" picks a gobo; "Gobo Rotation" spins it.
   if (/gobo/i.test(a.name) && /rot|spin/i.test(a.name) && !/wheel/i.test(a.name)) return 'goboRotation'
   if (/rotation/i.test(a.name) && a.code === 82) return 'rotation'
+  // A cold spark machine's height (or "spark", "fire", "fountain") drives its fountain.
+  if (/spark\s*(height|level|output)?|fountain|^height$|^fire$/i.test(a.name)) return 'fog'
   // A wheel with coloured slots is a colour wheel, whatever its code says.
   if (a.wheel && wheels?.[a.wheel]?.some((s) => s.rgb)) return 'colorWheel'
   return CODE_TO_FUNCTION[a.code] ?? functionByName(a.name)
@@ -183,7 +185,7 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
   if (!fixtureHasMover && coloured.length > 1) for (const h of coloured) h.role = 'pixel'
 
   // Several movers on one bar sharing a colour, dimmer or speed part (a Hydrabeam).
-  const lookAhead = catalogSpec(f.definition)?.look
+  const lookAhead = catalogSpec(f.definition, f.manufacturer)?.look
   if (fixtureHasMover && (lookAhead ? lookAhead === 'mover' || lookAhead === 'moverWash' : heads.filter((h) => h.ch.pan || h.ch.tilt).length > 1)) {
     heads.splice(0, heads.length, ...shareWithMovers(heads, true))
   }
@@ -192,7 +194,7 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
   const channels = channelListFromHeads(f.mode.channels, heads)
 
   const pixelHeads = heads.filter((h) => h.role === 'pixel').length
-  const known = catalogSpec(f.definition)
+  const known = catalogSpec(f.definition, f.manufacturer)
   // Movers whose speed channel goes slow to fast (a Hydrabeam), when SoundSwitch doesn't say.
   if (known?.speedRising) for (const h of heads) if (h.ch.moveSpeed && !h.moveSpeed) h.moveSpeed = RISING_SPEED
   // A Starburst's ball motor: its manual's speeds, when SoundSwitch doesn't give the ranges.
@@ -205,7 +207,7 @@ export function fixtureTypeFromMode(f: ImportedFixture): FixtureType {
         ? twinBarSpec(f.definition)
         : pixelHeads > 1
           ? multiCellSpec(f.definition, pixelHeads)
-        : specFor(f.definition, fixtureHasMover))
+        : specFor(f.definition, fixtureHasMover, f.manufacturer))
   const body: FixtureType['body'] = fixtureHasMover ? 'movingHead' : pixelHeads > 1 ? 'bar' : 'par'
   return {
     id: typeIdFor(f),
