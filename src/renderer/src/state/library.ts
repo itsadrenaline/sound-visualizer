@@ -64,6 +64,18 @@ interface LibraryState {
   /** Our fixture type for a library fixture and mode. Remembers it as recently used. */
   typeFor(key: string, modeIndex: number): FixtureType | null
   importFiles(): Promise<void>
+  /** Take a fixture off the Recent list (or clear it, with no key). */
+  forgetRecent(key?: string): void
+  /** Delete one of My Fixtures for good. Fixtures already in a show keep working. */
+  deleteMine(key: string): Promise<void>
+}
+
+function saveRecent(recent: string[]): void {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recent))
+  } catch {
+    // Recent items are a convenience only.
+  }
 }
 
 function loadRecent(): string[] {
@@ -144,11 +156,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const remember = () => {
       const recent = [key, ...get().recent.filter((k) => k !== key)].slice(0, RECENT_MAX)
       set({ recent })
-      try {
-        localStorage.setItem(RECENT_KEY, JSON.stringify(recent))
-      } catch {
-        // Recent items are a convenience only.
-      }
+      saveRecent(recent)
     }
     const def = defs[key]
     if (def) {
@@ -169,6 +177,21 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     return fixtureTypeFromOfl(key, entry.manufacturer, fixture, modeIndex)
   },
 
+  forgetRecent(key) {
+    const recent = key ? get().recent.filter((k) => k !== key) : []
+    set({ recent })
+    saveRecent(recent)
+  },
+
+  async deleteMine(key) {
+    const id = key.replace(/^mine\//, '')
+    if (typeof window !== 'undefined' && window.api) await window.api.deleteMyFixture(id)
+    const defs = { ...get().defs }
+    delete defs[key]
+    set({ defs, mine: get().mine.filter((d) => d.id !== id), entries: get().entries.filter((e) => e.key !== key) })
+    get().forgetRecent(key)
+  },
+
   async importFiles() {
     if (!window.api) return
     const { added, rejected } = await window.api.importFixtureFiles()
@@ -180,13 +203,25 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   }
 }))
 
-/** Search: every word must appear in the manufacturer, name or categories. */
+/** Other names makers go by, so "ADJ Focus Spot" finds American DJ's. */
+const MAKER_ALIASES: Record<string, string> = {
+  'American DJ': 'adj americandj',
+  ADJ: 'american dj',
+  'Chauvet DJ': 'chauvetdj',
+  'Chauvet Professional': 'chauvet pro',
+  'Both Lighting': 'both',
+  'Blizzard Lighting': 'blizzard',
+  'Ape Labs': 'apelabs',
+  "U'King": 'uking'
+}
+
+/** Search: every word must appear in the manufacturer (or another name it goes by), name or categories. */
 export function searchLibrary(entries: LibraryEntry[], query: string, category: string): LibraryEntry[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   const cat = CATEGORIES.find((c) => c.id === category) ?? CATEGORIES[0]
   return entries.filter((e) => {
     if (!cat.match(e.categories)) return false
-    const text = `${e.manufacturer} ${e.name} ${e.categories.join(' ')} ${e.bulb ?? ''}`.toLowerCase()
+    const text = `${e.manufacturer} ${MAKER_ALIASES[e.manufacturer] ?? ''} ${e.name} ${e.categories.join(' ')} ${e.bulb ?? ''}`.toLowerCase()
     return words.every((w) => text.includes(w))
   })
 }

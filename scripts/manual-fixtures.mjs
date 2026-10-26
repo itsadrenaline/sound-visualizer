@@ -7,6 +7,7 @@ import { laserworldFixtures } from './laserworld.mjs'
 import { adjFixtures } from './adj.mjs'
 import { genericFixtures } from './generic.mjs'
 import { chauvetDjFixtures, chauvetProFixtures } from './chauvet.mjs'
+import { ayraFixtures } from './ayra.mjs'
 
 export function manualFixtures() {
   return [
@@ -18,6 +19,7 @@ export function manualFixtures() {
     { maker: 'American DJ', slug: 'american-dj', fixtures: adjFixtures() },
     { maker: 'Generic', slug: 'generic', fixtures: genericFixtures() },
     { maker: 'Chauvet DJ', slug: 'chauvet-dj', fixtures: chauvetDjFixtures() },
-    { maker: 'Chauvet Professional', slug: 'chauvet-professional', fixtures: chauvetProFixtures() }
+    { maker: 'Chauvet Professional', slug: 'chauvet-professional', fixtures: chauvetProFixtures() },
+    { maker: 'Ayra', slug: 'ayra', fixtures: ayraFixtures() }
   ]
 }

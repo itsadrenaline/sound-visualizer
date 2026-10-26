@@ -31,7 +31,7 @@ console.log(`Added ${added} fixtures written from manufacturers' manuals.`)
 // looks the QLC+ reader got wrong (every multi-head "Effect" was drawn as a GigBar).
 const qlcFile = join(dirname(file), 'qlcplus.json')
 const qlc = JSON.parse(readFileSync(qlcFile, 'utf8'))
-const REPLACED = ['qlc/Laserworld/Laserworld-EL-900RGB']
+const REPLACED = ['qlc/Laserworld/Laserworld-EL-900RGB', 'qlc/American_DJ/American-DJ-Focus-Spot-4Z']
 const LOOKS = {
   'qlc/American_DJ/American-DJ-Asteroid-1200': ['effect', 'derby', 'floor'],
   'qlc/American_DJ/American-DJ-Hyper-Gem-LED': ['effect', 'derby', 'floor'],

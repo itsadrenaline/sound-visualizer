@@ -6,6 +6,7 @@ import { useStore } from './store'
 import { useViewSettings } from './viewSettings'
 import { deleteChannels, useStudio } from './studio'
 import { readFixtureFile } from '../model/fixtureFiles'
+import { useLibrary } from './library'
 import { notify } from './notices'
 import { deleteFixtures, deleteStructures, duplicateFixtures, duplicateStructures } from './commands'
 import { openDocument, saveDocument } from './document'
@@ -147,6 +148,25 @@ async function importFixtureFile(): Promise<void> {
   if (!file) return
   try {
     const { def, report } = readFixtureFile(file.name, file.bytes)
+    // A corrected version of a fixture you already saved replaces it (same maker and name),
+    // rather than piling up a second copy next to the old one.
+    await useLibrary.getState().loadMine()
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+    const old = useLibrary.getState().mine.find((m) => m.id !== def.id && same(m.name, def.name) && same(m.manufacturer, def.manufacturer))
+    if (old) {
+      def.id = old.id
+      def.revision = old.revision
+      def.history = old.history
+      // Keep the old modes' ids where the modes match (by name, else by channel count), so fixtures already in the show pick up the new version.
+      const taken = new Set<string>()
+      def.modes = def.modes.map((m) => {
+        const match = old.modes.find((o) => !taken.has(o.id) && same(o.name, m.name)) ?? old.modes.find((o) => !taken.has(o.id) && o.channels.length === m.channels.length)
+        if (!match) return m
+        taken.add(match.id)
+        return { ...m, id: match.id }
+      })
+      report.push(`You already have “${old.manufacturer} ${old.name}” in My Fixtures (version ${old.revision}). Saving replaces it, and updates the copies in your show.`)
+    }
     useStudio.getState().openDef(def, report)
   } catch (error) {
     notify('error', `${file.name}: ${(error as Error).message}`)

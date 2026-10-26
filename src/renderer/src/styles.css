@@ -699,5 +699,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 
 /* Fixture Studio links from the main window */
 .lib-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.lib-actions .danger { color: #f5a3a3; }
 .type-info .studio-open { margin-top: 6px; }
 .warn-text { color: var(--warn); }
