@@ -10,10 +10,11 @@
  * with the look and how sure each channel is), or the OFL file on its own.
  */
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
-import { FN, KINDS, defFromTypes, hexOf, newKey, type ChannelDef, type ChannelFn, type FixtureDef, type PartDef, type RangeDef } from './fixtureDef'
+import { FN, KINDS, defFromTypes, defaultRanges, hexOf, newKey, type ChannelDef, type ChannelFn, type FixtureDef, type PartDef, type RangeDef } from './fixtureDef'
 import { fixtureTypeFromOfl, oflModeChannelNames, type OflFixture } from './oflImport'
 import { defFromQxf, parseXml, type XmlNode } from './qxf'
 import { LOOK_DEFAULTS } from './catalog'
+import { fnFromText } from './manualParser'
 
 export interface ReadResult {
   def: FixtureDef
@@ -37,8 +38,13 @@ export function readFixtureFile(name: string, bytes: Uint8Array): ReadResult {
     const json = JSON.parse(strFromU8(bytes))
     if (json?.format === 'sound-visualizer-fixture') return { def: json as FixtureDef, report: [`Read a Fixture Studio definition: ${summary(json)}.`] }
     if (json?.name && Array.isArray(json.modes)) {
-      const def = defFromOfl(json as OflFixture, json.manufacturerKey ?? json.meta?.manufacturer ?? manufacturerFromName(name), name)
-      return { def, report: [`Read an Open Fixture Library fixture: ${summary(def)}.`] }
+      const maker = [json.manufacturer, json.manufacturerName, json.meta?.manufacturer, json.manufacturerKey].find((m) => typeof m === 'string' && m.trim()) ?? manufacturerFromName(name)
+      const def = defFromOfl(json as OflFixture, maker, name)
+      // Not the Open Fixture Library's own page: it's your file.
+      def.source = { kind: 'file', label: `Fixture file ${name}` }
+      const report = [`Read an Open Fixture Library fixture: ${summary(def)}.`]
+      report.push(...fillUndefinedChannels(json as OflFixture, def))
+      return { def, report }
     }
     throw new Error('This JSON file isn’t an Open Fixture Library fixture or a Fixture Studio file.')
   }
@@ -47,6 +53,44 @@ export function readFixtureFile(name: string, bytes: Uint8Array): ReadResult {
 
 function manufacturerFromName(file: string): string {
   return file.split(/[\\/]/).slice(-2, -1)[0] ?? 'Unknown'
+}
+
+/**
+ * Channels a mode lists but the file never describes (common in files written by hand
+ * or by an AI): their job is guessed from the name ("Gobo Wheel", "Prism 1 Rotation",
+ * "Pan/Tilt Speed") and marked guessed, so they work and show up to check in the Studio.
+ */
+function fillUndefinedChannels(fx: OflFixture, def: FixtureDef): string[] {
+  const known = new Set<string>()
+  for (const [key, ch] of Object.entries(fx.availableChannels ?? {})) {
+    known.add(key)
+    for (const alias of ch.fineChannelAliases ?? []) known.add(alias)
+    for (const alias of Object.keys(ch.switchChannels ?? {})) known.add(alias)
+  }
+  const guessed = new Set<string>()
+  const unknown = new Set<string>()
+  fx.modes.forEach((mode, i) => {
+    const out = def.modes[i]
+    if (!out || !Array.isArray(mode.channels) || out.channels.length !== mode.channels.length) return
+    mode.channels.forEach((name, k) => {
+      if (typeof name !== 'string' || known.has(name) || [...known].some((n) => n.includes('$pixelKey'))) return
+      const fn = fnFromText(name)
+      const ch = out.channels[k]
+      if (!fn || fn === 'none') {
+        unknown.add(name)
+        out.channels[k] = { ...ch, name, confidence: 'missing', note: 'Not described in the file: set what it does.' }
+        return
+      }
+      const prev = out.channels[k - 1]
+      const fine = /fine|16.?bit|lsb/i.test(name) && prev?.fn === fn
+      out.channels[k] = { ...ch, name, fn, fine: fine || undefined, ranges: fine ? [] : defaultRanges(fn), confidence: 'guessed', note: 'Not described in the file: guessed from its name.' }
+      guessed.add(name)
+    })
+  })
+  const out: string[] = []
+  if (guessed.size) out.push(`${guessed.size} channel${guessed.size === 1 ? '' : 's'} weren't described in the file, so their jobs were guessed from their names (${[...guessed].slice(0, 6).join(', ')}${guessed.size > 6 ? '…' : ''}). Check them on the twin.`)
+  if (unknown.size) out.push(`Couldn't tell what ${[...unknown].slice(0, 6).join(', ')} do${unknown.size === 1 ? 'es' : ''}: set ${unknown.size === 1 ? 'it' : 'them'} from the manual.`)
+  return out
 }
 
 export function summary(def: FixtureDef): string {

@@ -12,6 +12,7 @@ import { plainName, type FixtureType } from '../model/fixtureTypes'
 import { planPatch } from '../model/project'
 import { useStudio } from '../state/studio'
 import { runCommand } from '../state/menuCommands'
+import { MenuItem, MenuShell } from './Menu'
 
 export const DRAG_TYPE = 'application/x-ssvis-fixture'
 
@@ -24,6 +25,11 @@ export function LibraryPanel() {
   const [category, setCategory] = useState('all')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [picked, setPicked] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; key?: string; inRecent?: boolean } | null>(null)
+  const rowMenu = (inRecent: boolean) => (e: React.MouseEvent, key: string) => {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, key, inRecent })
+  }
 
   useEffect(() => {
     void load()
@@ -83,24 +89,24 @@ export function LibraryPanel() {
             {!searching && category === 'all' && mine.length > 0 && (
               <Group title="My Fixtures" count={mine.length} open onToggle={() => {}}>
                 {mine.map((e) => (
-                  <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} showMaker />
+                  <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} showMaker onMenu={rowMenu(false)} />
                 ))}
               </Group>
             )}
             {!searching && category === 'all' && <RigTypes />}
             {!searching && category === 'all' && recentEntries.length > 0 && (
-              <Group title="Recent" count={recentEntries.length} open onToggle={() => {}}>
+              <Group title="Recent" count={recentEntries.length} open onToggle={() => {}} onMenu={(e) => (e.preventDefault(), setMenu({ x: e.clientX, y: e.clientY, inRecent: true }))}>
                 {recentEntries.map((e) => (
-                  <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} />
+                  <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} onMenu={rowMenu(true)} />
                 ))}
               </Group>
             )}
             {searching
-              ? results.slice(0, 300).map((e) => <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} showMaker />)
+              ? results.slice(0, 300).map((e) => <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} showMaker onMenu={rowMenu(false)} />)
               : byMaker.map(([maker, list]) => (
                   <Group key={maker} title={maker} count={list.length} open={open.has(maker)} onToggle={() => toggle(maker)}>
                     {list.map((e) => (
-                      <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} />
+                      <Row key={e.key} entry={e} picked={picked === e.key} onPick={pick} onMenu={rowMenu(false)} />
                     ))}
                   </Group>
                 ))}
@@ -119,6 +125,7 @@ export function LibraryPanel() {
       </div>
 
       {pickedEntry && <Details key={pickedEntry.key} entry={pickedEntry} />}
+      {menu && <LibraryMenu menu={menu} onClose={() => setMenu(null)} onDeleted={(key) => picked === key && setPicked(null)} />}
       {library && (
         <p className="credit">
           Fixtures from the{' '}
@@ -142,10 +149,46 @@ export function LibraryPanel() {
   )
 }
 
-function Group({ title, count, open, onToggle, children }: { title: string; count: number; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+/** Right-click on a Library row (or the Recent heading). */
+function LibraryMenu({ menu, onClose, onDeleted }: { menu: { x: number; y: number; key?: string; inRecent?: boolean }; onClose: () => void; onDeleted: (key: string) => void }) {
+  const { entries, forgetRecent, recent } = useLibrary()
+  const entry = menu.key ? entries.find((e) => e.key === menu.key) : undefined
+  const run = (f: () => void) => () => {
+    onClose()
+    f()
+  }
+  return (
+    <MenuShell at={menu} onClose={onClose}>
+      {entry && <MenuItem label="Open in Fixture Studio" onClick={run(() => void openInStudio(entry))} />}
+      {entry && menu.inRecent && <MenuItem label="Remove from Recent" onClick={run(() => forgetRecent(entry.key))} />}
+      {menu.inRecent && <MenuItem label="Clear Recent" disabled={!recent.length} onClick={run(() => forgetRecent())} />}
+      {entry?.source === 'mine' && <MenuItem label="Delete from My Fixtures…" danger onClick={run(() => void deleteMine(entry, onDeleted))} />}
+    </MenuShell>
+  )
+}
+
+async function deleteMine(entry: LibraryEntry, onDeleted: (key: string) => void): Promise<void> {
+  if (typeof confirm === 'function' && !confirm(`Delete “${entry.manufacturer} ${entry.name}” from My Fixtures? Fixtures already in your shows keep working.`)) return
+  await useLibrary.getState().deleteMine(entry.key)
+  onDeleted(entry.key)
+}
+
+async function openInStudio(entry: LibraryEntry): Promise<void> {
+  const def = await useLibrary.getState().defFor(entry.key)
+  if (!def) return
+  const report =
+    entry.source === 'mine'
+      ? []
+      : entry.source === 'catalog'
+        ? [`${entry.manufacturer} ${entry.name}: its look and modes are filled in. Set what each channel does from the manual${def.manualUrl ? ` (${def.manualUrl})` : ''}, or ask Claude in the Studio to fill them in from it. Then save it and add it to your show.`]
+        : [`Opened from the Library: ${entry.manufacturer} ${entry.name}. Test it on the twin; changes make your own copy.`]
+  useStudio.getState().openDef(structuredClone(def), report)
+}
+
+function Group({ title, count, open, onToggle, onMenu, children }: { title: string; count: number; open: boolean; onToggle: () => void; onMenu?: (e: React.MouseEvent) => void; children: React.ReactNode }) {
   return (
     <div className="lib-group">
-      <button className="lib-group-head" onClick={onToggle}>
+      <button className="lib-group-head" onClick={onToggle} onContextMenu={onMenu}>
         <span className="caret">{open ? '▾' : '▸'}</span> {title} <span className="count">{count}</span>
       </button>
       {open && <div>{children}</div>}
@@ -157,11 +200,12 @@ function kindOf(categories: string[]): string {
   return categories.slice(0, 2).join(' · ') || 'Fixture'
 }
 
-function Row({ entry, picked, onPick, showMaker }: { entry: LibraryEntry; picked: boolean; onPick: (k: string) => void; showMaker?: boolean }) {
+function Row({ entry, picked, onPick, showMaker, onMenu }: { entry: LibraryEntry; picked: boolean; onPick: (k: string) => void; showMaker?: boolean; onMenu?: (e: React.MouseEvent, key: string) => void }) {
   return (
     <div
       className={`lib-row ${picked ? 'picked' : ''}`}
       onClick={() => onPick(entry.key)}
+      onContextMenu={onMenu ? (e) => onMenu(e, entry.key) : undefined}
       draggable
       onDragStart={(e) => {
         void useLibrary.getState().loadDef(entry.key)
@@ -169,7 +213,7 @@ function Row({ entry, picked, onPick, showMaker }: { entry: LibraryEntry; picked
         e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(payload))
         e.dataTransfer.effectAllowed = 'copy'
       }}
-      title="Click for details, or drag into the 3D view"
+      title="Click for details, drag into the 3D view, or right-click for more"
     >
       <div className="lib-name">{showMaker ? `${entry.manufacturer} ${entry.name}` : entry.name}</div>
       <div className="sub">
@@ -248,18 +292,6 @@ function Details({ entry }: { entry: LibraryEntry }) {
     const type = useLibrary.getState().typeFor(entry.key, mode)
     if (type) addLibraryFixtures(type, count, { start: startAt })
   }
-  const openInStudio = async () => {
-    const def = await useLibrary.getState().defFor(entry.key)
-    if (!def) return
-    const report =
-      entry.source === 'mine'
-        ? []
-        : entry.source === 'catalog'
-          ? [`${entry.manufacturer} ${entry.name}: its look and modes are filled in. Set what each channel does from the manual${def.manualUrl ? ` (${def.manualUrl})` : ''}, or ask Claude in the Studio to fill them in from it. Then save it and add it to your show.`]
-          : [`Opened from the Library: ${entry.manufacturer} ${entry.name}. Test it on the twin; changes make your own copy.`]
-    useStudio.getState().openDef(structuredClone(def), report)
-  }
-
   return (
     <div className="lib-details">
       <div
@@ -321,9 +353,14 @@ function Details({ entry }: { entry: LibraryEntry }) {
         {entry.source !== 'catalog' && <button className="primary" disabled={!plan.length} onClick={() => void add()} title="Add them to the show, patched where the line above says">
           Add {count > 1 ? `${count} fixtures` : 'to rig'}
         </button>}
-        <button className={entry.source === 'catalog' ? 'primary' : undefined} onClick={() => void openInStudio()} title="See every channel on a 3D twin and run its tests, before or after adding it">
+        <button className={entry.source === 'catalog' ? 'primary' : undefined} onClick={() => void openInStudio(entry)} title="See every channel on a 3D twin and run its tests, before or after adding it">
           {entry.source === 'catalog' ? 'Set it up in Fixture Studio' : 'Open in Fixture Studio'}
         </button>
+        {entry.source === 'mine' && (
+          <button className="danger" onClick={() => void deleteMine(entry, () => {})} title="Remove it from My Fixtures. Fixtures already in your shows keep working.">
+            Delete…
+          </button>
+        )}
       </div>
       {entry.source === 'ofl' || !entry.source ? (
         <a className="lib-link" href={`https://open-fixture-library.org/${entry.key}`} target="_blank" rel="noreferrer">

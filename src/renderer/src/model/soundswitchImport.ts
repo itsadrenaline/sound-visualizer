@@ -62,7 +62,15 @@ function functionOf(a: SoundSwitchAttribute, wheels: ImportedFixture['wheels']):
  */
 function functionByName(name: string): HeadFunction | null {
   // Whole names only ("UV", "Purple 2", "LED White"): "Red pulse" is a program, not a colour.
-  const n = name.trim().replace(/^(led|colou?r)\s+/i, '').replace(/\s*\d+$/, '')
+  // Manual-style names too: "Dimmer Red 0-100%", "Red dimmer", "Master dimmer 0-100%".
+  const n = name
+    .trim()
+    .replace(/\s*\d+\s*[-–]\s*\d+\s*%?\s*$/, '')
+    .replace(/\s+channel$/i, '')
+    .replace(/^(led|colou?r)\s+/i, '')
+    .replace(/\s*\d+$/, '')
+    .replace(/^dimmer\s+(?=\S)(?!.*dimmer)/i, '')
+    .replace(/\s+dimmer$/i, (m, _offset, whole) => (/^(master|main)?\s*dimmer$/i.test(whole) ? m : ''))
   if (/^(uv|u\.v\.|ultra\s*violet|purple|violet)$/i.test(n)) return 'uv'
   if (/^(amber|yellow)$/i.test(n)) return 'amber'
   if (/^(white|warm\s*white|cool\s*white|cold\s*white)$/i.test(n)) return 'white'
@@ -70,7 +78,7 @@ function functionByName(name: string): HeadFunction | null {
   if (/^green$/i.test(n)) return 'green'
   if (/^blue$/i.test(n)) return 'blue'
   if (/^(master\s*)?(dimmer|intensity)$/i.test(n)) return 'dimmer'
-  if (/^(strobe|shutter|strobe\s*\/\s*shutter)$/i.test(n)) return 'shutter'
+  if (/^(strobe|shutter|strobe\s*\/\s*shutter|shutter\s*\/\s*strobe)$/i.test(n)) return 'shutter'
   if (/^(ball\s*|motor\s*)?(rotation|rotate|spin)(\s*speed)?$/i.test(n)) return 'rotation'
   return null
 }

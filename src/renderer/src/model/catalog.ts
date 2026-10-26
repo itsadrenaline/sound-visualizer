@@ -243,6 +243,10 @@ const CATALOG: Entry[] = [
     spec: { look: 'acrylic', size: [0.5, 1.2, 0.04], beam: [160, 160], output: 0.35, bodyColor: '#ececee', mount: 'floor', note: 'LED acrylic panel: a frosted acrylic panel in a frame, lit from its edges by an RGBW LED strip inside.' }
   },
   {
+    match: /\bero\s*-?\s*706\b/i,
+    spec: { look: 'moverWash', size: [0.26, 0.31, 0.15], pan: 540, tilt: 220, beam: [35, 35], speed: 220, output: 1.0, leds: 7, mount: 'hanging', note: 'Ayra ERO 706: a wash moving head with 7 × 18 W RGBWA+UV LEDs (35° beam, 540° pan, 220° tilt). From its user manual.' }
+  },
+  {
     match: /fusion\s*orbit/i,
     spec: { look: 'mover', size: [0.172, 0.238, 0.146], pan: 540, tilt: 210, beam: [4, 4], speed: 300, output: 0.75, halo: true, speedRising: true, mount: 'hanging', note: 'Equinox Fusion Orbit MKII: a 60 W RGBW beam moving head with a ring of 12 RGB LEDs round the lens (540° pan, 210° tilt, 4° beam). Its pan/tilt speed goes slow to fast.' }
   },
