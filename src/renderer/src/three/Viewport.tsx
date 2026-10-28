@@ -916,6 +916,8 @@ export function Viewport() {
     observer.observe(container)
     resize()
 
+    /** Recording a video: the move arrows stay out of it. */
+    let recording = false
     // --- Switching between 3D and the Plan keeps you looking at the same thing ---
     const tanHalf = () => Math.tan((camera.fov * Math.PI) / 360)
     const toPlanView = () => {
@@ -929,7 +931,7 @@ export function Viewport() {
       let side: PlanSide = prefs.planSide
       if (dir.y > 0.8) side = 'top'
       else if (dir.y < 0.3 && Math.abs(dir.z) > 2 * Math.abs(dir.x)) side = 'front'
-      else if (dir.y < 0.3 && Math.abs(dir.x) > 2 * Math.abs(dir.z)) side = 'side'
+      else if (dir.y < 0.3 && Math.abs(dir.x) > 2 * Math.abs(dir.z)) side = dir.x < 0 ? 'left' : 'right'
       if (side !== prefs.planSide) prefs.setPlanSide(side)
       const [u, v] = toPlan(side, [target.x, target.y, target.z])
       const h = renderer.domElement.clientHeight || usePlanCam.getState().size.h
@@ -951,6 +953,9 @@ export function Viewport() {
       } else if (side === 'front') {
         target = new THREE.Vector3(cam.u, Math.max(0, -cam.v), mid[1])
         dir = new THREE.Vector3(0, 0, 1)
+      } else if (side === 'right') {
+        target = new THREE.Vector3(mid[0], Math.max(0, -cam.v), -cam.u)
+        dir = new THREE.Vector3(1, 0, 0)
       } else {
         target = new THREE.Vector3(mid[0], Math.max(0, -cam.v), cam.u)
         dir = new THREE.Vector3(-1, 0, 0)
@@ -986,7 +991,9 @@ export function Viewport() {
         const url = renderer.domElement.toDataURL('image/png')
         helper.visible = was
         return url
-      }
+      },
+      canvas: () => renderer.domElement,
+      setRecording: (on) => (recording = on)
     })
 
     // --- Keep the fixture action bar above the selection, on screen ---
@@ -1117,7 +1124,11 @@ export function Viewport() {
       controls.update()
       keepAboveFloor()
       placeHud()
+      const helper = gizmo.getHelper()
+      const shown = helper.visible
+      if (recording) helper.visible = false
       renderer.render(scene, camera)
+      helper.visible = shown
     }
     tick()
 

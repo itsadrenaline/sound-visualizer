@@ -18,6 +18,10 @@ export interface ViewHandlers {
   current(): { position: [number, number, number]; target: [number, number, number] }
   /** A PNG of the view as a data URL. */
   capture(): string
+  /** The 3D view's canvas, for recording a video of it. */
+  canvas(): HTMLCanvasElement
+  /** While recording, leave the move arrows out of the picture. */
+  setRecording(on: boolean): void
 }
 
 let handlers: ViewHandlers | null = null
@@ -33,5 +37,7 @@ export const view = {
   nudge: (kind: NudgeKind, x: number, y: number) => handlers?.nudge(kind, x, y),
   goTo: (p: [number, number, number], t: [number, number, number]) => handlers?.goTo(p, t),
   current: () => handlers?.current() ?? null,
-  capture: () => handlers?.capture() ?? null
+  capture: () => handlers?.capture() ?? null,
+  canvas: () => handlers?.canvas() ?? null,
+  setRecording: (on: boolean) => handlers?.setRecording(on)
 }

@@ -15,6 +15,7 @@ import { LengthField } from './LengthField'
 import { formatLength } from '../model/units'
 import { gridChoices, usePrefs, type PlanLabels, type PlanSide } from '../state/prefs'
 import { capturePlan } from './PlanView'
+import { PictureButton, RecordButton } from './MediaButtons'
 
 const PRESETS: Array<[ViewPreset, string, string]> = [
   ['perspective', 'Persp', '⇧1'],
@@ -102,9 +103,8 @@ export function ViewToolbar() {
       </div>
       <RoomMenu />
       <GridMenu />
-      <button data-tour="image" onClick={() => void saveViewImage()} title="Save the view as a PNG (Shift+Cmd+E)">
-        Image
-      </button>
+      <PictureButton onClick={() => void saveViewImage()} title="Save the view as a picture (PNG) (Shift+Cmd+E)" />
+      <RecordButton />
       <button data-tour="fullview" onClick={() => setFullView(!fullView)} className={fullView ? 'on' : ''} title="Hide the panels (Shift+Cmd+F)">
         {fullView ? 'Panels' : 'Full view'}
       </button>
@@ -196,7 +196,8 @@ function PlanToolbar() {
   const sides: Array<[PlanSide, string, string]> = [
     ['top', 'Top', '⇧2'],
     ['front', 'Front', '⇧3'],
-    ['side', 'Side', '⇧4']
+    ['left', 'Left', '⇧4'],
+    ['right', 'Right', '⇧5']
   ]
   return (
     <div className="view-toolbar">
@@ -225,9 +226,7 @@ function PlanToolbar() {
           </button>
         ))}
       </div>
-      <button onClick={() => void saveViewImage()} title="Save the Plan as a PNG, to send to the venue (Shift+Cmd+E)">
-        Image
-      </button>
+      <PictureButton onClick={() => void saveViewImage()} title="Save the Plan as a picture (PNG), to send to the venue (Shift+Cmd+E)" />
       <button onClick={() => setFullView(!fullView)} className={fullView ? 'on' : ''} title="Hide the panels (Shift+Cmd+F)">
         {fullView ? 'Panels' : 'Full view'}
       </button>

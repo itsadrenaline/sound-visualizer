@@ -1,18 +1,24 @@
 /**
  * The Plan: the show drawn flat, like a lighting plot. From the top (the default),
- * the front (as the audience sees it) or the side (from stage left).
+ * the front (as the audience sees it) or either side (from the left or the right, as in 3D).
  *
  * Every view maps the world onto two plan axes:
  *  - top:   u = x (left/right), v = z (back wall at the top, audience at the bottom)
  *  - front: u = x, v = -y (up is up)
- *  - side:  u = z (back wall on the left, audience on the right), v = -y
+ *  - left:  u = z (back wall on the left, audience on the right), v = -y
+ *  - right: u = -z (audience on the left, back wall on the right), v = -y
  */
 import { getFixtureType } from './fixtureTypes'
 import { footprint, heightOf, mountPoints, pointAt, STRUCTURE_KINDS, toWorld, type Category, type MountPoint, type Structure } from './structures'
 import type { Project, Vec3 } from './project'
 import type { LookKind } from './catalog'
 
-export type PlanSide = 'top' | 'front' | 'side'
+export type PlanSide = 'top' | 'front' | 'left' | 'right'
+
+/** Seen from the left or the right (not the top or the front). */
+export function isSideView(side: PlanSide): boolean {
+  return side === 'left' || side === 'right'
+}
 
 export interface PlanItem {
   id: string
@@ -42,6 +48,7 @@ export interface PlanItem {
 export function toPlan(side: PlanSide, p: Vec3): [number, number] {
   if (side === 'top') return [p[0], p[2]]
   if (side === 'front') return [p[0], -p[1]]
+  if (side === 'right') return [-p[2], -p[1]]
   return [p[2], -p[1]]
 }
 
@@ -49,6 +56,7 @@ export function toPlan(side: PlanSide, p: Vec3): [number, number] {
 export function planDelta(side: PlanSide, du: number, dv: number): Vec3 {
   if (side === 'top') return [du, 0, dv]
   if (side === 'front') return [du, -dv, 0]
+  if (side === 'right') return [0, -dv, -du]
   return [0, -dv, du]
 }
 
@@ -69,7 +77,7 @@ export function planItems(project: Project, side: PlanSide): PlanItem[] {
     if (side === 'top') items.push({ ...base, u: s.position[0], v: s.position[2], w, h: d, turn: -s.rotation, layer: info.ground ? 0 : 1 + s.position[1] + height / 100 })
     else {
       const [u] = toPlan(side, s.position)
-      items.push({ ...base, u, v: -(s.position[1] + height / 2), w: side === 'front' ? across : along, h: height, turn: 0, layer: info.ground ? 0 : 1 + (side === 'front' ? s.position[2] : -s.position[0]) / 100 })
+      items.push({ ...base, u, v: -(s.position[1] + height / 2), w: side === 'front' ? across : along, h: height, turn: 0, layer: info.ground ? 0 : 1 + (side === 'front' ? s.position[2] : side === 'right' ? s.position[0] : -s.position[0]) / 100 })
     }
   }
   for (const f of project.fixtures) {

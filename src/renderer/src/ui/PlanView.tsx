@@ -17,7 +17,7 @@ import { useLibrary } from '../state/library'
 import { getFixtureType } from '../model/fixtureTypes'
 import { roomFit } from '../model/physics'
 import { roomOf } from '../model/project'
-import { itemAt, majorSpacing, mountNear, planBounds, planDelta, planItems, toPlan, type PlanItem, type PlanMount } from '../model/plan'
+import { isSideView, itemAt, majorSpacing, mountNear, planBounds, planDelta, planItems, toPlan, type PlanItem, type PlanMount } from '../model/plan'
 import { movingRoots, withRiders } from '../model/arrange'
 import { formatLength } from '../model/units'
 import { STRUCTURE_DRAG, type StructureDrag } from './ObjectsPanel'
@@ -101,7 +101,7 @@ export function PlanView() {
       const room: PlanItem[] =
         side === 'top'
           ? [{ id: 'room', kind: 'structure', u: 0, v: (fit.wallZ + Math.min(fit.front, 8)) / 2, w: 12, h: Math.min(fit.front, 8) - fit.wallZ, turn: 0, label: '', locked: false, layer: 0 }]
-          : [{ id: 'room', kind: 'structure', u: side === 'front' ? 0 : (fit.wallZ + 8) / 2, v: -2, w: 12, h: 4, turn: 0, label: '', locked: false, layer: 0 }]
+          : [{ id: 'room', kind: 'structure', u: side === 'front' ? 0 : ((side === 'right' ? -1 : 1) * (fit.wallZ + 8)) / 2, v: -2, w: 12, h: 4, turn: 0, label: '', locked: false, layer: 0 }]
       const b = planBounds(chosen.length ? chosen : room)!
       const pad = chosen.length === 1 ? 2 : 1.5
       const scale = Math.max(8, Math.min(400, Math.min(size.w / (b.maxU - b.minU + pad * 2), (size.h - 70) / (b.maxV - b.minV + pad * 2))))
@@ -482,8 +482,9 @@ export function PlanView() {
     if (gesture.kind !== 'move' || !gesture.moved) return null
     const a = ghostOf(gesture.anchor)
     const [lu, lv] = side === 'top' ? ['X', 'Z'] : side === 'front' ? ['X', 'H'] : ['Z', 'H']
+    const uu = side === 'right' ? -a.u : a.u
     const vv = side === 'top' ? a.v : -a.v
-    return { x: sx(a.u), y: sy(a.v) - (a.h * c.scale) / 2 - 12, text: `${lu} ${formatLength(a.u)}   ${lv} ${formatLength(side === 'top' ? vv : vv - a.h / 2)}` }
+    return { x: sx(a.u), y: sy(a.v) - (a.h * c.scale) / 2 - 12, text: `${lu} ${formatLength(uu)}   ${lv} ${formatLength(side === 'top' ? vv : vv - a.h / 2)}` }
   })()
 
   return (
@@ -520,10 +521,10 @@ export function PlanView() {
         </>
       ) : (
         <>
-          <rect x={sx(side === 'front' ? -fit.halfWidth : fit.wallZ)} y={sy(-(ceiling ?? fit.ceiling))} width={(side === 'front' ? fit.halfWidth * 2 : fit.front - fit.wallZ) * c.scale} height={(ceiling ?? fit.ceiling) * c.scale} className="plan-floor" />
+          <rect x={sx(side === 'front' ? -fit.halfWidth : side === 'right' ? -fit.front : fit.wallZ)} y={sy(-(ceiling ?? fit.ceiling))} width={(side === 'front' ? fit.halfWidth * 2 : fit.front - fit.wallZ) * c.scale} height={(ceiling ?? fit.ceiling) * c.scale} className="plan-floor" />
           <line x1={0} x2={size.w} y1={sy(0)} y2={sy(0)} className="plan-wall" />
-          {ceiling !== null && <line x1={sx(side === 'front' ? -fit.halfWidth : fit.wallZ)} x2={sx(side === 'front' ? fit.halfWidth : fit.front)} y1={sy(-ceiling)} y2={sy(-ceiling)} className="plan-ceiling" />}
-          {side === 'side' && <line x1={sx(fit.wallZ)} x2={sx(fit.wallZ)} y1={sy(0)} y2={sy(-(ceiling ?? fit.ceiling))} className="plan-wall" />}
+          {ceiling !== null && <line x1={sx(side === 'front' ? -fit.halfWidth : side === 'right' ? -fit.front : fit.wallZ)} x2={sx(side === 'front' ? fit.halfWidth : side === 'right' ? -fit.wallZ : fit.front)} y1={sy(-ceiling)} y2={sy(-ceiling)} className="plan-ceiling" />}
+          {isSideView(side) && <line x1={sx(side === 'right' ? -fit.wallZ : fit.wallZ)} x2={sx(side === 'right' ? -fit.wallZ : fit.wallZ)} y1={sy(0)} y2={sy(-(ceiling ?? fit.ceiling))} className="plan-wall" />}
         </>
       )}
 
@@ -536,7 +537,7 @@ export function PlanView() {
           <line key={`mv${y}`} y1={sy(y)} y2={sy(y)} x1={0} x2={size.w} className="minor" />
         ))}
         {majorU.map((x) => (
-          <line key={`Mu${x}`} x1={sx(x)} x2={sx(x)} y1={0} y2={size.h} className={Math.abs(x) < 1e-9 && side !== 'side' ? 'centre' : 'major'} />
+          <line key={`Mu${x}`} x1={sx(x)} x2={sx(x)} y1={0} y2={size.h} className={Math.abs(x) < 1e-9 && !isSideView(side) ? 'centre' : 'major'} />
         ))}
         {majorV.map((y) => (
           <line key={`Mv${y}`} y1={sy(y)} y2={sy(y)} x1={0} x2={size.w} className="major" />
@@ -650,7 +651,7 @@ export function PlanView() {
       <g className="plan-ruler">
         {rulerU.filter((x) => sx(x) < size.w - 190).map((x) => (
           <text key={`ru${x}`} x={sx(x) + 3} y={size.h - 8}>
-            {short(x)}
+            {short(side === 'right' ? -x : x)}
           </text>
         ))}
         {rulerV.map((y) => (
@@ -660,7 +661,7 @@ export function PlanView() {
         ))}
       </g>
       <text x={size.w - 10} y={size.h - 104} textAnchor="end" className="plan-scale">
-        {side === 'top' ? 'Top' : side === 'front' ? 'Front' : 'Side'} · grid {formatLength(gridSize, 'length')}
+        {side === 'top' ? 'Top' : side === 'front' ? 'Front' : side === 'left' ? 'Left' : 'Right'} · grid {formatLength(gridSize, 'length')}
         {snap ? ' · snapping' : ''}
       </text>
     </svg>

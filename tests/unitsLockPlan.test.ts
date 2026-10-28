@@ -8,7 +8,7 @@ import { addLibraryFixtures, addStructure, alignFixtures, moveSelection, rotateS
 import { blankProject } from '../src/renderer/src/model/project'
 import { settle } from '../src/renderer/src/model/physics'
 import { defaultName, FT } from '../src/renderer/src/model/structures'
-import { itemAt, mountNear, planDelta, planItems } from '../src/renderer/src/model/plan'
+import { itemAt, mountNear, planDelta, planItems, toPlan } from '../src/renderer/src/model/plan'
 import { listFixtureTypes } from '../src/renderer/src/model/fixtureTypes'
 
 describe('Lengths in metric or imperial', () => {
@@ -121,7 +121,11 @@ describe('The Plan', () => {
   it('turns moves on the plan into moves in the room', () => {
     expect(planDelta('top', 1, 2)).toEqual([1, 0, 2])
     expect(planDelta('front', 1, -2)).toEqual([1, 2, 0])
-    expect(planDelta('side', 1, -2)).toEqual([0, 2, 1])
+    expect(planDelta('left', 1, -2)).toEqual([0, 2, 1])
+    expect(planDelta('right', 1, -2)).toEqual([0, 2, -1])
+    // Each side view sees the room mirrored: the audience on the right from the left, on the left from the right.
+    expect(toPlan('left', [0, 1, 3])).toEqual([3, -1])
+    expect(toPlan('right', [0, 1, 3])).toEqual([-3, -1])
   })
 
   it('finds the totem top or truss bar under a dragged fixture', () => {

@@ -15,6 +15,7 @@ import { view } from './viewBus'
 import { useWizards } from './wizards'
 import { useTour } from './tours'
 import { saveViewImage } from '../ui/ViewToolbar'
+import { useRecorder } from './recorder'
 import { exportCsv, exportMvr, importShowInto, openMvr, startFromTemplate } from './shows'
 
 export function runCommand(command: string): void {
@@ -82,6 +83,9 @@ export function runCommand(command: string): void {
       return void importFixtureFile()
     case 'saveImage':
       return void saveViewImage()
+    case 'recordVideo':
+      if (usePrefs.getState().view === 'plan' && !useRecorder.getState().recording) prefs.setView('3d')
+      return useRecorder.getState().toggle()
     case 'undo':
       return undo()
     case 'redo':
@@ -110,9 +114,9 @@ export function runCommand(command: string): void {
     case 'viewFront':
       return plan ? prefs.setPlanSide('front') : view.preset('front')
     case 'viewLeft':
-      return plan ? prefs.setPlanSide('side') : view.preset('left')
+      return plan ? prefs.setPlanSide('left') : view.preset('left')
     case 'viewRight':
-      return plan ? prefs.setPlanSide('side') : view.preset('right')
+      return plan ? prefs.setPlanSide('right') : view.preset('right')
     case 'viewUp':
       return view.preset('up')
     case 'toolSelect':
