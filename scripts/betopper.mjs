@@ -674,24 +674,25 @@ fixtures['lb295'] = {
 
 {
   const zones = ['Zone 1', 'Zone 2', 'Zone 3']
-  const aux = cellKeys(19, 'Aux ')
+  // The 6 small RGB LEDs round each of the 19 lenses ("aux"): all together, or one ring per lens.
+  const rings = cellKeys(19, 'Lens Ring ')
+  const ringGroup = (order) => ({ insert: 'matrixChannels', repeatFor: ['Lens Ring'], channelOrder: 'perPixel', templateChannels: order })
   const head = ['Pan', 'Pan fine', 'Tilt', 'Tilt fine', 'Pan/Tilt Speed', 'Zoom', 'Dimmer', 'Strobe']
-  const auxBlock = ['Aux Dimmer', 'Aux Strobe', 'Aux Red', 'Aux Green', 'Aux Blue', 'Aux Effect', 'Aux Characters']
+  const auxBlock = [ringGroup(['$pixelKey Dimmer', '$pixelKey Strobe', '$pixelKey Red', '$pixelKey Green', '$pixelKey Blue']), 'Aux Effect', 'Aux Characters']
   const stripBlock = [halo(['$pixelKey Dimmer', '$pixelKey Strobe', '$pixelKey Red', '$pixelKey Green', '$pixelKey Blue']), 'Strip Effect', 'Strip Speed', 'Control']
   fixtures['lm1915p'] = {
     name: 'LM1915P 19×15W RGBW Pixel Wash Moving Head with Halo Ring',
     categories: ['Moving Head', 'Color Changer'],
-    comment: 'From the LM1915P user manual (30, 38 and 99 channels). Each of the 19 LEDs has a ring of RGB LEDs ("aux", which can also show letters), and a halo strip ("strip") runs round the head. In 99-channel mode the three LED zones and the 19 aux rings are controlled one by one.',
+    comment: 'From the LM1915P user manual (30, 38 and 99 channels). Each of the 19 LEDs has a ring of 6 small RGB LEDs ("aux", 114 in all, which can also show letters): these are the "Lens Ring" parts. A halo strip ("strip") runs round the head. In 99-channel mode the three LED zones and the 19 lens rings are controlled one by one; the aux master dimmer, strobe and colour still apply.',
     links: { manual: [STORE] },
-    physical: { dimensions: [325, 430, 210], weight: 6.5, power: 300, bulb: { type: '19 × 15W RGBW 4-in-1 LEDs + RGB rings + halo strip' }, lens: { degreesMinMax: [15, 40] } },
-    matrix: { pixelKeys: [[[...zones, ...aux, 'Halo']]] },
+    physical: { dimensions: [325, 430, 210], weight: 6.5, power: 300, bulb: { type: '19 × 15W RGBW 4-in-1 LEDs + 114 × 0.2W RGB lens rings + halo strip' }, lens: { degreesMinMax: [15, 40] } },
+    matrix: { pixelKeys: [[[...zones, 'Lens Ring', ...rings, 'Halo']]] },
     availableChannels: {
       Pan: pan(540), Tilt: tilt(270), 'Pan/Tilt Speed': ptSpeed(), Zoom: zoom(15, 40), Dimmer: intensity(), Strobe: strobeFrom(10),
       Red: color('Red'), Green: color('Green'), Blue: color('Blue'), White: color('White'),
       CTO: caps(cap(0, 255, { type: 'ColorTemperature', colorTemperatureStart: 'warm', colorTemperatureEnd: 'cold' })),
       'RGBW Effect': program(...Array.from({ length: 15 }, (_, i) => [16 + i * 16, 31 + i * 16, `Auto ${i + 1}`])),
       'RGBW Speed': speed('RGBW effect speed'),
-      'Aux Dimmer': generic('Aux rings: master'), 'Aux Strobe': generic('Aux rings: strobe'), 'Aux Red': color('Red'), 'Aux Green': color('Green'), 'Aux Blue': color('Blue'),
       'Aux Effect': program([8, 15, 'Letters (Aux Characters)'], [16, 253, 'Aux auto 1-119'], [254, 255, 'Aux auto, all']),
       'Aux Characters': generic('Aux letter / effect selection and speed'),
       'Strip Effect': program(...Array.from({ length: 31 }, (_, i) => [8 + i * 8, 15 + i * 8, `Strip auto ${i + 1}`])),
@@ -702,7 +703,7 @@ fixtures['lb295'] = {
     modes: [
       { name: '30-channel', shortName: '30ch', channels: [...head, 'Red', 'Green', 'Blue', 'White', 'CTO', 'RGBW Effect', 'RGBW Speed', ...auxBlock, ...stripBlock] },
       { name: '38-channel', shortName: '38ch', channels: [...head, ...[perCell(zones, ['$pixelKey Red', '$pixelKey Green', '$pixelKey Blue', '$pixelKey White'])], 'CTO', 'RGBW Effect', 'RGBW Speed', ...auxBlock, ...stripBlock] },
-      { name: '99-channel', shortName: '99ch', channels: [...head, 'Red', 'Green', 'Blue', 'White', 'CTO', 'RGBW Effect', 'RGBW Speed', ...auxBlock, ...stripBlock, ...[perCell(zones, ['$pixelKey Red', '$pixelKey Green', '$pixelKey Blue', '$pixelKey White'])], perCell(aux, ['$pixelKey Red', '$pixelKey Green', '$pixelKey Blue'])] }
+      { name: '99-channel', shortName: '99ch', channels: [...head, 'Red', 'Green', 'Blue', 'White', 'CTO', 'RGBW Effect', 'RGBW Speed', ...auxBlock, ...stripBlock, ...[perCell(zones, ['$pixelKey Red', '$pixelKey Green', '$pixelKey Blue', '$pixelKey White'])], perCell(rings, ['$pixelKey Red', '$pixelKey Green', '$pixelKey Blue'])] }
     ]
   }
 }

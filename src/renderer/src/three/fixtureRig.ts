@@ -40,6 +40,14 @@ function glowMaterial(): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false })
 }
 
+/** A part that is one of the small LED rings round a lens, not the big ring round the head. */
+function isLensRing(name: string): boolean {
+  return /^lens\s*ring/i.test(name)
+}
+function ringNumber(name: string): number {
+  return Number(/(\d+)$/.exec(name)?.[1] ?? 0)
+}
+
 function setGlow(m: THREE.MeshBasicMaterial, c: [number, number, number], k: number): void {
   // Boost brightness but never past full on the brightest channel, so the hue is
   // kept (clipping each channel separately would turn red into orange, mixes into white).
@@ -715,6 +723,35 @@ export class FixtureRig {
     return new LaserEmitter(holder, !!this.heads[i].ch.laser, own || other >= 0, this.spec.look === 'laser' ? this.spec.apertures ?? 1 : 1, this.spec.size[0])
   }
 
+  /**
+   * The small LED rings round each lens (Betopper LM1915P "aux"): no beam, just their
+   * colour and brightness on the face, so you can see the colour you picked. "Lens Ring"
+   * lights them all; "Lens Ring 1", "Lens Ring 2"… one each, falling back to "Lens Ring"
+   * while their own colour is off.
+   */
+  private buildLensRings(plate: THREE.Group, dots: THREE.Mesh[], lensSize: number): void {
+    const ringHeads = this.headIndex((x) => x.role === 'halo' && isLensRing(x.name))
+    if (!ringHeads.length) return
+    const group = ringHeads.find((i) => !/\d$/.test(this.heads[i].name))
+    const each = ringHeads.filter((i) => /\d$/.test(this.heads[i].name)).sort((a, b) => ringNumber(this.heads[a].name) - ringNumber(this.heads[b].name))
+    const rings = dots.map((dot) => {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(lensSize * 1.3, lensSize * 0.14, 6, 24))
+      ring.rotation.x = Math.PI / 2
+      ring.position.set(dot.position.x, 0.001, dot.position.z)
+      plate.add(ring)
+      return ring
+    })
+    if (each.length) {
+      each.forEach((i, k) => {
+        this.emitters[i] = new GlowEmitter(rings.filter((_, d) => d % each.length === k), 2.2)
+        if (group !== undefined) this.ringFallback.set(i, group)
+      })
+    } else if (group !== undefined) this.emitters[group] = new GlowEmitter(rings, 2.2)
+  }
+
+  /** Lens rings whose own colour is off show their group's ("Lens Ring") instead. */
+  private ringFallback = new Map<number, number>()
+
   private build(): void {
     const s = this.spec
     const [w, h, d] = s.size
@@ -802,10 +839,11 @@ export class FixtureRig {
             this.dotsFollow = new GlowEmitter(dots, 3)
             this.dotsHead = main
           }
+          this.buildLensRings(plate, dots, lensSize)
         }
         // A halo ring around the lens: its own head if the fixture has one, else follows the beam.
         // A ring in segments (each with its own colour) is drawn as that many arcs.
-        const halos = this.headIndex((x) => x.role === 'halo')
+        const halos = this.headIndex((x) => x.role === 'halo' && !isLensRing(x.name))
         if (s.halo || halos.length) {
           const n = Math.max(1, halos.length)
           const arcs = Array.from({ length: n }, (_, k) => {
@@ -1499,7 +1537,9 @@ export class FixtureRig {
       m.tilt.rotation.x = m.tiltAngle * DEG
     }
     this.emitters.forEach((e, i) => {
-      const own = states[i] ?? DARK
+      let own = states[i] ?? DARK
+      const fallback = this.ringFallback.get(i)
+      if (fallback !== undefined && own.intensity < 0.01) own = states[fallback] ?? DARK
       const from = this.colourFrom.get(i)
       const c = from !== undefined ? states[from] : undefined
       e?.update(c ? { ...own, color: c.color, colours: c.colours } : own, haze, time)
