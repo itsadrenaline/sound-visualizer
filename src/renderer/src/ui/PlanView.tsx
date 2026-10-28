@@ -23,14 +23,9 @@ import { formatLength } from '../model/units'
 import { STRUCTURE_DRAG, type StructureDrag } from './ObjectsPanel'
 import { DRAG_TYPE, type DragPayload } from './LibraryPanel'
 import { useStructureEditor } from './StructureActions'
+import { planNudge, usePlanCam, type PlanCam } from '../state/planCamera'
 
-interface Cam {
-  /** Plan point at the middle of the view. */
-  u: number
-  v: number
-  /** Pixels per metre. */
-  scale: number
-}
+type Cam = PlanCam
 
 const CATEGORY_FILL: Record<string, string> = {
   'Stands & totems': '#5b6577',
@@ -75,7 +70,9 @@ export function PlanView() {
   const { units, grid, snap, gridSize, planSide: side, planLabels } = usePrefs()
   const svgRef = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 800, h: 600 })
-  const [cam, setCam] = useState<Cam | null>(null)
+  const cam = usePlanCam((st) => st.cam)
+  const camSide = usePlanCam((st) => st.side)
+  const setCam = usePlanCam((st) => st.setCam)
   const [gesture, setGesture] = useState<Gesture>({ kind: 'none' })
   const space = useRef(false)
 
@@ -86,9 +83,14 @@ export function PlanView() {
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth || 800, h: el.clientHeight || 600 }))
+    const measure = () => {
+      const next = { w: el.clientWidth || 800, h: el.clientHeight || 600 }
+      setSize(next)
+      usePlanCam.getState().setSize(next)
+    }
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
-    setSize({ w: el.clientWidth || 800, h: el.clientHeight || 600 })
+    measure()
     return () => ro.disconnect()
   }, [])
 
@@ -103,18 +105,16 @@ export function PlanView() {
       const b = planBounds(chosen.length ? chosen : room)!
       const pad = chosen.length === 1 ? 2 : 1.5
       const scale = Math.max(8, Math.min(400, Math.min(size.w / (b.maxU - b.minU + pad * 2), (size.h - 70) / (b.maxV - b.minV + pad * 2))))
-      setCam({ u: (b.minU + b.maxU) / 2, v: (b.minV + b.maxV) / 2 - 28 / scale, scale })
+      setCam({ u: (b.minU + b.maxU) / 2, v: (b.minV + b.maxV) / 2 - 28 / scale, scale }, side)
     },
     [items, side, fit, size.w, size.h]
   )
-  // Frame everything when the Plan opens and when the side changes.
-  const framedFor = useRef('')
+  // Frame everything when the side changes. Coming from 3D, the view carries across
+  // (set by the 3D view as it hands over), so it isn't framed afresh.
   useEffect(() => {
-    const key = `${side}|${size.w > 0}`
-    if (framedFor.current === key && cam) return
-    framedFor.current = key
+    if (cam && camSide === side) return
     frame('all')
-  }, [side, size.w, frame, cam])
+  }, [side, camSide, frame, cam])
   useEffect(() => {
     const onFocus = (e: Event) => frame((e as CustomEvent).detail as string[] | 'all')
     window.addEventListener('plan:focus', onFocus)
@@ -177,7 +177,21 @@ export function PlanView() {
         e.preventDefault()
         return
       }
+      // + and − zoom; arrows slide the view when nothing is selected (they move the selection otherwise).
+      if (!e.metaKey && !e.ctrlKey && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_')) {
+        e.preventDefault()
+        return planNudge('zoom', 0, e.key === '+' || e.key === '=' ? 1 : -1)
+      }
+      if (e.key === 'Home' && !e.metaKey) {
+        e.preventDefault()
+        return frame('all')
+      }
       const { selection: sel } = useStore.getState()
+      const pans: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }
+      if (pans[e.key] && !sel.length && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        return planNudge('pan', pans[e.key][0], pans[e.key][1])
+      }
       const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
       const dir = arrows[e.key]
       if (dir && sel.length && !e.metaKey && !e.ctrlKey) {
@@ -208,7 +222,7 @@ export function PlanView() {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onUp)
     }
-  }, [side, project])
+  }, [side, project, frame])
 
   // --- Wheel: zoom (mouse wheel, pinch); two-finger scroll pans ---
   useEffect(() => {
@@ -645,7 +659,7 @@ export function PlanView() {
           </text>
         ))}
       </g>
-      <text x={size.w - 10} y={size.h - 10} textAnchor="end" className="plan-scale">
+      <text x={size.w - 10} y={size.h - 104} textAnchor="end" className="plan-scale">
         {side === 'top' ? 'Top' : side === 'front' ? 'Front' : 'Side'} · grid {formatLength(gridSize, 'length')}
         {snap ? ' · snapping' : ''}
       </text>
