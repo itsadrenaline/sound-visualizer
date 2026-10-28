@@ -15,6 +15,7 @@ export type MenuCommand =
   | 'showLibrary' | 'showFixtures' | 'toolSelect' | 'toolMove' | 'toolOrbit'
   | 'welcome' | 'builder' | 'importShow' | 'openMvr' | 'exportMvr' | 'exportCsv' | `template:${string}`
   | 'freshStart' | 'tours' | `tour:${string}` | 'about'
+  | 'toggleLock' | 'view3d' | 'togglePlan' | 'toggleGrid' | 'toggleSnap' | 'unitsMetric' | 'unitsImperial'
 
 export function buildMenu(getWindow: () => BrowserWindow | null): void {
   const send = (command: MenuCommand) => () => getWindow()?.webContents.send('menu', command)
@@ -87,12 +88,26 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
         { role: 'paste' },
         { type: 'separator' },
         { label: 'Select All Fixtures', accelerator: 'CmdOrCtrl+A', registerAccelerator: false, click: send('selectAll') },
-        { label: 'Duplicate', accelerator: 'CmdOrCtrl+D', registerAccelerator: false, click: send('duplicate') }
+        { label: 'Duplicate', accelerator: 'CmdOrCtrl+D', registerAccelerator: false, click: send('duplicate') },
+        { label: 'Lock / Unlock', accelerator: 'Shift+CmdOrCtrl+L', registerAccelerator: false, click: send('toggleLock') }
       ]
     },
     {
       label: 'View',
       submenu: [
+        { label: '3D View', click: send('view3d') },
+        { label: 'Plan View (3D ↔ Plan)', accelerator: 'P', registerAccelerator: false, click: send('togglePlan') },
+        { type: 'separator' },
+        { label: 'Show Grid', click: send('toggleGrid') },
+        { label: 'Snap to Grid', accelerator: 'G', registerAccelerator: false, click: send('toggleSnap') },
+        {
+          label: 'Units',
+          submenu: [
+            { label: 'Metric (m, mm)', click: send('unitsMetric') },
+            { label: 'Imperial (ft, in)', click: send('unitsImperial') }
+          ]
+        },
+        { type: 'separator' },
         { label: 'Select Tool', accelerator: 'V', registerAccelerator: false, click: send('toolSelect') },
         { label: 'Move Tool', accelerator: 'W', registerAccelerator: false, click: send('toolMove') },
         { label: 'Orbit Tool (or hold Space)', accelerator: 'O', registerAccelerator: false, click: send('toolOrbit') },

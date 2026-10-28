@@ -26,6 +26,8 @@ export interface Fixture {
   position: Vec3
   /** Hanging fixtures are mounted upside down on a truss. */
   mounting: 'hanging' | 'floor'
+  /** Locked: it can't be moved, turned or re-aimed by hand until it's unlocked. */
+  locked?: boolean
   /** Fixed aim for fixtures that can't move, degrees from straight down (hanging) or up (floor). */
   aimTilt: number
   /** Turn the whole fixture around its vertical axis, degrees. */

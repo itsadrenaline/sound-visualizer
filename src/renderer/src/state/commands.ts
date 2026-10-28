@@ -4,10 +4,13 @@
  */
 import { useStore } from './store'
 import { useMix } from './mix'
+import { notify } from './notices'
+import type { Units } from '../model/units'
+import { usePrefs } from './prefs'
 import { hasOwnStand, specFor } from '../model/catalog'
 import { getFixtureType, plainName, type FixtureType } from '../model/fixtureTypes'
 import { defaultProject, footprint, newId, nextFreeAddress, planPatch, roomOf, type Fixture, type Project, type RoomSettings, type Vec3 } from '../model/project'
-import { defaultName, footprint as structureFootprint, mountPoints, STRUCTURE_KINDS, type Structure, type StructureKind, type StructureParams } from '../model/structures'
+import { defaultName, isAutoName, renamedForUnits, footprint as structureFootprint, mountPoints, STRUCTURE_KINDS, type Structure, type StructureKind, type StructureParams } from '../model/structures'
 import { projectFromSoundSwitch, soundswitchKeyOf, syncKey, typeIdFor } from '../model/soundswitchImport'
 import { autoLayout, distribute, type Shape, type Where } from '../model/layout'
 import { ceilingOf, nearestMount } from '../model/physics'
@@ -208,6 +211,7 @@ function selected(ids: string[]): Fixture[] {
 
 /** Line the fixtures up on one axis: at the lowest, the middle or the highest of them. */
 export function alignFixtures(ids: string[], axis: Axis, to: 'min' | 'center' | 'max'): void {
+  ids = unlockedIds(ids)
   const list = selected(ids)
   if (list.length < 2) return
   const values = list.map((f) => f.position[axis])
@@ -221,6 +225,7 @@ export function alignFixtures(ids: string[], axis: Axis, to: 'min' | 'center' | 
 
 /** Space the fixtures evenly between the two outermost ones, keeping their order. */
 export function spreadEven(ids: string[], axis: Axis): void {
+  ids = unlockedIds(ids)
   const list = selected(ids).sort((a, b) => a.position[axis] - b.position[axis])
   if (list.length < 3) return
   const first = list[0].position[axis]
@@ -293,6 +298,7 @@ export function selectSameType(ids: string[]): void {
 
 /** Move fixtures by a delta (dragging in the 3D view). */
 export function moveFixtures(ids: string[], delta: Vec3): void {
+  ids = unlockedIds(ids)
   if (!delta.some((d) => Math.abs(d) > 1e-6)) return
   updateFixtures(ids, ids.length === 1 ? 'Move fixture' : `Move ${ids.length} fixtures`, (f) => ({
     ...f,
@@ -342,11 +348,56 @@ export function setGroup(ids: string[], group: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// Locking: locked fixtures and objects aren't moved, turned or resized by hand
+// ---------------------------------------------------------------------------
+
+/** Every locked id in the show. */
+function lockedIds(p: Project): Set<string> {
+  return new Set([...p.fixtures, ...structuresOf(p)].filter((x) => x.locked).map((x) => x.id))
+}
+
+/** The ids that aren't locked. Says so (once) when some were left where they are. */
+export function unlockedIds(ids: string[]): string[] {
+  const locked = lockedIds(store().project)
+  const out = ids.filter((id) => !locked.has(id))
+  const kept = ids.length - out.length
+  if (kept) notify('info', `${kept === 1 ? 'One item is' : `${kept} items are`} locked and stayed where ${kept === 1 ? 'it is' : 'they are'}. Right-click ▸ Unlock to move ${kept === 1 ? 'it' : 'them'}.`)
+  return out
+}
+
+/** After switching between metric and imperial: objects with automatic names ("Totem 6 ft") are renamed to match. */
+export function renameForUnits(to: Units): void {
+  const list = structuresOf(store().project)
+  const renames = new Map(list.map((s) => [s.id, renamedForUnits(s, to)] as const).filter(([, n]) => n !== null) as Array<[string, string]>)
+  if (![...renames].some(([id, n]) => list.find((s) => s.id === id)!.name !== n)) return
+  store().apply('Names in the new units', (p) => ({ ...p, structures: structuresOf(p).map((s) => (renames.has(s.id) ? { ...s, name: renames.get(s.id)! } : s)) }), { merge: true })
+}
+
+/** Lock or unlock fixtures and objects. */
+export function setLocked(ids: string[], locked: boolean): void {
+  const set = new Set(ids)
+  const n = ids.length
+  store().apply(`${locked ? 'Lock' : 'Unlock'} ${n === 1 ? 'item' : `${n} items`}`, (p) => ({
+    ...p,
+    fixtures: p.fixtures.map((f) => (set.has(f.id) ? { ...f, locked: locked || undefined } : f)),
+    structures: structuresOf(p).map((s) => (set.has(s.id) ? { ...s, locked: locked || undefined } : s))
+  }))
+}
+
+/** Lock the selection, or unlock it if it's all locked already (⌘L in the 3D view). */
+export function toggleLocked(ids: string[]): void {
+  if (!ids.length) return
+  const locked = lockedIds(store().project)
+  setLocked(ids, !ids.every((id) => locked.has(id)))
+}
+
+// ---------------------------------------------------------------------------
 // Distributing (no dragging each fixture by hand)
 // ---------------------------------------------------------------------------
 
 /** Spread the fixtures evenly: a line, arc, circle or grid, on the truss, the floor or where they are. */
 export function distributeFixtures(ids: string[], shape: Shape, where: Where, width?: number): void {
+  ids = unlockedIds(ids)
   const list = selected(ids)
   if (!list.length) return
   const spots = distribute(list, (f) => getFixtureType(f.typeId), shape, where, width)
@@ -355,6 +406,7 @@ export function distributeFixtures(ids: string[], shape: Shape, where: Where, wi
 
 /** Put fixtures where the automatic layout would: movers on the truss, tubes at the back, and so on. */
 export function autoPlaceFixtures(ids: string[]): void {
+  ids = unlockedIds(ids)
   const list = selected(ids)
   if (!list.length) return
   const spots = autoLayout(list, (f) => getFixtureType(f.typeId))
@@ -424,9 +476,10 @@ export function updateStructures(ids: string[], label: string, change: (s: Struc
 
 /** Change size or options; the name follows if it was the automatic one. */
 export function setStructureParams(ids: string[], change: StructureParams): void {
+  ids = unlockedIds(ids)
   updateStructures(ids, 'Change object', (s) => {
     const params = { ...s.params, ...change }
-    const auto = s.name === defaultName(s.kind, s.params)
+    const auto = isAutoName(s)
     return { ...s, params, name: auto ? defaultName(s.kind, params) : s.name }
   }, true)
 }
@@ -437,6 +490,7 @@ export function moveStructures(ids: string[], delta: Vec3): void {
 }
 
 export function rotateStructures(ids: string[], degrees: number): void {
+  ids = unlockedIds(ids)
   updateStructures(ids, 'Turn object', (s) => ({ ...s, rotation: (((s.rotation + degrees) % 360) + 540) % 360 - 180 }))
 }
 
@@ -550,6 +604,7 @@ export function duplicateStructures(ids: string[]): void {
  * `point` can be a mount point id or a kind ('top', 'under', 'clamp', 'face').
  */
 export function mountFixtures(ids: string[], structure: string, point: string, t = 0.5): boolean {
+  ids = unlockedIds(ids)
   const p = store().project
   const plan = planMount(p, p.fixtures.filter((f) => ids.includes(f.id)), structure, point, t)
   if (!plan) return false
@@ -592,6 +647,7 @@ export function planMount(p: Project, list: Fixture[], structure: string, point:
 
 /** Take fixtures off what they're attached to; they stand on whatever is below. */
 export function detachFixtures(ids: string[]): void {
+  ids = unlockedIds(ids)
   const list = store().project.fixtures.filter((f) => ids.includes(f.id) && f.mount)
   if (!list.length) return
   updateFixtures(list.map((f) => f.id), list.length === 1 ? `Detach ${list[0].name}` : `Detach ${list.length} fixtures`, (f) => {
@@ -610,6 +666,7 @@ export function detachFixtures(ids: string[]): void {
  * names of fixtures that had nothing to hang from.
  */
 export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[] {
+  ids = unlockedIds(ids)
   const p = store().project
   const list = p.fixtures.filter((f) => ids.includes(f.id) && f.mounting !== to)
   const changes = new Map<string, Partial<Fixture>>()
@@ -657,6 +714,7 @@ export function orientFixtures(ids: string[], to: 'hanging' | 'floor'): string[]
  * or a PAR on a ceiling hook). Returns false when the room has no ceiling.
  */
 export function hangFromCeiling(ids: string[], at?: { id: string; x: number; z: number }): boolean {
+  ids = unlockedIds(ids)
   const ceiling = ceilingOf(store().project)
   if (ceiling === null) return false
   // Dragged onto the ceiling: the one you dragged lands at `at`, the others keep their spacing.
@@ -673,6 +731,7 @@ export function hangFromCeiling(ids: string[], at?: { id: string; x: number; z: 
 
 /** Take fixtures down from the ceiling (dragged down onto the floor): they stand upright where they're put. */
 export function standOnFloor(ids: string[], at: { id: string; x: number; z: number }): void {
+  ids = unlockedIds(ids)
   const lead = store().project.fixtures.find((f) => f.id === at.id)
   const dx = lead ? at.x - lead.position[0] : 0
   const dz = lead ? at.z - lead.position[2] : 0
@@ -868,6 +927,7 @@ export function panelSize(f: Fixture): [number, number] {
  * like the front of a DJ booth.
  */
 export function joinPanels(ids: string[]): boolean {
+  ids = unlockedIds(ids)
   const list = selected(ids).filter(isAcrylicPanel)
   if (list.length < 2) return false
   const first = list.reduce((a, b) => (b.position[0] < a.position[0] ? b : a))
@@ -893,6 +953,7 @@ export function joinPanels(ids: string[]): boolean {
 
 /** Set acrylic panels' size or frame colour. */
 export function setPanel(ids: string[], change: NonNullable<Fixture['panel']>): void {
+  ids = unlockedIds(ids)
   updateFixtures(ids, 'Change panel', (f) => ({ ...f, panel: { ...f.panel, ...change } }))
 }
 
@@ -907,3 +968,8 @@ export function restoreSoundSwitchFixtures(): void {
   void import('./soundswitchLink').then((m) => m.useSoundSwitch.getState().syncNow())
 }
 
+
+// Objects with automatic names follow a switch between metric and imperial.
+usePrefs.subscribe((s, prev) => {
+  if (s.units !== prev.units) renameForUnits(s.units)
+})

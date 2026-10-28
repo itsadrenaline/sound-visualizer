@@ -16,7 +16,8 @@ import {
   mountFixtures,
   rotateStructures,
   setStructureParams,
-  updateStructures
+  updateStructures,
+  toggleLocked
 } from '../state/commands'
 import { FT, mountPoints, NEON_COLOURS, nearestOn, paramsOf, SCREEN_CONTENT, STRUCTURE_KINDS, toLocal, TRUSS_OPTIONS, type Cover, type MountPoint, type ParamField, type Structure } from '../model/structures'
 import { notify } from '../state/notices'
@@ -26,7 +27,11 @@ import { view } from '../state/viewBus'
 import { Icon } from './ObjectsPanel'
 import { MenuItem, MenuShell } from './Menu'
 import { ArrangeButtons, ArrangeMenu } from './ArrangeMenu'
+import { LockButton } from './FixtureActions'
 import { Section } from './Section'
+import { LengthField } from './LengthField'
+import { useUnits } from '../state/prefs'
+import { formatFeet, formatLength, lengthStep } from '../model/units'
 
 function useChosenStructures(): Structure[] {
   const structures = useStore((s) => s.project.structures)
@@ -45,6 +50,7 @@ export function StructureHud() {
   const openMenu = useFixtureMenu((s) => s.open)
   const editing = useStructureEditor((s) => s.open)
   const setEditing = useStructureEditor((s) => s.set)
+  const units = useUnits()
   if (!chosen.length) return null
   const ids = chosen.map((s) => s.id)
   const title = chosen.length === 1 ? chosen[0].name : `${chosen.length} objects`
@@ -52,19 +58,21 @@ export function StructureHud() {
   const sameKind = chosen.every((s) => s.kind === chosen[0].kind)
   const heightField = sameKind ? STRUCTURE_KINDS[chosen[0].kind].fields.find((f) => f.key === 'height' && f.presets) : undefined
   const heights = heightField && ['totem', 'flexstand', 'tubeStand', 'tbar', 'micStand', 'speakerOnPole', 'speakerOnSub'].includes(chosen[0].kind) ? heightField : undefined
+  const locked = chosen.some((s) => s.locked)
   return (
     <div className="fixture-hud" onPointerDown={(e) => e.stopPropagation()}>
       <span className="hud-name" title={title}>
         {title}
       </span>
+      <LockButton ids={ids} locked={locked} />
       <button className={`hud-btn ${editing ? 'on' : ''}`} title="Edit size, height and options (or double-click it)" onClick={() => setEditing(!editing)}>
         Edit
       </button>
       {heights && (
         <>
           {heights.presets!.map((h) => (
-            <button key={h} className={`hud-btn ${Math.abs(ft(paramsOf(chosen[0]).height) - h) < 0.05 ? 'on' : ''}`} title={`Make it ${h} ft`} onClick={() => setStructureParams(ids, { height: Math.max(heights.min ?? 0, Math.min(heights.max ?? 10, h * FT)) })}>
-              {h}′
+            <button key={h} disabled={locked} className={`hud-btn ${Math.abs(ft(paramsOf(chosen[0]).height) - h) < 0.05 ? 'on' : ''}`} title={`Make it ${formatFeet(h, units)}`} onClick={() => setStructureParams(ids, { height: Math.max(heights.min ?? 0, Math.min(heights.max ?? 10, h * FT)) })}>
+              {formatFeet(h, units)}
             </button>
           ))}
           <span className="hud-sep" />
@@ -114,6 +122,7 @@ export function StructureMenu() {
   return (
     <MenuShell at={at} onClose={close}>
       <div className="menu-title">{chosen.length === 1 ? chosen[0].name : `${chosen.length} objects`}</div>
+      <MenuItem label={chosen.every((x) => x.locked) ? 'Unlock' : 'Lock in place'} keys="⇧⌘L" title="Locked objects can't be dragged, turned or resized by accident" onClick={run(() => toggleLocked(ids))} />
       <MenuItem label="Edit size and options…" onClick={run(() => openEditor(ids))} />
       <MenuItem label="Turn 90° left" onClick={run(() => rotateStructures(ids, 90))} />
       <MenuItem label="Turn 90° right" onClick={run(() => rotateStructures(ids, -90))} />
@@ -183,6 +192,8 @@ export function StructureInspector({ chosen }: { chosen: Structure[] }) {
   const fit = roomFit(project, roomOf(project).ceilingHeight)
 
   const editing = useStructureEditor((v) => v.open)
+  useUnits()
+  const locked = chosen.some((s) => s.locked)
   return (
     <div className={`inspector ${editing ? 'editing' : ''}`}>
       <h2 className="with-icon">
@@ -199,16 +210,17 @@ export function StructureInspector({ chosen }: { chosen: Structure[] }) {
         </Section>
       )}
       <Section id="object:place" title="Place">
-        <NumberField label="Left-right (ft)" value={chosen.length === 1 ? ft(first.position[0]) : null} onCommit={(v) => updateStructures(ids, 'Move object', (s) => ({ ...s, position: [v * FT, s.position[1], s.position[2]] }))} />
-        <NumberField label="Front-back (ft)" value={chosen.length === 1 ? ft(first.position[2]) : null} onCommit={(v) => updateStructures(ids, 'Move object', (s) => ({ ...s, position: [s.position[0], s.position[1], v * FT] }))} />
-        <NumberField label="Turn (°)" value={chosen.every((s) => s.rotation === first.rotation) ? first.rotation : null} onCommit={(v) => updateStructures(ids, 'Turn object', (s) => ({ ...s, rotation: v }))} />
+        {locked && <p className="hint">Locked: unlock it to move, turn or resize it (right-click ▸ Unlock, or ⌘L).</p>}
+        <LengthField label="Left-right" disabled={locked} value={chosen.length === 1 ? first.position[0] : null} onCommit={(v) => updateStructures(ids, 'Move object', (s) => ({ ...s, position: [v, s.position[1], s.position[2]] }))} />
+        <LengthField label="Front-back" disabled={locked} value={chosen.length === 1 ? first.position[2] : null} onCommit={(v) => updateStructures(ids, 'Move object', (s) => ({ ...s, position: [s.position[0], s.position[1], v] }))} />
+        <NumberField label="Turn (°)" disabled={locked} value={chosen.every((s) => s.rotation === first.rotation) ? first.rotation : null} onCommit={(v) => updateStructures(ids, 'Turn object', (s) => ({ ...s, rotation: v }))} />
         <div className="field">
           <span className="label">Stands on</span>
-          <span className="sub">{first.position[1] > 0.001 ? `something ${ft(first.position[1])} ft up (a stage or table)` : 'the floor'}</span>
+          <span className="sub">{first.position[1] > 0.001 ? `something ${formatLength(first.position[1])} up (a stage or table)` : 'the floor'}</span>
         </div>
       </Section>
       <ArrangeButtons ids={ids} />
-      {fit.raised && <p className="hint">The ceiling has been raised to {ft(fit.ceiling)} ft so everything fits.</p>}
+      {fit.raised && <p className="hint">The ceiling has been raised to {formatLength(fit.ceiling)} so everything fits.</p>}
       {chosen.length === 1 && <MountList structure={first} />}
       {attached.length > 0 && (
         <Section id="object:on-it" title="On it">
@@ -264,7 +276,7 @@ function NameField({ structure }: { structure: Structure }) {
   )
 }
 
-export function NumberField({ label, value, onCommit, step = 0.5 }: { label: string; value: number | null; onCommit: (v: number) => void; step?: number }) {
+export function NumberField({ label, value, onCommit, step = 0.5, disabled }: { label: string; value: number | null; onCommit: (v: number) => void; step?: number; disabled?: boolean }) {
   const shown = value === null ? '' : String(value)
   const [draft, setDraft] = useState(shown)
   useEffect(() => setDraft(shown), [shown])
@@ -276,12 +288,14 @@ export function NumberField({ label, value, onCommit, step = 0.5 }: { label: str
   return (
     <label className="field">
       <span className="label">{label}</span>
-      <input type="number" step={step} placeholder={value === null ? 'Mixed' : ''} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+      <input type="number" step={step} disabled={disabled} placeholder={value === null ? 'Mixed' : ''} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
     </label>
   )
 }
 
 function ParamInput({ field, chosen }: { field: ParamField; chosen: Structure[] }) {
+  const units = useUnits()
+  const locked = chosen.some((s) => s.locked)
   const ids = chosen.map((s) => s.id)
   const values = chosen.map((s) => paramsOf(s)[field.key])
   const mixed = values.some((v) => v !== values[0])
@@ -289,30 +303,34 @@ function ParamInput({ field, chosen }: { field: ParamField; chosen: Structure[] 
   switch (field.kind) {
     case 'length': {
       const clamp = (m: number) => Math.max(field.min ?? 0, Math.min(field.max ?? 100, m))
+      const step = lengthStep('length', units)
+      const less = units === 'imperial' ? 'Half a foot less' : '10 cm less'
+      const more = units === 'imperial' ? 'Half a foot more' : '10 cm more'
       return (
         <div className="field">
-          <NumberField label={`${field.label} (ft)`} value={value === null ? null : ft(value as number)} onCommit={(v) => setStructureParams(ids, { [field.key]: clamp(v * FT) })} />
+          <LengthField label={field.label} disabled={locked} value={value === null ? null : (value as number)} min={field.min ?? 0} max={field.max ?? 100} onCommit={(v) => setStructureParams(ids, { [field.key]: clamp(v) })} />
           <div className="stepper">
-            <button className="mini" title="Half a foot less" onClick={() => setStructureParams(ids, { [field.key]: clamp(((value as number) ?? 0) - FT / 2) })}>
+            <button className="mini" disabled={locked} title={less} onClick={() => setStructureParams(ids, { [field.key]: clamp(((value as number) ?? 0) - step) })}>
               −
             </button>
             <input
               type="range"
+              disabled={locked}
               min={field.min ?? 0}
               max={field.max ?? 10}
-              step={FT / 12}
+              step={units === 'imperial' ? FT / 12 : 0.01}
               value={(value as number) ?? field.min ?? 0}
               onChange={(e) => setStructureParams(ids, { [field.key]: clamp(Number(e.target.value)) })}
             />
-            <button className="mini" title="Half a foot more" onClick={() => setStructureParams(ids, { [field.key]: clamp(((value as number) ?? 0) + FT / 2) })}>
+            <button className="mini" disabled={locked} title={more} onClick={() => setStructureParams(ids, { [field.key]: clamp(((value as number) ?? 0) + step) })}>
               +
             </button>
           </div>
           {field.presets && (
             <div className="presets">
               {field.presets.map((p) => (
-                <button key={p} className={`mini ${value !== null && Math.abs(ft(value as number) - p) < 0.05 ? 'on' : ''}`} onClick={() => setStructureParams(ids, { [field.key]: clamp(p * FT) })}>
-                  {p}′
+                <button key={p} disabled={locked} className={`mini ${value !== null && Math.abs(ft(value as number) - p) < 0.05 ? 'on' : ''}`} onClick={() => setStructureParams(ids, { [field.key]: clamp(p * FT) })}>
+                  {formatFeet(p, units)}
                 </button>
               ))}
             </div>
@@ -550,7 +568,7 @@ export function FixtureMount({ fixtures }: { fixtures: Fixture[] }) {
       {options.length > 0 && (
         <div className="attach-options">
           {options.map((o) => (
-            <button key={o.structure.id + o.point.id} className="mini" title={`${Math.round(o.distance * 10) / 10} m away`} onClick={() => mountFixtures(ids, o.structure.id, o.point.id, o.t)}>
+            <button key={o.structure.id + o.point.id} className="mini" title={`${formatLength(o.distance)} away`} onClick={() => mountFixtures(ids, o.structure.id, o.point.id, o.t)}>
               {o.point.label} · {o.structure.name}
             </button>
           ))}

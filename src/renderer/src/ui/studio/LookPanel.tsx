@@ -4,6 +4,7 @@
  * once. When a manual doesn't give the size or shape, borrow them from a similar
  * Library fixture, or add a photo of the real light to compare against.
  */
+import { LengthField } from '../LengthField'
 import { useMemo, useState } from 'react'
 import { KINDS, KIND_ORDER, type FixtureDef, type FixtureKind, type LookDef } from '../../model/fixtureDef'
 import { ledsFromName, LOOK_DEFAULTS, type CellLayout, type LookKind } from '../../model/catalog'
@@ -30,10 +31,9 @@ export function LookPanel({ def }: { def: FixtureDef }) {
   const setLook = (change: Partial<LookDef>) => useStudio.getState().edit((d) => ({ ...d, look: { ...d.look, ...change } }))
   const cells = new Set(def.parts.filter((p) => p.role === 'pixel').map((p) => p.cell ?? 0)).size
   const [cellInput, setCellInput] = useState<string | null>(null)
-  const mm = (v: number) => Math.round(v * 1000)
-  const setSize = (i: number, v: number) => {
+  const setSize = (i: number, m: number) => {
     const size = [...look.size] as [number, number, number]
-    size[i] = Math.max(0.005, Math.min(4, v / 1000))
+    size[i] = Math.max(0.005, Math.min(4, m))
     setLook({ size })
   }
   const moving = look.shape === 'mover' || look.shape === 'moverWash'
@@ -73,13 +73,10 @@ export function LookPanel({ def }: { def: FixtureDef }) {
         </label>
       )}
 
-      <div className="panel-sub">Size (mm)</div>
-      <div className="row-3">
+      <div className="panel-sub">Size</div>
+      <div className="row-3 small-lengths">
         {(['Width', 'Height', 'Depth'] as const).map((label, i) => (
-          <label key={label} className="field small" title={`${label} of the housing in millimetres, from the manual's specifications`}>
-            <span className="label">{label}</span>
-            <input type="number" min={5} max={4000} value={mm(look.size[i])} onChange={(e) => setSize(i, Number(e.target.value))} />
-          </label>
+          <LengthField key={label} label={label} kind="small" value={look.size[i]} min={0.005} max={4} title={`${label} of the housing, from the manual's specifications`} onCommit={(m) => setSize(i, m)} />
         ))}
       </div>
       <BorrowLook />

@@ -13,6 +13,8 @@ import { planPatch } from '../model/project'
 import { useStudio } from '../state/studio'
 import { runCommand } from '../state/menuCommands'
 import { MenuItem, MenuShell } from './Menu'
+import { useUnits } from '../state/prefs'
+import { lengthNumber, unitLabel } from '../model/units'
 
 export const DRAG_TYPE = 'application/x-ssvis-fixture'
 
@@ -269,11 +271,9 @@ function AddOne({ type }: { type: FixtureType }) {
   )
 }
 
-function mm(v: number): string {
-  return String(Math.round(v * 1000))
-}
 
 function Details({ entry }: { entry: LibraryEntry }) {
+  useUnits()
   const fixtures = useStore((s) => s.project.fixtures)
   const [mode, setMode] = useState(0)
   const [count, setCount] = useState(1)
@@ -311,7 +311,7 @@ function Details({ entry }: { entry: LibraryEntry }) {
       <div className="lib-facts">
         {entry.size && (
           <span>
-            {mm(entry.size[0])} × {mm(entry.size[1])} × {mm(entry.size[2])} mm
+            {lengthNumber(entry.size[0], 'small')} × {lengthNumber(entry.size[1], 'small')} × {lengthNumber(entry.size[2], 'small')} {unitLabel('small')}
           </span>
         )}
         {entry.weight ? <span>{entry.weight} kg</span> : null}

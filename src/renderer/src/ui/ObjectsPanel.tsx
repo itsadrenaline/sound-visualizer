@@ -5,11 +5,14 @@
  * beside anything already there), or drag it into the 3D view to put it
  * exactly where you want. Below: what's in this show; right-click for actions.
  */
+import { LockedBadge } from './LockIcon'
 import { useMemo, useState, type ReactElement } from 'react'
 import { useStore } from '../state/store'
 import { addStructure, deleteStructures } from '../state/commands'
 import { useFixtureMenu } from '../state/fixtureMenu'
-import { FT, STRUCTURE_KINDS, STRUCTURE_PRESETS, type Category, type StructureKind, type StructureParams } from '../model/structures'
+import { localiseFeet } from '../model/units'
+import { useUnits } from '../state/prefs'
+import { STRUCTURE_KINDS, STRUCTURE_PRESETS, type Category, type StructureKind, type StructureParams } from '../model/structures'
 import { view } from '../state/viewBus'
 
 export const STRUCTURE_DRAG = 'application/x-ssvis-structure'
@@ -37,6 +40,7 @@ export function ObjectsPanel() {
   const openMenu = useFixtureMenu((s) => s.open)
   const [query, setQuery] = useState('')
   const [folded, setFolded] = useState<Category[]>(loadFolded)
+  const units = useUnits()
 
   const toggle = (c: Category) => {
     const next = folded.includes(c) ? folded.filter((x) => x !== c) : [...folded, c]
@@ -92,7 +96,7 @@ export function ObjectsPanel() {
                     onClick={() => addStructure(p.kind, p.params)}
                   >
                     <Icon kind={p.kind} />
-                    <span>{p.name}</span>
+                    <span>{localiseFeet(p.name, units)}</span>
                   </button>
                 ))}
               </div>
@@ -121,6 +125,7 @@ export function ObjectsPanel() {
             >
               <Icon kind={s.kind} />
               <span className="name">{s.name}</span>
+              {s.locked && <LockedBadge id={s.id} />}
               <span className="sub">{on ? `${on} fixture${on > 1 ? 's' : ''}` : ''}</span>
               <button className="mini" title="Delete (what's on it falls to the floor)" onClick={(e) => (e.stopPropagation(), deleteStructures([s.id]))}>
                 ✕
@@ -129,7 +134,6 @@ export function ObjectsPanel() {
           )
         })}
       </ul>
-      <p className="hint">Sizes in feet. 1 ft = {Math.round(FT * 1000) / 1000} m.</p>
     </div>
   )
 }

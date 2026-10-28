@@ -12,6 +12,7 @@
  * skip the tubes"): chooseFromText fills in the list, which you can still change.
  * Everything a new show does is one undo step.
  */
+import { feetInText } from '../model/units'
 import { useStore } from './store'
 import { addStructure, distributeFixtures, mountFixtures, syncFromSoundSwitch, updateFixtures } from './commands'
 import { fixtureTypeFromMode, soundswitchKeyOf } from '../model/soundswitchImport'
@@ -146,8 +147,8 @@ export function chooseFromText(text: string, rows: PickRow[]): { rows: PickRow[]
   const mentioned = new Set<string>()
   let positive = 0
   let standFt: number | undefined
-  const height = /(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')/.exec(text.toLowerCase())
-  if (height) standFt = Number(height[1])
+  const height = feetInText(text)
+  if (height !== null) standFt = height
   const everything = /\b(everything|all (of )?(my |the )?fixtures|all of them)\b/i.test(text)
 
   for (const clause of text.toLowerCase().split(/[,;.\n]|\band\b|\bthen\b|\bplus\b/)) {
@@ -157,7 +158,7 @@ export function chooseFromText(text: string, rows: PickRow[]): { rows: PickRow[]
     const where = PLACES.find(([re]) => re.test(c))?.[1]
     const copies = /\bcop(y|ies)\b|\bx\s*\d+\b|\b\d+\s*x\b/.test(c)
     const numWord = c.split(/\s+/).map((w) => NUMBERS[w]).find((n) => n !== undefined)
-    const digits = [...c.matchAll(/\b(\d+)\b(?!\s*(?:ft|feet|foot|'|w\b|watt))/g)].map((m) => Number(m[1])).find((n) => n > 0 && n <= 48)
+    const digits = [...c.matchAll(/\b(\d+)\b(?!\s*(?:ft|feet|foot|'|w\b|watt|m\b|cm\b|\.\d))/g)].map((m) => Number(m[1])).find((n) => n > 0 && n <= 48)
     const n = /\bx\s*(\d+)\b/.exec(c)?.[1] ? Number(/\bx\s*(\d+)\b/.exec(c)![1]) : (numWord ?? digits)
     // Which rows does it mean? Model names ("IR4", "MH-150") and kinds ("movers", "tubes").
     const tokens = norm(c).split(' ').filter((w) => w.length >= 2 && !STOP.has(w) && !/^\d+$/.test(w) && !Object.keys(NUMBERS).includes(w))
