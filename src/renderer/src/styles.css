@@ -740,7 +740,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 /* --- Plan view, units, grid, locking --- */
 .plan-view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: default; user-select: none; touch-action: none; }
 .plan-view.panning { cursor: grab; }
-.viewport-wrap.plan .navpad { display: none; }
+.viewport-wrap.plan .navpad { z-index: 6; }
 .viewport-wrap.plan .fixture-hud::after { display: none; }
 .view-toolbar .seg button.on { background: #1f4fa8; border-color: #2f63c4; color: #fff; }
 .view-switch button { font-weight: 600; }

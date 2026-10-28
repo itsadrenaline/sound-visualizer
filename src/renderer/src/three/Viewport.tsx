@@ -22,6 +22,9 @@ import { StructureRig, mountGuides } from './structures'
 import { DiscoReflections, spotRays, type Ball } from './discoBalls'
 import { ViewToolbar } from '../ui/ViewToolbar'
 import { NavPad } from '../ui/NavPad'
+import { toPlan } from '../model/plan'
+import { MAX_SCALE, MIN_SCALE, usePlanCam } from '../state/planCamera'
+import type { PlanSide } from '../state/prefs'
 import { Notices } from '../ui/Notices'
 import { useStore } from '../state/store'
 import { useViewSettings } from '../state/viewSettings'
@@ -156,6 +159,25 @@ export function Viewport() {
     }
     // You can look up at the ceiling; the camera just never goes below the floor (see the frame loop).
     controls.maxPolarAngle = Math.PI * 0.94
+    /**
+     * The camera never goes through the floor. Orbiting down to it stops the turn there
+     * rather than pulling the camera in (which used to zoom in as you turned). The ceiling
+     * is see-through from above, so you can go up past it to look down on the whole show.
+     */
+    const FLOOR = 0.3
+    const keepAboveFloor = () => {
+      if (camera.position.y >= FLOOR) return
+      const offset = camera.position.clone().sub(controls.target)
+      const r = offset.length()
+      const want = FLOOR - controls.target.y
+      if (r > Math.abs(want) + 1e-6) {
+        // Same distance, same direction round the show: only the angle up or down changes.
+        const flat = Math.sqrt(Math.max(0, r * r - want * want))
+        const h = Math.hypot(offset.x, offset.z)
+        const k = h > 1e-6 ? flat / h : 0
+        camera.position.set(controls.target.x + offset.x * k, FLOOR, controls.target.z + offset.z * k + (h > 1e-6 ? 0 : flat))
+      } else camera.position.y = FLOOR
+    }
 
     // --- Camera moves: presets, framing, stored positions (eased, not jumped) ---
     let flight: { from: THREE.Vector3; to: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3; t: number } | null = null
@@ -894,6 +916,60 @@ export function Viewport() {
     observer.observe(container)
     resize()
 
+    // --- Switching between 3D and the Plan keeps you looking at the same thing ---
+    const tanHalf = () => Math.tan((camera.fov * Math.PI) / 360)
+    const toPlanView = () => {
+      const target = controls.target.clone()
+      const offset = camera.position.clone().sub(target)
+      const d = offset.length()
+      const dir = offset.clone().normalize()
+      const prefs = usePrefs.getState()
+      // Looking down: the top. Looking straight at the front or the side: that side.
+      // From an angle in between, the Plan stays on the side it was last on.
+      let side: PlanSide = prefs.planSide
+      if (dir.y > 0.8) side = 'top'
+      else if (dir.y < 0.3 && Math.abs(dir.z) > 2 * Math.abs(dir.x)) side = 'front'
+      else if (dir.y < 0.3 && Math.abs(dir.x) > 2 * Math.abs(dir.z)) side = 'side'
+      if (side !== prefs.planSide) prefs.setPlanSide(side)
+      const [u, v] = toPlan(side, [target.x, target.y, target.z])
+      const h = renderer.domElement.clientHeight || usePlanCam.getState().size.h
+      const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, h / (2 * d * tanHalf())))
+      usePlanCam.getState().setCam({ u, v, scale }, side)
+    }
+    const fromPlanView = () => {
+      const { cam, side } = usePlanCam.getState()
+      if (!cam || !side) return
+      const h = renderer.domElement.clientHeight || usePlanCam.getState().size.h
+      const d = h / cam.scale / 2 / tanHalf()
+      const b = showBounds()
+      const mid = b ? [(b.min[0] + b.max[0]) / 2, (b.min[2] + b.max[2]) / 2] : [0, 0]
+      let target: THREE.Vector3
+      let dir: THREE.Vector3
+      if (side === 'top') {
+        target = new THREE.Vector3(cam.u, 0, cam.v)
+        dir = new THREE.Vector3(...DIRECTIONS.top).normalize()
+      } else if (side === 'front') {
+        target = new THREE.Vector3(cam.u, Math.max(0, -cam.v), mid[1])
+        dir = new THREE.Vector3(0, 0, 1)
+      } else {
+        target = new THREE.Vector3(mid[0], Math.max(0, -cam.v), cam.u)
+        dir = new THREE.Vector3(-1, 0, 0)
+      }
+      flight = null
+      // Use up any leftover orbit momentum first, or it turns the camera off the view.
+      controls.enableDamping = false
+      controls.update()
+      camera.position.copy(target).addScaledVector(dir, d)
+      controls.target.copy(target)
+      controls.update()
+      controls.enableDamping = true
+    }
+    const unsubscribeHandOff = usePrefs.subscribe((st, prev) => {
+      if (st.view === prev.view) return
+      if (st.view === 'plan') toPlanView()
+      else fromPlanView()
+    })
+
     registerView({
       preset: (v) => fitView(v),
       focus: (ids) => frameIds(ids),
@@ -1039,12 +1115,7 @@ export function Viewport() {
       setProjectors(lit, time)
       ;(window as unknown as { __projectors?: unknown }).__projectors = { total: projectors.count(), used: lit.length, up: lit.filter((p) => p.direction.y > 0.2).length }
       controls.update()
-      // Looking up is allowed; going through the floor (or the ceiling) isn't.
-      const top = builtRoom?.ceiling && builtFit ? builtFit.ceiling - 0.25 : 1e4
-      if (camera.position.y < 0.3 || camera.position.y > top) {
-        const y = Math.min(top, Math.max(0.3, camera.position.y))
-        camera.position.y = y
-      }
+      keepAboveFloor()
       placeHud()
       renderer.render(scene, camera)
     }
@@ -1072,6 +1143,7 @@ export function Viewport() {
       unsubscribeTool()
       unsubscribeGrid()
       unsubscribeGridRoom()
+      unsubscribeHandOff()
       marquee.remove()
       for (const rig of rigs.values()) rig.dispose()
       for (const rig of sets.values()) rig.dispose()

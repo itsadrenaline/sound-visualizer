@@ -7,6 +7,8 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { view, type NudgeKind } from '../state/viewBus'
+import { usePrefs } from '../state/prefs'
+import { planNudge } from '../state/planCamera'
 
 const KEY = 'sound-visualizer:navpad'
 
@@ -19,7 +21,9 @@ function loadOpen(): boolean {
 }
 
 /** A button that moves the camera while it's held down. */
-function Hold({ kind, x, y, tip, children, className = '' }: { kind: NudgeKind; x: number; y: number; tip: string; children: ReactNode; className?: string }) {
+function Hold({ kind, x, y, tip, children, className = '', plan = false }: { kind: NudgeKind; x: number; y: number; tip: string; children: ReactNode; className?: string; plan?: boolean }) {
+  // In the Plan the same buttons zoom and slide the drawing.
+  const nudge = (k: NudgeKind, a: number, b: number) => (plan ? planNudge(k === 'zoom' ? 'zoom' : 'pan', a, b) : view.nudge(k, a, b))
   const timer = useRef<number | null>(null)
   const stop = () => {
     if (timer.current !== null) cancelAnimationFrame(timer.current)
@@ -29,12 +33,12 @@ function Hold({ kind, x, y, tip, children, className = '' }: { kind: NudgeKind; 
   const start = () => {
     stop()
     // One step straight away (a click), then smooth movement while held.
-    view.nudge(kind, x, y)
+    nudge(kind, x, y)
     let last = performance.now() + 220
     const tick = (now: number) => {
       if (now > last) {
         const dt = Math.min(0.05, (now - last) / 1000)
-        view.nudge(kind, x * dt * 12, y * dt * 12)
+        nudge(kind, x * dt * 12, y * dt * 12)
         last = now
       }
       timer.current = requestAnimationFrame(tick)
@@ -55,7 +59,7 @@ function Hold({ kind, x, y, tip, children, className = '' }: { kind: NudgeKind; 
       onPointerUp={stop}
       onPointerCancel={stop}
       onLostPointerCapture={stop}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), view.nudge(kind, x, y))}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), nudge(kind, x, y))}
     >
       {children}
     </button>
@@ -64,6 +68,7 @@ function Hold({ kind, x, y, tip, children, className = '' }: { kind: NudgeKind; 
 
 export function NavPad() {
   const [open, setOpen] = useState(loadOpen)
+  const plan = usePrefs((s) => s.view === 'plan')
   const toggle = () => {
     setOpen(!open)
     try {
@@ -77,6 +82,46 @@ export function NavPad() {
       <div className="navpad closed" data-tour="navpad" onPointerDown={(e) => e.stopPropagation()}>
         <button className="nav-btn" title="Show the camera buttons: zoom, turn, move, up and down" onClick={toggle}>
           ✥
+        </button>
+      </div>
+    )
+  }
+  if (plan) {
+    return (
+      <div className="navpad" data-tour="navpad" onPointerDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
+        <div className="nav-group">
+          <span className="nav-label">Zoom</span>
+          <div className="nav-col">
+            <Hold plan kind="zoom" x={0} y={1} tip="Zoom in (or press +). Hold to keep going.">
+              ＋
+            </Hold>
+            <Hold plan kind="zoom" x={0} y={-1} tip="Zoom out (or press −). Hold to keep going.">
+              −
+            </Hold>
+          </div>
+        </div>
+        <div className="nav-group">
+          <span className="nav-label">Move</span>
+          <div className="nav-cross">
+            <Hold plan kind="pan" x={0} y={1} tip="Move the view up (↑ with nothing selected)" className="n">
+              ↑
+            </Hold>
+            <Hold plan kind="pan" x={-1} y={0} tip="Move the view left (←)" className="w">
+              ←
+            </Hold>
+            <button className="nav-btn c" title="Show everything (Home)" aria-label="Show everything" onClick={() => window.dispatchEvent(new CustomEvent('plan:focus', { detail: 'all' }))}>
+              ⌂
+            </button>
+            <Hold plan kind="pan" x={1} y={0} tip="Move the view right (→)" className="e">
+              →
+            </Hold>
+            <Hold plan kind="pan" x={0} y={-1} tip="Move the view down (↓)" className="s">
+              ↓
+            </Hold>
+          </div>
+        </div>
+        <button className="nav-hide" title="Hide the camera buttons (✥ brings them back)" onClick={toggle}>
+          ✕
         </button>
       </div>
     )
