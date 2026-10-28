@@ -51,11 +51,14 @@ export function movingRoots(p: Project, ids: string[]): { structures: Set<string
   const structures = new Set<string>()
   const fixtures = new Set<string>()
   const pick = new Set(ids)
-  for (const s of p.structures ?? []) if (pick.has(s.id)) structures.add(s.id)
+  // Locked things stay put (and so does a stand with a locked fixture on top, or a locked stand).
+  for (const s of p.structures ?? []) if (pick.has(s.id) && !s.locked) structures.add(s.id)
   for (const f of p.fixtures) {
-    if (!pick.has(f.id)) continue
+    if (!pick.has(f.id) || f.locked) continue
     const carrier = carrierOf(p, f)
-    if (carrier) structures.add(carrier.id)
+    if (carrier) {
+      if (!carrier.locked) structures.add(carrier.id)
+    }
     // On a moving object already (a truss that's also selected): it comes along anyway.
     else if (!(f.mount && structures.has(f.mount.structure))) fixtures.add(f.id)
   }

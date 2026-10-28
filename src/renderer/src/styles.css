@@ -702,3 +702,26 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .lib-actions .danger { color: #f5a3a3; }
 .type-info .studio-open { margin-top: 6px; }
 .warn-text { color: var(--warn); }
+
+/* --- Plan view, units, grid, locking --- */
+.plan-view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: default; user-select: none; touch-action: none; }
+.plan-view.panning { cursor: grab; }
+.viewport-wrap.plan .navpad { display: none; }
+.viewport-wrap.plan .fixture-hud::after { display: none; }
+.view-toolbar .seg button.on { background: #1f4fa8; border-color: #2f63c4; color: #fff; }
+.view-switch button { font-weight: 600; }
+.units-switch { margin-left: 2px; }
+.grid-menu { width: 270px; }
+.grid-menu .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.grid-menu .menu-keys { margin-left: auto; }
+.grid-menu .room-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0 2px; }
+.grid-menu .label { color: var(--muted); font-size: 11.5px; }
+fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
+fieldset.plain:disabled { opacity: 0.55; }
+.lock-icon { display: inline-block; vertical-align: -1px; }
+.lock-badge { border: 0; background: none; padding: 0 3px 0 0; color: var(--warn); cursor: pointer; line-height: 1; }
+.lock-badge:hover { color: #fff; }
+.hud-btn.lock { padding: 2px 6px; color: var(--muted); }
+.hud-btn.lock.on { color: var(--warn); border-color: #7a5a1c; background: #2e2510; }
+input.length-input { font-variant-numeric: tabular-nums; }
+.row-3.small-lengths .field { min-width: 0; }

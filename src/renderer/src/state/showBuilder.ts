@@ -10,6 +10,7 @@
  * Either way everything it does is one undo step, and it only patches into
  * free addresses, like adding from the library by hand.
  */
+import { feetInText, formatFeet } from '../model/units'
 import { useStore } from './store'
 import {
   addLibraryFixtures,
@@ -507,14 +508,14 @@ export function quickPlan(prompt: string, lib: LibraryAccess): QuickPlan | null 
   if (!match) return null
 
   // What they stand on.
-  const height = /(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')\b/.exec(text)
+  const heightFt = feetInText(text)
   const holder: StructureKind | null = /\b(tube|mic(rophone)?|pixel tube) stands?\b/.test(text) ? 'tubeStand' : /\btotems?\b/.test(text) ? 'totem' : /\bflex ?stands?\b/.test(text) ? 'flexstand' : /\bt-?bars?\b|\btripod/.test(text) ? 'tbar' : /\btruss\b/.test(text) ? 'goalpost' : null
   const eachSide = /\b(each|either|both|opposite|other) sides?\b|\bone on (one|the left|the right|each) side\b|\bleft and (the )?right\b|\bstage left and stage right\b/.test(text)
   const nearStage = /\bstage\b/.test(text)
   const invert = /\b(invers|invert|mirror|opposite (direction|pan)|reverse)/.test(text)
   const invertTilt = /\binvert(ed)? tilt|tilt invert/.test(text)
   const understood: string[] = [`${count} × ${match.manufacturer} ${match.name}`]
-  if (holder) understood.push(`each on a ${STRUCTURE_KINDS[holder].label.toLowerCase()}${height ? `, ${height[1]} ft` : ''}`)
+  if (holder) understood.push(`each on a ${STRUCTURE_KINDS[holder].label.toLowerCase()}${heightFt !== null ? `, ${formatFeet(heightFt)}` : ''}`)
   if (eachSide) understood.push(nearStage ? 'split either side of the stage' : 'split left and right')
   if (invert) understood.push(`pan inverted on one side${invertTilt ? ' (tilt too)' : ''}`)
 
@@ -535,13 +536,13 @@ export function quickPlan(prompt: string, lib: LibraryAccess): QuickPlan | null 
           // One truss for all of them.
           let truss = structures().find((s) => s.kind === 'goalpost' || s.kind === 'trussBox')
           if (!truss) {
-            const r = runTool(l, { name: 'add_structure', input: { kind: 'goalpost', ...(height ? { height_ft: Number(height[1]) } : {}), ...(stage ? { beside: { structure_id: stage.id, side: 'on' } } : {}) } }) as { id: string }
+            const r = runTool(l, { name: 'add_structure', input: { kind: 'goalpost', ...(heightFt !== null ? { height_ft: heightFt } : {}), ...(stage ? { beside: { structure_id: stage.id, side: 'on' } } : {}) } }) as { id: string }
             truss = structures().find((s) => s.id === r.id)
           }
           on = { structure_id: truss!.id, point: 'under' }
         } else if (holder) {
           const side = sides[i] ?? 'right'
-          const input: Input = { kind: holder, ...(height ? { height_ft: Number(height[1]) } : {}) }
+          const input: Input = { kind: holder, ...(heightFt !== null ? { height_ft: heightFt } : {}) }
           if (stage && sides.length) input.beside = { structure_id: stage.id, side, gap_ft: 1 + rowOf(i) * 3, align: 'front' }
           else if (sides.length) Object.assign(input, { x_ft: (side === 'left' ? -1 : 1) * (6 + rowOf(i) * 3), z_ft: 4 })
           const r = runTool(l, { name: 'add_structure', input }) as { id: string }

@@ -8,7 +8,8 @@ import { deleteChannels, useStudio } from './studio'
 import { readFixtureFile } from '../model/fixtureFiles'
 import { useLibrary } from './library'
 import { notify } from './notices'
-import { deleteFixtures, deleteStructures, duplicateFixtures, duplicateStructures } from './commands'
+import { deleteFixtures, deleteStructures, duplicateFixtures, duplicateStructures, toggleLocked } from './commands'
+import { usePrefs } from './prefs'
 import { openDocument, saveDocument } from './document'
 import { view } from './viewBus'
 import { useWizards } from './wizards'
@@ -31,7 +32,25 @@ export function runCommand(command: string): void {
   const settings = useViewSettings.getState()
   if (command.startsWith('template:')) return void startFromTemplate(command.slice('template:'.length))
   if (command.startsWith('tour:')) return useTour.getState().start(command.slice('tour:'.length))
+  const prefs = usePrefs.getState()
+  const plan = prefs.view === 'plan'
   switch (command) {
+    case 'toggleLock':
+      return toggleLocked(selection)
+    case 'togglePlan':
+      return prefs.setView(plan ? '3d' : 'plan')
+    case 'view3d':
+      return prefs.setView('3d')
+    case 'viewPlan':
+      return prefs.setView('plan')
+    case 'toggleGrid':
+      return prefs.setGrid(!prefs.grid)
+    case 'toggleSnap':
+      return prefs.setSnap(!prefs.snap)
+    case 'unitsMetric':
+      return prefs.setUnits('metric')
+    case 'unitsImperial':
+      return prefs.setUnits('imperial')
     case 'builder':
       settings.setFullView(false)
       return settings.setBuilder(!settings.builder)
@@ -82,16 +101,18 @@ export function runCommand(command: string): void {
       if (pieces.length) deleteStructures(pieces)
       return
     }
+    // In the Plan, the view keys pick its side; Perspective goes back to 3D.
     case 'viewPerspective':
+      if (plan) prefs.setView('3d')
       return view.preset('perspective')
     case 'viewTop':
-      return view.preset('top')
+      return plan ? prefs.setPlanSide('top') : view.preset('top')
     case 'viewFront':
-      return view.preset('front')
+      return plan ? prefs.setPlanSide('front') : view.preset('front')
     case 'viewLeft':
-      return view.preset('left')
+      return plan ? prefs.setPlanSide('side') : view.preset('left')
     case 'viewRight':
-      return view.preset('right')
+      return plan ? prefs.setPlanSide('side') : view.preset('right')
     case 'viewUp':
       return view.preset('up')
     case 'toolSelect':
@@ -101,8 +122,10 @@ export function runCommand(command: string): void {
     case 'toolOrbit':
       return settings.setTool('orbit')
     case 'focusSelection':
+      if (plan) return void window.dispatchEvent(new CustomEvent('plan:focus', { detail: selection.length ? selection : 'all' }))
       return view.focus(selection.length ? selection : 'all')
     case 'focusAll':
+      if (plan) return void window.dispatchEvent(new CustomEvent('plan:focus', { detail: 'all' }))
       return view.focus('all')
     case 'toggleFullView':
       return settings.setFullView(!settings.fullView)
@@ -125,6 +148,7 @@ export function commandForKey(e: KeyboardEvent): string | null {
   if (mod && key === 'd') return 'duplicate'
   if (mod && key === 's') return e.shiftKey ? 'saveAs' : 'save'
   if (mod && key === 'o') return 'open'
+  if (mod && e.shiftKey && key === 'l') return 'toggleLock'
   if (mod && key === 'l') return 'showLibrary'
   if (mod && key === 'k') return 'builder'
   if (mod && key === 'n') return 'new'
@@ -135,6 +159,8 @@ export function commandForKey(e: KeyboardEvent): string | null {
   if (key === 'v') return 'toolSelect'
   if (key === 'w') return 'toolMove'
   if (key === 'o') return 'toolOrbit'
+  if (key === 'p' && !e.shiftKey) return 'togglePlan'
+  if (key === 'g' && !e.shiftKey) return 'toggleSnap'
   // Views are Shift+1 to Shift+6, so typing a number never moves the camera.
   // (e.code, not e.key: with Shift, "1" arrives as "!" on most keyboards.)
   if (!e.shiftKey || e.altKey) return null

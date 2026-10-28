@@ -15,6 +15,7 @@
  * MVR's axes: X to the right, Y upstage (away from the audience), Z up, in mm.
  * Ours: x to the right, y up, z towards the audience, in metres.
  */
+import { units } from './units'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { getFixtureType, plainName, type ChannelFunction, type FixtureType } from './fixtureTypes'
 import { defaultProject, footprint, newId, planPatch, type Fixture, type Project, type Vec3 } from './project'
@@ -379,9 +380,12 @@ export function showFromMvr(scene: MvrScene, name: string, entries: LibraryEntry
 // ---------------------------------------------------------------------------
 
 export function patchCsv(project: Project): string {
-  const ft = (m: number) => (Math.round((m / FT) * 10) / 10).toString()
+  // Positions in the chosen units (metres or feet).
+  const imperial = units() === 'imperial'
+  const ft = (m: number) => (imperial ? Math.round((m / FT) * 10) / 10 : Math.round(m * 100) / 100).toString()
+  const u = imperial ? 'ft' : 'm'
   const q = (s: string | number) => (/[",\n]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s))
-  const rows = [['Name', 'Manufacturer', 'Fixture', 'Channels', 'Universe', 'Address', 'Last channel', 'Group', 'Attached to', 'X (ft)', 'Height (ft)', 'Z (ft)', 'Hanging', 'Invert pan', 'Invert tilt']]
+  const rows = [['Name', 'Manufacturer', 'Fixture', 'Channels', 'Universe', 'Address', 'Last channel', 'Group', 'Attached to', `X (${u})`, `Height (${u})`, `Z (${u})`, 'Hanging', 'Invert pan', 'Invert tilt']]
   const byId = new Map((project.structures ?? []).map((s) => [s.id, s]))
   const sorted = [...project.fixtures].sort((a, b) => a.universe - b.universe || a.address - b.address)
   for (const f of sorted) {

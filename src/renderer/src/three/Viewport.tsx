@@ -39,10 +39,14 @@ import { useFixtureMenu } from '../state/fixtureMenu'
 import { FixtureHud, FixtureMenu } from '../ui/FixtureActions'
 import { FixtureRig, lookKeyOf } from './fixtureRig'
 import { useStudio } from '../state/studio'
+import { snapXZ, usePrefs } from '../state/prefs'
+import { PlanView } from '../ui/PlanView'
+import { notify } from '../state/notices'
 
 export function Viewport() {
   const host = useRef<HTMLDivElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
+  const mainView = usePrefs((s) => s.view)
 
   useEffect(() => {
     const container = host.current!
@@ -89,6 +93,55 @@ export function Viewport() {
     fitRoom(useStore.getState().project)
     const unsubscribeRoom = useStore.subscribe((s, prev) => {
       if (s.project !== prev.project) fitRoom(s.project)
+    })
+
+    // --- The floor grid: shown while snapping to it is on ---
+    let floorGrid: THREE.LineSegments | null = null
+    let gridKey = ''
+    const syncGrid = () => {
+      const { snap, gridSize } = usePrefs.getState()
+      const fit = builtFit
+      const key = snap && fit ? `${gridSize}|${fit.halfWidth}|${fit.wallZ}|${fit.front}` : ''
+      if (key === gridKey) return
+      gridKey = key
+      if (floorGrid) {
+        scene.remove(floorGrid)
+        floorGrid.geometry.dispose()
+        ;(floorGrid.material as THREE.Material).dispose()
+        floorGrid = null
+      }
+      if (!key || !fit) return
+      // Square, centred on the stage's middle line, covering the room.
+      const half = Math.max(fit.halfWidth, (fit.front - fit.wallZ) / 2)
+      const cells = 2 * Math.max(1, Math.ceil(half / gridSize))
+      // Lines both ways across the floor (every fifth one brighter).
+      const size = cells * gridSize
+      const z0 = Math.round((fit.wallZ + fit.front) / 2 / gridSize) * gridSize
+      const pts: number[] = []
+      const cols: number[] = []
+      const dim = new THREE.Color(0x56627a)
+      const bright = new THREE.Color(0x4d8dff)
+      for (let k = -cells / 2; k <= cells / 2; k++) {
+        const c = k === 0 ? bright : Math.abs(k) % 5 === 0 ? new THREE.Color(0x7a879e) : dim
+        const o = k * gridSize
+        pts.push(o, 0, z0 - size / 2, o, 0, z0 + size / 2, -size / 2, 0, z0 + o, size / 2, 0, z0 + o)
+        for (let n = 0; n < 4; n++) cols.push(c.r, c.g, c.b)
+      }
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
+      floorGrid = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, fog: false }))
+      floorGrid.position.y = 0.012
+      floorGrid.renderOrder = 1
+      scene.add(floorGrid)
+    }
+    syncGrid()
+    const unsubscribeGrid = usePrefs.subscribe(() => {
+      syncGrid()
+      gizmo.setTranslationSnap(usePrefs.getState().snap ? usePrefs.getState().gridSize : 0.05)
+    })
+    const unsubscribeGridRoom = useStore.subscribe((st, prev) => {
+      if (st.project !== prev.project) syncGrid()
     })
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200)
@@ -254,7 +307,7 @@ export function Viewport() {
 
     // --- Drag the selection around with a move gizmo ---
     const gizmo = new TransformControls(camera, renderer.domElement)
-    gizmo.setTranslationSnap(0.05)
+    gizmo.setTranslationSnap(usePrefs.getState().snap ? usePrefs.getState().gridSize : 0.05)
     gizmo.setSize(0.75)
     const pivot = new THREE.Object3D()
     scene.add(pivot)
@@ -262,7 +315,8 @@ export function Viewport() {
     let dragStart: THREE.Vector3 | null = null
     const placePivot = () => {
       const { project, selection } = useStore.getState()
-      const chosen = [...project.fixtures, ...(project.structures ?? [])].filter((f) => selection.includes(f.id))
+      // Locked things get no move arrows.
+      const chosen = [...project.fixtures, ...(project.structures ?? [])].filter((f) => selection.includes(f.id) && !f.locked)
       if (!chosen.length || useViewSettings.getState().tool !== 'move') return gizmo.detach()
       const c = chosen.reduce((a, f) => a.add(new THREE.Vector3(...f.position)), new THREE.Vector3()).divideScalar(chosen.length)
       pivot.position.copy(c)
@@ -386,6 +440,8 @@ export function Viewport() {
       /** Dragged onto the ceiling, or down off it onto the floor. */
       surface?: { x: number; y: number; z: number; ceiling: boolean } | null
       moved: boolean
+      /** Pressed on something locked: dragging says so instead of moving it. */
+      locked?: boolean
     } = { kind: 'none', x: 0, y: 0, moved: false }
     const applyNav = () => {
       const look = navigating()
@@ -654,7 +710,8 @@ export function Viewport() {
           const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -st.position[1])
           raycaster.setFromCamera(toNdc(e.clientX, e.clientY), camera)
           const from = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
-          gesture = { kind: from ? 'set' : 'click', x: e.clientX, y: e.clientY, id: piece, plane, from: from ?? undefined, delta: new THREE.Vector3(), moved: false }
+          // Locked: a click still selects it, but dragging doesn't move it.
+          gesture = { kind: from && !st.locked ? 'set' : 'click', x: e.clientX, y: e.clientY, id: piece, plane, from: from ?? undefined, delta: new THREE.Vector3(), moved: false, locked: st.locked }
         }
         renderer.domElement.setPointerCapture(e.pointerId)
         applyNav()
@@ -667,11 +724,12 @@ export function Viewport() {
         const fixture = project.fixtures.find((f) => f.id === id)!
         // On a stand or totem: the stand comes too (hold Option/Alt to lift the fixture off instead).
         const carrier = fixture.mount && !e.altKey ? (project.structures ?? []).find((x) => x.id === fixture.mount!.structure && STRUCTURE_KINDS[x.kind].carrier) : undefined
+        const locked = fixture.locked || carrier?.locked
         if (carrier) {
           const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -carrier.position[1])
           raycaster.setFromCamera(toNdc(e.clientX, e.clientY), camera)
           const from = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
-          gesture = { kind: from ? 'set' : 'click', x: e.clientX, y: e.clientY, id, plane, from: from ?? undefined, delta: new THREE.Vector3(), moved: false }
+          gesture = { kind: from && !locked ? 'set' : 'click', x: e.clientX, y: e.clientY, id, plane, from: from ?? undefined, delta: new THREE.Vector3(), moved: false, locked }
           renderer.domElement.setPointerCapture(e.pointerId)
           applyNav()
           return
@@ -679,7 +737,7 @@ export function Viewport() {
         const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -fixture.position[1])
         raycaster.setFromCamera(toNdc(e.clientX, e.clientY), camera)
         const from = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
-        gesture = { kind: from ? 'body' : 'click', x: e.clientX, y: e.clientY, id, plane, from: from ?? undefined, delta: new THREE.Vector3(), moved: false }
+        gesture = { kind: from && !locked ? 'body' : 'click', x: e.clientX, y: e.clientY, id, plane, from: from ?? undefined, delta: new THREE.Vector3(), moved: false, locked }
       } else {
         gesture = { kind: id ? 'click' : 'box', x: e.clientX, y: e.clientY, id, moved: false }
       }
@@ -690,6 +748,7 @@ export function Viewport() {
       if (gesture.kind === 'none') return
       const far = Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > 4
       if (!far && !gesture.moved) return
+      if (gesture.kind === 'click' && gesture.locked && !gesture.moved) notify('info', 'Locked: it stays where it is. Right-click ▸ Unlock (or ⌘L) to move it.')
       gesture.moved = true
       if (gesture.kind === 'box') {
         const rect = renderer.domElement.getBoundingClientRect()
@@ -700,8 +759,18 @@ export function Viewport() {
         if (gesture.kind === 'body' && !guides) showGuides(true)
         raycaster.setFromCamera(toNdc(e.clientX, e.clientY), camera)
         const at = raycaster.ray.intersectPlane(gesture.plane, new THREE.Vector3())
-        // Snap to 5 cm, like the arrows.
-        if (at) gesture.delta = at.sub(gesture.from).divideScalar(0.05).round().multiplyScalar(0.05)
+        // Snap to 5 cm, like the arrows; or, with Snap to grid on, land the dragged thing on the grid.
+        if (at) {
+          const raw = at.clone().sub(gesture.from)
+          const { project } = useStore.getState()
+          const fixture = project.fixtures.find((f) => f.id === gesture.id)
+          const carried = gesture.kind === 'set' && fixture?.mount ? (project.structures ?? []).find((x) => x.id === fixture.mount!.structure) : undefined
+          const anchor = carried ?? fixture ?? (project.structures ?? []).find((x) => x.id === gesture.id)
+          if (usePrefs.getState().snap && anchor) {
+            const [x, z] = snapXZ(anchor.position[0] + raw.x, anchor.position[2] + raw.z)
+            gesture.delta = new THREE.Vector3(x - anchor.position[0], 0, z - anchor.position[2])
+          } else gesture.delta = raw.divideScalar(0.05).round().multiplyScalar(0.05)
+        }
         // Along the ceiling, pointing near the horizon reaches far away: keep it inside the room.
         const dragged = gesture.kind === 'body' && gesture.id ? useStore.getState().project.fixtures.find((f) => f.id === gesture.id) : undefined
         if (dragged?.onCeiling && builtFit && gesture.delta) {
@@ -898,6 +967,8 @@ export function Viewport() {
       frameId = requestAnimationFrame(tick)
       // Fixture Studio covers the show and has its own view: don't draw this one meanwhile.
       if (useStudio.getState().open) return
+      // The Plan covers the 3D view: don't draw it meanwhile either.
+      if (usePrefs.getState().view === 'plan') return
       timer.update(now)
       const dt = Math.min(0.1, timer.getDelta())
       const time = timer.getElapsed()
@@ -999,6 +1070,8 @@ export function Viewport() {
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
       unsubscribeTool()
+      unsubscribeGrid()
+      unsubscribeGridRoom()
       marquee.remove()
       for (const rig of rigs.values()) rig.dispose()
       for (const rig of sets.values()) rig.dispose()
@@ -1011,8 +1084,9 @@ export function Viewport() {
   }, [])
 
   return (
-    <div className="viewport-wrap" ref={wrap}>
+    <div className={`viewport-wrap ${mainView === 'plan' ? 'plan' : ''}`} ref={wrap}>
       <div className="viewport" ref={host} />
+      {mainView === 'plan' && <PlanView />}
       <FixtureHud />
       <FixtureMenu />
       <StructureHud />

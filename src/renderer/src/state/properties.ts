@@ -28,6 +28,8 @@ export type PropertyDescriptor =
       set(f: Fixture, v: number): Fixture
     })
   | (Base & { kind: 'boolean'; get(f: Fixture): boolean; set(f: Fixture, v: boolean): Fixture })
+  /** A length in metres, shown and typed in the chosen units. */
+  | (Base & { kind: 'length'; min: number; max: number; get(f: Fixture): number; set(f: Fixture, v: number): Fixture })
   | (Base & {
       kind: 'select'
       options: Array<{ value: string; label: string }>
@@ -38,11 +40,9 @@ export type PropertyDescriptor =
 const axis = (index: 0 | 1 | 2, label: string, min: number, max: number): PropertyDescriptor => ({
   key: `position-${index}`,
   label,
-  kind: 'number',
+  kind: 'length',
   min,
   max,
-  step: 0.1,
-  unit: 'm',
   get: (f) => f.position[index],
   set: (f, v) => {
     const position = [...f.position] as Fixture['position']

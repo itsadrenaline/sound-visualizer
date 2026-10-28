@@ -11,6 +11,10 @@ import { roomFit } from '../model/physics'
 import { roomOf } from '../model/project'
 import { useViewSettings } from '../state/viewSettings'
 import { notify } from '../state/notices'
+import { LengthField } from './LengthField'
+import { formatLength } from '../model/units'
+import { gridChoices, usePrefs, type PlanLabels, type PlanSide } from '../state/prefs'
+import { capturePlan } from './PlanView'
 
 const PRESETS: Array<[ViewPreset, string, string]> = [
   ['perspective', 'Persp', '⇧1'],
@@ -24,7 +28,8 @@ const PRESETS: Array<[ViewPreset, string, string]> = [
 const NO_CAMERAS: never[] = []
 
 export async function saveViewImage(): Promise<void> {
-  const url = view.capture()
+  // In the Plan, the plan is the picture.
+  const url = usePrefs.getState().view === 'plan' ? await capturePlan() : view.capture()
   if (!url) return
   if (!window.api) {
     // In a plain browser: download it.
@@ -55,8 +60,12 @@ export function ViewToolbar() {
     notify('info', `Stored camera position "View ${n}"`)
   }
 
+  const mainView = usePrefs((s) => s.view)
+  if (mainView === 'plan') return <PlanToolbar />
+
   return (
     <div className="view-toolbar">
+      <ViewSwitch />
       <ToolPicker />
       <div className="seg" data-tour="views">
         {PRESETS.map(([id, label, key]) => (
@@ -92,10 +101,134 @@ export function ViewToolbar() {
         )}
       </div>
       <RoomMenu />
+      <GridMenu />
       <button data-tour="image" onClick={() => void saveViewImage()} title="Save the view as a PNG (Shift+Cmd+E)">
         Image
       </button>
       <button data-tour="fullview" onClick={() => setFullView(!fullView)} className={fullView ? 'on' : ''} title="Hide the panels (Shift+Cmd+F)">
+        {fullView ? 'Panels' : 'Full view'}
+      </button>
+    </div>
+  )
+}
+
+/** 3D or the Plan (P). */
+function ViewSwitch() {
+  const mainView = usePrefs((s) => s.view)
+  const setView = usePrefs((s) => s.setView)
+  return (
+    <div className="seg view-switch" data-tour="view-switch">
+      <button className={mainView === '3d' ? 'on' : ''} onClick={() => setView('3d')} title="The 3D view (P switches)">
+        3D
+      </button>
+      <button className={mainView === 'plan' ? 'on' : ''} onClick={() => setView('plan')} title="The Plan: a flat drawing from the top, front or side to place things exactly (P switches)">
+        Plan
+      </button>
+    </div>
+  )
+}
+
+/** Metric or imperial, for every length in the app. */
+export function UnitsSwitch() {
+  const units = usePrefs((s) => s.units)
+  const setUnits = usePrefs((s) => s.setUnits)
+  return (
+    <div className="seg small units-switch" data-tour="units" title="Lengths in metres or in feet and inches, everywhere in the app (View ▸ Units). You can type either in any field.">
+      <button className={units === 'metric' ? 'on' : ''} onClick={() => setUnits('metric')}>
+        m
+      </button>
+      <button className={units === 'imperial' ? 'on' : ''} onClick={() => setUnits('imperial')}>
+        ft
+      </button>
+    </div>
+  )
+}
+
+/** The grid: show it, snap to it (G), and how big it is. */
+function GridMenu() {
+  const { grid, snap, gridSize, units, view: mainView, setGrid, setSnap, setGridSize } = usePrefs()
+  const [open, setOpen] = useState(false)
+  const ref = useDismiss<HTMLDivElement>(open, useCallback(() => setOpen(false), []))
+  return (
+    <div className="dropdown" ref={ref}>
+      <button onClick={() => setOpen(!open)} className={open || snap ? 'on' : ''} title="Grid and snapping (G turns snapping on and off)">
+        Grid ▾
+      </button>
+      {open && (
+        <div className="dropdown-menu grid-menu">
+          {mainView === 'plan' && (
+            <label className="check">
+              <input type="checkbox" checked={grid} onChange={(e) => setGrid(e.target.checked)} /> Show the grid
+            </label>
+          )}
+          <label className="check">
+            <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> Snap to the grid <span className="menu-keys">G</span>
+          </label>
+          <div className="room-row">
+            <span className="label">Grid size</span>
+            <div className="seg small">
+              {gridChoices(units).map((g) => (
+                <button key={g.label} className={Math.abs(g.m - gridSize) < 1e-6 ? 'on' : ''} onClick={() => setGridSize(g.m)}>
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="hint">
+            {snap
+              ? 'Dragged things land on the grid, and arrow keys move one square.'
+              : mainView === 'plan'
+                ? 'Off: things move freely and line up with their neighbours (blue guides).'
+                : 'Turn snapping on to show the grid on the floor and land things on it.'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The Plan's own bar: which side, framing, grid, labels, picture. */
+function PlanToolbar() {
+  const { planSide, setPlanSide, planLabels, setPlanLabels } = usePrefs()
+  const selection = useStore((s) => s.selection)
+  const fullView = useViewSettings((s) => s.fullView)
+  const setFullView = useViewSettings((s) => s.setFullView)
+  const sides: Array<[PlanSide, string, string]> = [
+    ['top', 'Top', '⇧2'],
+    ['front', 'Front', '⇧3'],
+    ['side', 'Side', '⇧4']
+  ]
+  return (
+    <div className="view-toolbar">
+      <ViewSwitch />
+      <div className="seg" data-tour="plan-sides">
+        {sides.map(([id, label, key]) => (
+          <button key={id} className={planSide === id ? 'on' : ''} onClick={() => setPlanSide(id)} title={`${label} (${key})`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => window.dispatchEvent(new CustomEvent('plan:focus', { detail: selection.length ? selection : 'all' }))} title="Frame the selection, or everything (F)">
+        Fit
+      </button>
+      <GridMenu />
+      <div className="seg small" title="What the Plan writes by each fixture">
+        {(
+          [
+            ['name', 'Names'],
+            ['patch', 'Patch'],
+            ['none', 'No labels']
+          ] as Array<[PlanLabels, string]>
+        ).map(([id, label]) => (
+          <button key={id} className={planLabels === id ? 'on' : ''} onClick={() => setPlanLabels(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => void saveViewImage()} title="Save the Plan as a PNG, to send to the venue (Shift+Cmd+E)">
+        Image
+      </button>
+      <button onClick={() => setFullView(!fullView)} className={fullView ? 'on' : ''} title="Hide the panels (Shift+Cmd+F)">
         {fullView ? 'Panels' : 'Full view'}
       </button>
     </div>
@@ -158,21 +291,10 @@ function RoomMenu() {
           </label>
           {room.ceiling && (
             <div className="room-row">
-              <span className="label">Height (m)</span>
-              <input
-                type="number"
-                min={3}
-                max={25}
-                step={0.1}
-                value={room.ceilingHeight}
-                onChange={(e) => {
-                  const v = Number(e.target.value)
-                  if (v >= 3 && v <= 25) updateRoom({ ceilingHeight: v }, 'Ceiling height')
-                }}
-              />
+              <LengthField label="Height" min={3} max={25} value={room.ceilingHeight} onCommit={(v) => updateRoom({ ceilingHeight: v }, 'Ceiling height')} />
             </div>
           )}
-          {fit.raised && room.ceiling && <p className="hint">Raised to {fit.ceiling} m so everything fits under it.</p>}
+          {fit.raised && room.ceiling && <p className="hint">Raised to {formatLength(fit.ceiling)} so everything fits under it.</p>}
           <p className="hint">The room grows to hold everything. Gobos and beam pools show on the floor, the back wall and the ceiling. Press Up (Shift+6) to look at the ceiling.</p>
         </div>
       )}

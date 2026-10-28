@@ -7,6 +7,9 @@ import { useStore } from '../state/store'
 import { isAcrylicPanel, joinPanels, orientFixtures, panelSize, setPanel, updateFixtures } from '../state/commands'
 import { notify } from '../state/notices'
 import { FIXTURE_PROPERTIES, type PropertyDescriptor } from '../state/properties'
+import { LengthField } from './LengthField'
+import { useUnits } from '../state/prefs'
+import { lengthNumber, unitLabel } from '../model/units'
 import { footprint, type Fixture } from '../model/project'
 import { mirrorsOf } from '../model/patchCheck'
 import { SelectionProblems } from './PatchProblems'
@@ -17,7 +20,7 @@ import { modeChoices, setFixtureMode } from '../state/modes'
 import { originalFixtureType } from '../model/fixtureTypes'
 import { ArrangePanel } from './ArrangePanel'
 import { ArrangeButtons } from './ArrangeMenu'
-import { FixtureMount, NumberField, StructureInspector } from './StructureActions'
+import { FixtureMount, StructureInspector } from './StructureActions'
 import { Section } from './Section'
 
 export function Inspector() {
@@ -58,9 +61,12 @@ export function Inspector() {
       <PanelSection fixtures={selected} />
       {FIXTURE_PROPERTIES.map(({ section, properties }) => (
         <Section key={section} id={`fixture:${section}`} title={section}>
-          {properties.map((p) => (
-            <Field key={p.key} property={p} fixtures={selected} />
-          ))}
+          {section === 'Placement' && selected.some((f) => f.locked) && <p className="hint">Locked: unlock it to move or re-aim it (the padlock above, or ⇧⌘L).</p>}
+          <fieldset className="plain" disabled={section === 'Placement' && selected.some((f) => f.locked)}>
+            {properties.map((p) => (
+              <Field key={p.key} property={p} fixtures={selected} />
+            ))}
+          </fieldset>
         </Section>
       ))}
       <ArrangePanel ids={selection} />
@@ -78,6 +84,22 @@ function Field({ property, fixtures }: { property: PropertyDescriptor; fixtures:
   // so typing "120" is one undo step, not three.
   const [draft, setDraft] = useState(shown)
   useEffect(() => setDraft(shown), [shown])
+
+  if (property.kind === 'length') {
+    // Locked fixtures stay where they are.
+    const locked = fixtures.some((f) => f.locked)
+    return (
+      <LengthField
+        label={property.label}
+        value={mixed ? null : (values[0] as number)}
+        min={property.min}
+        max={property.max}
+        disabled={locked}
+        title={locked ? 'Locked: unlock it to move it (right-click ▸ Unlock)' : property.hint}
+        onCommit={(v) => updateFixtures(ids, `Set ${property.label}`, (f) => property.set(f, v))}
+      />
+    )
+  }
 
   const commit = (raw: string) => {
     if (raw === shown) return
@@ -148,6 +170,7 @@ function Field({ property, fixtures }: { property: PropertyDescriptor; fixtures:
 
 /** What the fixture is: make, model, mode, real size and where it's patched. */
 function TypeInfo({ fixture }: { fixture: Fixture }) {
+  useUnits()
   const type = getFixtureType(fixture.typeId)
   const size = type.spec?.size
   const end = fixture.address + footprint(fixture) - 1
@@ -156,7 +179,7 @@ function TypeInfo({ fixture }: { fixture: Fixture }) {
       <div>{type.name}</div>
       <div className="sub">
         {[type.manufacturer, type.source].filter(Boolean).join(' · ')}
-        {size ? ` · ${size.map((v) => Math.round(v * 1000)).join(' × ')} mm` : ''}
+        {size ? ` · ${size.map((v) => lengthNumber(v, 'small')).join(' × ')} ${unitLabel('small')}` : ''}
       </div>
       <div className="sub">
         Universe {fixture.universe + 1}, channels {fixture.address}–{end} ({footprint(fixture)} ch)
@@ -250,15 +273,13 @@ function PanelSection({ fixtures }: { fixtures: Fixture[] }) {
   if (!panels.length) return null
   const ids = panels.map((f) => f.id)
   const same = <T,>(values: T[]): T | null => (values.every((v) => v === values[0]) ? values[0] : null)
-  const inches = (m: number) => Math.round(m / INCH)
-  const width = same(panels.map((f) => inches(panelSize(f)[0])))
-  const height = same(panels.map((f) => inches(panelSize(f)[1])))
+  const width = same(panels.map((f) => panelSize(f)[0]))
+  const height = same(panels.map((f) => panelSize(f)[1]))
   const border = same(panels.map((f) => f.panel?.border ?? 'white'))
-  const clamp = (n: number) => Math.max(4, Math.min(120, n)) * INCH
   return (
     <Section id="fixture:panel" title="Panel" hint="Each panel's own size and frame. The RGBW strip inside lights it from the edges.">
-      <NumberField label="Width (in)" step={1} value={width} onCommit={(v) => setPanel(ids, { width: clamp(v) })} />
-      <NumberField label="Height (in)" step={1} value={height} onCommit={(v) => setPanel(ids, { height: clamp(v) })} />
+      <LengthField label="Width" kind="small" min={4 * INCH} max={120 * INCH} value={width} onCommit={(v) => setPanel(ids, { width: v })} />
+      <LengthField label="Height" kind="small" min={4 * INCH} max={120 * INCH} value={height} onCommit={(v) => setPanel(ids, { height: v })} />
       <label className="field">
         <span className="label">Frame</span>
         <select value={border ?? ''} onChange={(e) => setPanel(ids, { border: e.target.value as 'white' | 'black' | 'silver' })}>

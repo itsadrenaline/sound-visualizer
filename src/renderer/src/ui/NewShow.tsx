@@ -25,6 +25,7 @@ import {
 } from '../state/newShow'
 import type { SoundSwitchProfile } from '../../../shared/ipc'
 import type { SoundSwitchFixture } from '../../../shared/soundswitch'
+import { formatFeet } from '../model/units'
 
 type Start = 'soundswitch' | 'scratch' | 'describe' | 'demo'
 type Step = 'start' | 'profile' | 'fixtures' | 'finish'
@@ -375,7 +376,7 @@ function FixturesStep(props: {
             <select value={props.standFt} onChange={(e) => props.setStandFt(Number(e.target.value))}>
               {[2, 4, 6, 8, 9].map((h) => (
                 <option key={h} value={h}>
-                  {h} ft
+                  {formatFeet(h)}
                 </option>
               ))}
             </select>

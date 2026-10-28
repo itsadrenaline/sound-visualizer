@@ -5,13 +5,14 @@
  *  - a right-click menu with everything, including hang/stand, rotate and delete.
  * Both call the same commands as the list, the inspector and the shortcuts.
  */
+import { LockIcon } from './LockIcon'
 import { hasOwnStand } from '../model/catalog'
 import { useEffect } from 'react'
 import { useStore } from '../state/store'
 import { useMix } from '../state/mix'
 import { useFixtureMenu } from '../state/fixtureMenu'
 import { useViewSettings } from '../state/viewSettings'
-import { autoPlaceFixtures, deleteFixtures, detachFixtures, distributeFixtures, duplicateArray, duplicateFixtures, mirrorFixtures, mountFixtures, orientFixtures, hangFromCeiling, selectSameType, updateFixtures, isAcrylicPanel, joinPanels, setPanel } from '../state/commands'
+import { autoPlaceFixtures, deleteFixtures, detachFixtures, distributeFixtures, duplicateArray, duplicateFixtures, mirrorFixtures, mountFixtures, orientFixtures, hangFromCeiling, selectSameType, updateFixtures, isAcrylicPanel, joinPanels, setPanel, setLocked, toggleLocked } from '../state/commands'
 import { notify } from '../state/notices'
 import { attachOptions } from './StructureActions'
 import { nearestMount } from '../model/physics'
@@ -73,6 +74,15 @@ export function editFixtureType(typeId: string): void {
 
 const shortTypeName = (typeId: string) => getFixtureType(typeId).name.replace(/\s*\([^)]*\)\s*$/, '')
 
+/** Lock or unlock what's selected, from the floating bar. */
+export function LockButton({ ids, locked }: { ids: string[]; locked: boolean }) {
+  return (
+    <button className={`hud-btn lock ${locked ? 'on' : ''}`} title={locked ? 'Locked: click to unlock (⇧⌘L)' : 'Lock in place, so it can’t be moved by accident (⇧⌘L)'} onClick={() => setLocked(ids, !locked)}>
+      <LockIcon locked={locked} />
+    </button>
+  )
+}
+
 export function FixtureHud() {
   const info = useSelectionInfo()
   const openMenu = useFixtureMenu((s) => s.open)
@@ -86,6 +96,7 @@ export function FixtureHud() {
       <span className="hud-name" title={title}>
         {title}
       </span>
+      <LockButton ids={info.chosen.map((f) => f.id)} locked={info.chosen.every((f) => f.locked)} />
       <button className={`hud-btn ${info.muted !== 'off' ? 'on-mute' : ''}`} title="Mute (M): stop it doing anything" onClick={() => mix.toggle('muted', ids)}>
         M
       </button>
@@ -173,6 +184,8 @@ export function FixtureMenu() {
     <MenuShell at={at} onClose={close}>
         <div className="menu-title">{info.chosen.length === 1 ? info.chosen[0].name : all.length > info.chosen.length ? `${all.length} items` : `${info.chosen.length} fixtures`}</div>
         <Item label={`Edit fixture${types.length > 1 ? ` “${shortTypeName(types[0])}”` : ''}…`} title="Open this fixture in Fixture Studio: change its channels, look or modes. Save & add to show updates every fixture of this type in the show." onClick={run(() => editFixtureType(info.chosen[0].typeId))} />
+        <hr />
+        <Item label={info.chosen.every((f) => f.locked) ? 'Unlock' : 'Lock in place'} keys="⇧⌘L" title="Locked fixtures can't be dragged, moved or re-aimed by accident" onClick={run(() => toggleLocked(info.chosen.map((f) => f.id)))} />
         <hr />
         <Item label="Mute" check={check(info.muted)} keys="M" onClick={run(() => mix.toggle('muted', ids))} />
         <Item label="Solo" check={check(info.solo)} keys="S" onClick={run(() => mix.toggle('solo', ids))} />

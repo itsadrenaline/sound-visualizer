@@ -7,6 +7,7 @@
  * - Double-click a name or patch to edit it. With several selected, a new name
  *   numbers them ("Spot 1", "Spot 2"...) and a new address patches them in a row.
  */
+import { LockedBadge } from './LockIcon'
 import { useMemo, useRef, useState } from 'react'
 import { useStore } from '../state/store'
 import { useMix } from '../state/mix'
@@ -292,6 +293,7 @@ export function FixtureList() {
                             !
                           </span>
                         )}
+                        {f.locked && <LockedBadge id={f.id} />}
                         <InlineEdit value={f.name} onCommit={(v) => rename(f, v, targets(f.id))} />
                         {listView.groupBy !== 'type' && (
                           <div className="sub">

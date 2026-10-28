@@ -1,3 +1,4 @@
+import { UnitsSwitch } from './ViewToolbar'
 import { MenuItem, MenuShell } from './Menu'
 import { LearnMenu } from './Tour'
 import { useEffect, useState } from 'react'
@@ -69,6 +70,7 @@ export function Toolbar({ artNet }: { artNet: ArtNetStatus | null }) {
         <input type="range" min={0} max={1} step={0.01} value={haze} onChange={(e) => setHaze(Number(e.target.value))} aria-label="Haze" />
       </label>
       <div className="spacer" />
+      <UnitsSwitch />
       <SoundSwitchIndicator />
       <ArtNetIndicator status={artNet} />
       <LearnMenu />

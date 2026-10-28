@@ -16,6 +16,7 @@
  * typical 8-15 in powered tops, 18 in subs, and line array boxes around
  * 1 m × 0.3 m × 0.5 m (sizes vary by maker; these are typical, not one model).
  */
+import { localiseFeet, type Units } from './units'
 import type { Vec3 } from './project'
 
 export const FT = 0.3048
@@ -58,6 +59,8 @@ export interface Structure {
    * `position[1]` is then the point it hangs from. Missing: it stands (on a totem, a table, the floor).
    */
   hang?: 'truss' | 'ceiling'
+  /** Locked: it can't be moved, turned or resized by hand until it's unlocked. */
+  locked?: boolean
 }
 
 export interface StructureParams {
@@ -1014,8 +1017,33 @@ export function covers(s: Structure, x: number, z: number, margin = 0): boolean 
   return Math.abs(lx) <= w / 2 + margin && Math.abs(lz) <= d / 2 + margin
 }
 
-/** A friendly default name: "Totem 6 ft", "Stage deck 8 × 12 ft". */
+/** A friendly default name: "Totem 6 ft", "Stage deck 8 × 12 ft" (in metres when metric is chosen). */
 export function defaultName(kind: StructureKind, params: StructureParams): string {
+  return localiseFeet(defaultNameFt(kind, params))
+}
+
+/** Is this the automatic name, in either system? */
+export function isAutoName(s: Pick<Structure, 'kind' | 'params' | 'name'>): boolean {
+  const ft = defaultNameFt(s.kind, s.params)
+  return s.name === ft || s.name === localiseFeet(ft, 'metric')
+}
+
+/**
+ * The automatic name in the other system too ("Totem 6 ft" ↔ "Totem 1.83 m"), with any
+ * copy number kept ("Totem 6 ft 2"): what a structure is called after switching units,
+ * or null when it has a name of its own.
+ */
+export function renamedForUnits(s: Pick<Structure, 'kind' | 'params' | 'name'>, to: Units): string | null {
+  const ft = defaultNameFt(s.kind, s.params)
+  const names = [ft, localiseFeet(ft, 'metric')]
+  for (const n of names) {
+    if (s.name === n) return localiseFeet(ft, to)
+    if (s.name.startsWith(`${n} `) && /^\d+$/.test(s.name.slice(n.length + 1))) return `${localiseFeet(ft, to)}${s.name.slice(n.length)}`
+  }
+  return null
+}
+
+function defaultNameFt(kind: StructureKind, params: StructureParams): string {
   const info = STRUCTURE_KINDS[kind]
   const p = { ...info.defaults, ...params }
   const ft = (m?: number) => (m === undefined ? '' : `${Math.round((m / FT) * 10) / 10}`)
