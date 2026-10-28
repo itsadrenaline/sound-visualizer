@@ -205,6 +205,12 @@ button.link:hover:not(:disabled) { background: none; color: #fff; text-decoratio
 .viewport-wrap { position: absolute; inset: 0; container-type: size; container-name: view; }
 .view-toolbar { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap; }
 .view-toolbar button { background: rgba(21, 24, 29, 0.85); backdrop-filter: blur(6px); font-size: 12px; padding: 4px 9px; }
+.view-toolbar .icon-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; min-height: 25px; }
+.tb-icon { display: block; }
+.view-toolbar .icon-btn.recording { color: #fff; background: rgba(150, 28, 36, 0.92); border-color: #e0444e; font-variant-numeric: tabular-nums; }
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d57; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85); animation: rec-blink 1s steps(2, start) infinite; }
+.rec-stop { width: 8px; height: 8px; background: #fff; border-radius: 1px; margin-left: 2px; }
+@keyframes rec-blink { to { visibility: hidden; } }
 .seg { display: flex; }
 .seg button { border-radius: 0; margin-left: -1px; }
 .seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }

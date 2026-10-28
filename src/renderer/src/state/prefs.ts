@@ -8,7 +8,7 @@ import { FOOT, INCH, setUnitsValue, type Units } from '../model/units'
 const KEY = 'sv.prefs'
 
 export type MainView = '3d' | 'plan'
-export type PlanSide = 'top' | 'front' | 'side'
+export type PlanSide = 'top' | 'front' | 'left' | 'right'
 export type PlanLabels = 'name' | 'patch' | 'none'
 
 interface Prefs {
@@ -39,6 +39,8 @@ const DEFAULTS: Saved = { units: 'metric', grid: true, snap: false, gridSize: 0.
 function load(): Saved {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Saved>
+    // The one "Side" view of 1.8 is the Left view now.
+    if ((raw.planSide as string) === 'side') raw.planSide = 'left'
     return { ...DEFAULTS, ...raw }
   } catch {
     return DEFAULTS

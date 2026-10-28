@@ -125,13 +125,14 @@ export const TOURS: Tour[] = [
   {
     id: 'present',
     title: 'Looking good: cameras, room and pictures',
-    summary: 'Haze, the room’s light, stored cameras and saving pictures.',
+    summary: 'Haze, the room’s light, stored cameras, saving pictures and recording videos.',
     steps: [
       { target: 'haze', title: 'Haze', body: 'More haze makes the beams show up in the air.', prepare: panels },
       { target: 'room', title: 'The room', body: 'How dark the room is (dark club to house lights), its colour, and the ceiling.' },
       { target: 'cameras', title: 'Cameras', body: 'Store a view you like and come back to it. Stored views are saved with the show.' },
       { target: 'views', title: 'Quick views', body: 'Perspective, top, front, sides and ceiling, Shift+1 to Shift+6.' },
-      { target: 'image', title: 'Save a picture', body: 'Saves exactly what the 3D view shows as an image (⇧⌘E), for a client or the crew.' },
+      { target: 'image', title: 'Save a picture', body: 'The camera button saves exactly what the 3D view shows as an image (⇧⌘E), for a client or the crew.' },
+      { target: 'video', title: 'Record a video', body: 'The video camera records the 3D view as the show runs (⇧⌘R). Click it again to stop and save the video, ready to send to a client. The panels and buttons stay out of it.' },
       { target: 'fullview', title: 'Full view', body: 'Hides the panels so the 3D view fills the window, for presenting (⇧⌘F).' }
     ]
   }

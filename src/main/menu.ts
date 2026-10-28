@@ -15,7 +15,7 @@ export type MenuCommand =
   | 'showLibrary' | 'showFixtures' | 'toolSelect' | 'toolMove' | 'toolOrbit'
   | 'welcome' | 'builder' | 'importShow' | 'openMvr' | 'exportMvr' | 'exportCsv' | `template:${string}`
   | 'freshStart' | 'tours' | `tour:${string}` | 'about'
-  | 'toggleLock' | 'view3d' | 'togglePlan' | 'toggleGrid' | 'toggleSnap' | 'unitsMetric' | 'unitsImperial'
+  | 'recordVideo' | 'toggleLock' | 'view3d' | 'togglePlan' | 'toggleGrid' | 'toggleSnap' | 'unitsMetric' | 'unitsImperial'
 
 export function buildMenu(getWindow: () => BrowserWindow | null): void {
   const send = (command: MenuCommand) => () => getWindow()?.webContents.send('menu', command)
@@ -73,6 +73,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
         { label: 'New Fixture…', accelerator: 'Shift+CmdOrCtrl+N', click: send('newFixture') },
         { label: 'Import Fixture File…', click: send('importFixtures') },
         { label: 'Save View as Image…', accelerator: 'Shift+CmdOrCtrl+E', click: send('saveImage') },
+        { label: 'Record Video of the Show (again to stop)', accelerator: 'Shift+CmdOrCtrl+R', click: send('recordVideo') },
         ...(isMac ? [] : [{ type: 'separator' as const }, { role: 'quit' as const }])
       ]
     },
