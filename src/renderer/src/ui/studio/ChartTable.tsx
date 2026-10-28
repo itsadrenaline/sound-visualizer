@@ -95,6 +95,16 @@ export function ChartTable({ name, maker, onMake, claude, onClaude }: { name?: s
       }
       return editRow(c.id, { part: ring.id })
     }
+    if (v === '+lensring') {
+      // The small LEDs round each lens (shown as their colour on the face, no beam).
+      let ring = draft.parts.find((p) => p.role === 'halo' && /^lens\s*ring/i.test(p.name))
+      if (!ring) {
+        ring = { id: newKey('p'), name: 'Lens rings', role: 'halo' }
+        const r = ring
+        update((d) => ({ ...d, parts: [...d.parts, r] }))
+      }
+      return editRow(c.id, { part: ring.id })
+    }
     editRow(c.id, { part: v })
   }
 
@@ -253,7 +263,8 @@ export function ChartTable({ name, maker, onMake, claude, onClaude }: { name?: s
                   </option>
                 ))}
                 <option value="+cell">New cell</option>
-                {!draft.parts.some((p) => p.role === 'halo') && <option value="+ring">LED ring</option>}
+                {!draft.parts.some((p) => p.role === 'halo' && !/^lens\s*ring/i.test(p.name)) && <option value="+ring">LED ring (round the head)</option>}
+                {!draft.parts.some((p) => p.role === 'halo' && /^lens\s*ring/i.test(p.name)) && <option value="+lensring">LED rings (round each lens)</option>}
               </select>
               <button className={`mini ct-ranges ${c.ranges.length ? 'has' : ''}`} onClick={() => setOpenRanges(openRanges === c.id ? null : c.id)} title="Add the value ranges the manual lists for this channel">
                 {c.ranges.length ? `${c.ranges.length} range${c.ranges.length === 1 ? '' : 's'}` : '0–255'} {openRanges === c.id ? '▴' : '▾'}

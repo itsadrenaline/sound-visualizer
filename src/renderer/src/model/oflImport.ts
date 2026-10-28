@@ -9,8 +9,8 @@
  * Matrix fixtures (pixel bars, multi-cell washes) get one head per pixel.
  */
 import type { FixtureType } from './fixtureTypes'
-import { channelListFromHeads, shareWithMovers, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type SpinRange, type WheelSlot } from './heads'
-import { catalogSpec, LOOK_DEFAULTS, type FixtureSpec, type LookKind } from './catalog'
+import { channelListFromHeads, shareGroupParts, shareWithMovers, type GoboSlot, type HeadDef, type HeadFunction, type HeadRole, type ShutterRange, type SpinRange, type WheelSlot } from './heads'
+import { catalogSpec, ledsFromName, LOOK_DEFAULTS, type FixtureSpec, type LookKind } from './catalog'
 
 // --- The parts of the OFL format we read -------------------------------------------------
 
@@ -401,6 +401,18 @@ function lookFor(fx: OflFixture, heads: HeadDef[], hasMovement: boolean, size?: 
   return 'flood'
 }
 
+const RING_FNS = new Set<string>(['dimmer', 'shutter', 'red', 'green', 'blue', 'white', 'amber', 'uv', 'colorWheel'])
+
+/**
+ * Which ring a moving head's channel lights, by its name: the glow round or behind each
+ * lens ("Aura", "Aux") or the big ring round the head ("Halo", "LED Ring", "Backlight").
+ */
+function ringPart(name: string): string {
+  if (/^(aura|aux|auxiliary)\b/i.test(name)) return 'Lens Ring'
+  if (/^(halo|led\s*ring|ring|backlight|led\s*strip)\b/i.test(name)) return 'Halo'
+  return ''
+}
+
 function roleFor(fx: OflFixture, isMain: boolean, fns: HeadFunction[], hasPixels: boolean, name = ''): HeadRole {
   const cats = fx.categories ?? []
   if (!isMain) {
@@ -469,14 +481,17 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
     if (chKey === null) return
     const r = table.get(chKey)
     if (!r) return
-    // A fixture's own laser channels ("Laser Color", "Laser Strobe") form a laser head.
-    const headKey = r.pixel ?? pixel ?? (/^laser\b/i.test(r.base) ? 'Laser' : '')
+    const c = classify(r.base.replace(/ fine$/i, ''), r.def, fx)
+    // A fixture's own laser channels ("Laser Color", "Laser Strobe") form a laser head, and a
+    // moving head's ring lights ("Aura Red", "Aux Dimmer", "Halo Blue") a part of their own,
+    // so they don't take over the beam's colour.
+    const ring = !r.pixel && !pixel && c.fn && RING_FNS.has(c.fn) && (fx.categories ?? []).includes('Moving Head') ? ringPart(r.base) : ''
+    const headKey = r.pixel ?? pixel ?? (/^laser\b/i.test(r.base) ? 'Laser' : ring)
     if (!byHead.has(headKey)) {
       byHead.set(headKey, { name: /^\d+$|^\(/.test(headKey) ? `Pixel ${headKey}` : headKey, role: 'pixel', ch: {} })
       order.push(headKey)
     }
     const head = byHead.get(headKey)!
-    const c = classify(r.base.replace(/ fine$/i, ''), r.def, fx)
     if (!c.fn) return
     if (r.byte === 0) {
       if (head.ch[c.fn]) return // the first channel for a function wins
@@ -511,6 +526,8 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
   const known = catalogSpec(fx.name, manufacturer)
   const look = known?.look ?? lookFor(fx, heads, hasMovement, size)
   if (look === 'mover' || look === 'moverWash') heads = shareWithMovers(heads, [...Object.keys(fx.availableChannels ?? {}), ...Object.keys(fx.templateChannels ?? {})].some((k) => /^(pan|tilt)\b/i.test(k)))
+  // "Lens Ring" dims and strobes "Lens Ring 1" to "Lens Ring 19" (and "Ring" its numbered segments).
+  heads = shareGroupParts(heads)
   const lens = fx.physical?.lens?.degreesMinMax
   const beam: [number, number] = zoom ?? (lens ? [Math.min(...lens), Math.max(...lens)] : DEFAULT_BEAM(look))
   const pixelCount = heads.filter((h) => h.role === 'pixel').length
@@ -522,7 +539,10 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
   // A fixture whose pixels each pan and tilt (in some mode) has that many heads, in every mode.
   const pixelMovers = fx.matrix && Object.keys(fx.templateChannels ?? {}).some((k) => /^(pan|tilt)\b/i.test(k)) ? pixelKeys(fx).length : 0
   const movers = pixelMovers > 1 ? pixelMovers : known?.movers
-  const spec: FixtureSpec = known ? { ...known, leds: pixelCount > 1 ? pixelCount : known.leds, movers } : {
+  // A wash with its LEDs in a few zones (three rings of the 19) still shows every LED.
+  const named = ledsFromName(fx.name)
+  const ledCount = (fallback?: number) => ((look === 'moverWash' || look === 'beeEye') && named && pixelCount > 1 && pixelCount < named ? named : pixelCount > 1 ? pixelCount : fallback)
+  const spec: FixtureSpec = known ? { ...known, leds: ledCount(known.leds), movers } : {
     movers,
     look,
     size: size ?? DEFAULT_SIZE(look),
@@ -531,7 +551,9 @@ export function fixtureTypeFromOfl(key: string, manufacturer: string, fx: OflFix
     beam,
     speed: hasMovement ? 220 : undefined,
     output,
-    leds: pixelCount > 1 ? pixelCount : undefined,
+    leds: ledCount(),
+    // A ring round the lens drawn on the head even in modes that don't control it (dark there).
+    halo: (hasMovement && /halo|aura|led ring|light strip|led strip/i.test(fx.physical?.bulb?.type ?? '')) || undefined,
     mount: hasMovement ? 'hanging' : 'floor',
     note: `${manufacturer} ${fx.name}${fx.physical?.bulb?.type ? `: ${fx.physical.bulb.type}` : ''}. From the Open Fixture Library.`
   }
