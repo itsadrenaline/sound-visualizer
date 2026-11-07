@@ -789,3 +789,9 @@ input.length-input { font-variant-numeric: tabular-nums; }
 .my-shows .wizard-foot .soft { font-size: 12px; }
 .sign-in-google iframe { color-scheme: normal; }
 .sign-in-google { display: flex; align-items: center; gap: 12px; min-height: 48px; margin: 6px 0 12px; }
+
+/* The demo (signed out on the web version) */
+.account-signin .demo-clock { font-variant-numeric: tabular-nums; color: var(--muted); padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--line); }
+.account-signin.ending .demo-clock { color: #f0b44c; }
+.wizard-backdrop.demo-over { background: rgba(4, 5, 10, 0.82); z-index: 80; }
+.sign-in .soft a { color: var(--accent); }

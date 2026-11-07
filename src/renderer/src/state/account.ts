@@ -12,6 +12,7 @@ import { useStore } from './store'
 import { accountSave, loadDocument, useDocument } from './document'
 import { usePrefs } from './prefs'
 import { notify } from './notices'
+import { useWizards } from './wizards'
 import type { Project } from '../model/project'
 
 export interface AccountUser {
@@ -47,6 +48,10 @@ interface AccountState {
   setSignInOpen(open: boolean): void
   /** The site's Google OAuth client ID; null until it's set up on the server. */
   googleClientId: string | null
+  /** Signed out: demo time left (ms), counting down while the page is in front. */
+  demoLeft: number | null
+  /** Email me about updates (new features, fixtures). */
+  updates: boolean
 }
 
 export const useAccount = create<AccountState>((set) => ({
@@ -59,7 +64,9 @@ export const useAccount = create<AccountState>((set) => ({
   setShowsOpen: (showsOpen) => set({ showsOpen }),
   signInOpen: false,
   setSignInOpen: (signInOpen) => set({ signInOpen }),
-  googleClientId: null
+  googleClientId: null,
+  demoLeft: null,
+  updates: true
 }))
 
 const FORMAT = 'sound-visualizer'
@@ -108,11 +115,13 @@ export async function startAccount(): Promise<void> {
       useAccount.setState({ status: 'unavailable' })
       return
     }
-    const { user, prefs } = (await response.json()) as { user: AccountUser | null; prefs: SavedPrefs | null }
+    const { user, prefs, updates } = (await response.json()) as { user: AccountUser | null; prefs: SavedPrefs | null; updates?: boolean }
+    if (typeof updates === 'boolean') useAccount.setState({ updates })
     const config = await call<{ googleClientId: string | null }>('/api/config').catch(() => ({ googleClientId: null }))
     useAccount.setState({ googleClientId: config.googleClientId })
     if (!user) {
       useAccount.setState({ status: 'signed-out' })
+      startDemo()
       return
     }
     useAccount.setState({ status: 'signed-in', user })
@@ -196,6 +205,68 @@ function saveLink(): void {
     else localStorage.removeItem(LINK_KEY)
   } catch {
     // A convenience only.
+  }
+}
+
+// --- The demo (signed out) ------------------------------------------------------------------
+
+/** How long someone can use the site before signing in. */
+export const DEMO_MS = 5 * 60 * 1000
+const DEMO_KEY = 'sv.demo.used'
+
+function demoUsed(): number {
+  try {
+    return Math.max(0, Number(localStorage.getItem(DEMO_KEY) ?? 0) || 0)
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Counts the time the page is in front while signed out (not while the welcome or New show
+ * window is open), kept in this browser so a reload doesn't start it again. At zero the
+ * Sign in window opens and stays: signing in (free) is how to carry on.
+ */
+function startDemo(): void {
+  let used = demoUsed()
+  let last = performance.now()
+  const tick = () => {
+    const now = performance.now()
+    const step = Math.min(now - last, 5000)
+    last = now
+    const w = useWizards.getState()
+    const paused = document.visibilityState !== 'visible' || w.welcome || w.newShow
+    if (!paused) used += step
+    const left = Math.max(0, DEMO_MS - used)
+    try {
+      localStorage.setItem(DEMO_KEY, String(Math.round(used)))
+    } catch {
+      // Without storage the demo still counts down in this page.
+    }
+    useAccount.setState({ demoLeft: left })
+    if (left <= 0) {
+      clearInterval(timer)
+      useAccount.setState({ signInOpen: true })
+    }
+  }
+  const timer = window.setInterval(tick, 1000)
+  tick()
+}
+
+/** The demo is over and the person hasn't signed in. */
+export function demoOver(): boolean {
+  const { status, demoLeft } = useAccount.getState()
+  return status === 'signed-out' && demoLeft !== null && demoLeft <= 0
+}
+
+/** Email about updates, on or off. */
+export async function setUpdates(on: boolean): Promise<void> {
+  useAccount.setState({ updates: on })
+  try {
+    await call('/api/profile', { method: 'PUT', body: JSON.stringify({ updates: on }) })
+  } catch (error) {
+    useAccount.setState({ updates: !on })
+    notify('error', `Couldn't change that: ${(error as Error).message}`)
   }
 }
 

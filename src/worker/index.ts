@@ -27,6 +27,8 @@ interface Env {
   DB: D1Database
   GOOGLE_CLIENT_ID: string
   ALLOWED_EMAILS?: string
+  /** Shown on the privacy page; set in the Cloudflare dashboard (kept out of the code). */
+  CONTACT_EMAIL?: string
   /** Local testing only (.dev.vars): /auth/dev?email= signs in without Google. Never set in production. */
   DEV_LOGIN?: string
 }
@@ -53,6 +55,7 @@ export default {
     try {
       if (url.pathname.startsWith('/auth/')) return await auth(request, env, url)
       if (url.pathname.startsWith('/api/')) return await api(request, env, url)
+      if (url.pathname === '/privacy') return privacyPage(url, env.CONTACT_EMAIL)
       return env.ASSETS.fetch(request)
     } catch (error) {
       console.error(error)
@@ -132,8 +135,8 @@ async function api(request: Request, env: Env, url: URL): Promise<Response> {
 
   if (url.pathname === '/api/me' && method === 'GET') {
     if (!user) return json({ user: null })
-    const row = await env.DB.prepare('SELECT prefs FROM users WHERE id = ?').bind(user.id).first<{ prefs: string | null }>()
-    return json({ user, prefs: row?.prefs ? JSON.parse(row.prefs) : null })
+    const row = await env.DB.prepare('SELECT prefs, updates FROM users WHERE id = ?').bind(user.id).first<{ prefs: string | null; updates: number | null }>()
+    return json({ user, prefs: row?.prefs ? JSON.parse(row.prefs) : null, updates: row?.updates !== 0 })
   }
 
   if (!user) return json({ error: 'Please sign in first.' }, 401)
@@ -142,8 +145,10 @@ async function api(request: Request, env: Env, url: URL): Promise<Response> {
   if (url.pathname === '/api/profile' && method === 'PUT') {
     const text = await request.text()
     if (text.length > MAX_PREFS_BYTES) return json({ error: 'Those settings are too large.' }, 413)
-    const body = JSON.parse(text) as { prefs?: unknown }
-    await env.DB.prepare('UPDATE users SET prefs = ?, updated_at = ? WHERE id = ?').bind(JSON.stringify(body.prefs ?? null), now(), user.id).run()
+    const body = JSON.parse(text) as { prefs?: unknown; updates?: unknown }
+    // Only what was sent changes: settings, and whether to get emails about updates.
+    if (body.prefs !== undefined) await env.DB.prepare('UPDATE users SET prefs = ?, updated_at = ? WHERE id = ?').bind(JSON.stringify(body.prefs), now(), user.id).run()
+    if (typeof body.updates === 'boolean') await env.DB.prepare('UPDATE users SET updates = ?, updated_at = ? WHERE id = ?').bind(body.updates ? 1 : 0, now(), user.id).run()
     return json({ ok: true })
   }
 
@@ -239,6 +244,8 @@ function ensureSchema(db: D1Database): Promise<void> {
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`),
       db.prepare('CREATE INDEX IF NOT EXISTS shows_user ON shows(user_id, updated_at)')
     ])
+    // Added later: emails about updates (on unless turned off). Already there: nothing to do.
+    .then(() => db.prepare('ALTER TABLE users ADD COLUMN updates INTEGER NOT NULL DEFAULT 1').run().catch(() => undefined))
     .then(() => undefined)
     .catch((error) => {
       schemaReady = null
@@ -344,3 +351,38 @@ function redirect(location: string, cookies: string[] = []): Response {
   return new Response(null, { status: 302, headers })
 }
 
+
+/** The privacy policy (linked from Google's sign-in screen and the Sign in window). */
+function privacyPage(url: URL, contact?: string): Response {
+  const email = (contact ?? '').replace(/[^\w.@+-]/g, '')
+  const reach = email ? `<a href="mailto:${email}">${email}</a>` : 'the contact on our GitHub page'
+  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy · Sound Visualizer</title>
+<style>body{margin:0;background:#0d1117;color:#e6edf3;font:16px/1.6 system-ui,-apple-system,sans-serif}main{max-width:680px;margin:0 auto;padding:48px 20px}h1{font-size:28px;margin:0 0 4px}h2{font-size:18px;margin:28px 0 6px}p,li{color:#c9d1d9}a{color:#6ea2ff}.soft{color:#8b949e;font-size:14px}</style>
+<main>
+<h1>Privacy</h1>
+<p class="soft">Sound Visualizer · last updated November 7, 2026</p>
+<p>Sound Visualizer shows your lighting rig in 3D. This page says what it keeps about you, why, and how to have it removed.</p>
+<h2>What we keep</h2>
+<ul>
+<li><b>From Google, when you sign in:</b> your name, email address and profile picture. Never your password: Google confirms it's you.</li>
+<li><b>What you save:</b> the shows you save to your account and your settings (such as metres or feet).</li>
+<li><b>A sign-in cookie</b>, so you stay signed in on this browser for 30 days. Signed out, the site keeps a small note in your browser of how much of the free demo you've used.</li>
+</ul>
+<p>Shows you don't save to your account, fixtures you import, and videos you place on screens stay in your browser. Live lighting data (Art-Net) goes from your computer straight to the page and is never sent to us.</p>
+<h2>What we do with it</h2>
+<ul>
+<li>Keep your shows and settings so they open wherever you sign in.</li>
+<li>Email you now and then about new features and fixtures. Every email can be turned off: in the app (your picture ▸ Email me about updates) or by replying.</li>
+</ul>
+<p>We don't sell your information or share it with advertisers.</p>
+<h2>Where it's kept</h2>
+<p>On Cloudflare, which runs the site and its database. Google handles signing in.</p>
+<h2>Removing it</h2>
+<p>Email ${reach} and we'll delete your account, your shows and your settings. You can also remove Sound Visualizer's access in your <a href="https://myaccount.google.com/connections">Google account</a>.</p>
+<h2>Questions</h2>
+<p>${reach}</p>
+<p><a href="${url.origin}/">Back to Sound Visualizer</a></p>
+</main></html>`
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' } })
+}

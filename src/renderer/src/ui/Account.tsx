@@ -11,6 +11,7 @@ import {
   openFromAccount,
   renameInAccount,
   saveToAccount,
+  setUpdates,
   signIn,
   signOut,
   useAccount,
@@ -44,7 +45,7 @@ function Avatar({ name, picture }: { name: string; picture: string | null }) {
 
 /** In the toolbar: Sign in, or your picture and the account menu. */
 export function AccountButton() {
-  const { status, user, linkedId, saving, savedAt, setShowsOpen } = useAccount()
+  const { status, user, linkedId, saving, savedAt, setShowsOpen, demoLeft, updates } = useAccount()
   const edited = useDocument((s) => s.saved) !== useStore((s) => s.project)
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   const [, tick] = useState(0)
@@ -54,8 +55,15 @@ export function AccountButton() {
   }, [])
   if (status === 'checking' || status === 'unavailable') return null
   if (status === 'signed-out' || !user) {
+    const left = demoLeft ?? 0
+    const clock = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`
     return (
-      <button className="account-signin" onClick={signIn} title="Sign in with Google to keep your shows and settings online">
+      <button
+        className={`account-signin${demoLeft !== null && left < 60_000 ? ' ending' : ''}`}
+        onClick={signIn}
+        title="You're trying the demo. Sign in with Google (free) to keep going, and to keep your shows and settings online"
+      >
+        {demoLeft !== null && <span className="demo-clock">Demo {clock}</span>}
         <GoogleMark /> Sign in
       </button>
     )
@@ -109,6 +117,12 @@ export function AccountButton() {
               }}
             />
           )}
+          <MenuItem
+            label="Email me about updates"
+            check={updates ? '✓' : ''}
+            title="New features and fixtures, now and then. Turn it off any time."
+            onClick={() => void setUpdates(!updates)}
+          />
           <hr />
           <MenuItem
             label="Sign out"
@@ -276,12 +290,13 @@ export function SignIn() {
   const open = useAccount((s) => s.signInOpen)
   const setOpen = useAccount((s) => s.setSignInOpen)
   const clientId = useAccount((s) => s.googleClientId)
+  const over = useAccount((s) => s.status === 'signed-out' && s.demoLeft !== null && s.demoLeft <= 0)
   const slot = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     if (!open) return
     setError(null)
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !over && setOpen(false)
     window.addEventListener('keydown', onKey)
     let cancelled = false
     if (clientId) {
@@ -306,14 +321,28 @@ export function SignIn() {
       cancelled = true
       window.removeEventListener('keydown', onKey)
     }
-  }, [open, clientId])
+  }, [open, clientId, over])
   if (!open) return null
   return (
-    <div className="wizard-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setOpen(false)}>
-      <div className="wizard small-dialog sign-in" role="dialog" aria-label="Sign in">
-        <h2>Sign in to keep your shows</h2>
-        <p>Sign in with your Google account. Your shows and settings are kept online, so they open on any computer you sign in on.</p>
-        <p className="soft">There's no password to make: Google confirms it's you. This site only gets your name, email and picture.</p>
+    <div className={`wizard-backdrop${over ? ' demo-over' : ''}`} onPointerDown={(e) => !over && e.target === e.currentTarget && setOpen(false)}>
+      <div className="wizard small-dialog sign-in" role="dialog" aria-modal={over} aria-label="Sign in">
+        {over ? (
+          <>
+            <h2>Your 5-minute demo is over</h2>
+            <p>Sign in with Google to keep using Sound Visualizer. It's free, and your shows and settings are kept online, so they open on any computer you sign in on.</p>
+          </>
+        ) : (
+          <>
+            <h2>Sign in to keep your shows</h2>
+            <p>Sign in with your Google account. Your shows and settings are kept online, so they open on any computer you sign in on.</p>
+          </>
+        )}
+        <p className="soft">
+          There's no password to make: Google confirms it's you. This site only gets your name, email and picture, and sends you the occasional update about new features (turn it off any time).{' '}
+          <a href="/privacy" target="_blank" rel="noreferrer">
+            Privacy
+          </a>
+        </p>
         {clientId ? (
           <div className="sign-in-google">
             <div ref={slot} />
@@ -322,10 +351,12 @@ export function SignIn() {
           <p className="my-shows-error">Google sign-in isn't set up on this site yet.</p>
         )}
         {error && <p className="my-shows-error">{error}</p>}
-        <div className="wizard-foot">
-          <span className="spacer" />
-          <button onClick={() => setOpen(false)}>Not now</button>
-        </div>
+        {!over && (
+          <div className="wizard-foot">
+            <span className="spacer" />
+            <button onClick={() => setOpen(false)}>Not now</button>
+          </div>
+        )}
       </div>
     </div>
   )
