@@ -4,6 +4,7 @@
  * settings and shows are kept in a D1 database.
  *
  *   POST /auth/google            sign in with the ID token Google's button gives the page ({ credential })
+ *   POST /auth/google/redirect   the same, from Google's full-page sign-in (a form post from Google)
  *   POST /auth/logout            sign out
  *   GET  /api/config             what the page needs to show the Google button (the client ID)
  *   GET  /api/me                 who's signed in, and their saved settings
@@ -76,6 +77,25 @@ async function auth(request: Request, env: Env, url: URL): Promise<Response> {
     const user = await upsertUser(env.DB, String(claims.sub), email, String(claims.name ?? email.split('@')[0]), claims.picture ? String(claims.picture) : null)
     const token = await createSession(env.DB, user.id)
     return json({ user }, 200, [cookie(SESSION_COOKIE, token, SESSION_DAYS * 86400)])
+  }
+
+  // Google's full-page sign-in (no pop-up, so it works in every browser): Google posts the
+  // signed token back here as a form. Its CSRF token must match the cookie Google's script set.
+  if (url.pathname === '/auth/google/redirect' && request.method === 'POST') {
+    const back = (code: string) => redirect(`/?signin=${code}`)
+    if (!env.GOOGLE_CLIENT_ID) return back('unavailable')
+    const form = await request.formData().catch(() => null)
+    const csrf = form?.get('g_csrf_token')
+    const credential = form?.get('credential')
+    if (typeof csrf !== 'string' || !csrf || csrf !== readCookie(request, 'g_csrf_token')) return back('expired')
+    const claims = typeof credential === 'string' ? await verifyGoogleToken(credential, env.GOOGLE_CLIENT_ID) : null
+    if (!claims) return back('failed')
+    const email = String(claims.email).toLowerCase()
+    if (!allowed(env, email)) return back('not-allowed')
+    await ensureSchema(env.DB)
+    const user = await upsertUser(env.DB, String(claims.sub), email, String(claims.name ?? email.split('@')[0]), claims.picture ? String(claims.picture) : null)
+    const token = await createSession(env.DB, user.id)
+    return redirect('/', [cookie(SESSION_COOKIE, token, SESSION_DAYS * 86400)])
   }
 
   if (url.pathname === '/auth/dev' && env.DEV_LOGIN === '1' && isLocal(url)) {

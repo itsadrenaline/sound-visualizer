@@ -85,9 +85,22 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 let started = false
 
 /** Ask the site who's signed in. Call once, on the web version only. */
+const SIGN_IN_PROBLEMS: Record<string, string> = {
+  expired: 'That sign-in took too long. Please try again.',
+  failed: 'Google’s sign-in couldn’t be checked. Please try again.',
+  'not-allowed': 'That Google account isn’t on the list for this test yet.',
+  unavailable: 'Google sign-in isn’t set up on this site yet.'
+}
+
 export async function startAccount(): Promise<void> {
   if (started) return
   started = true
+  // Back from Google's sign-in page with a problem: say so, and tidy the address.
+  const problem = new URLSearchParams(window.location.search).get('signin')
+  if (problem) {
+    notify('error', SIGN_IN_PROBLEMS[problem] ?? 'Signing in didn’t work. Please try again.')
+    window.history.replaceState(null, '', window.location.pathname)
+  }
   try {
     const response = await fetch('/api/me', { credentials: 'same-origin' })
     // Another host (GitHub Pages, a plain file server): no account API, no account.
@@ -116,7 +129,7 @@ export function signIn(): void {
 }
 
 interface GoogleId {
-  initialize(options: { client_id: string; callback: (r: { credential: string }) => void; use_fedcm_for_button?: boolean; ux_mode?: 'popup' }): void
+  initialize(options: { client_id: string; callback?: (r: { credential: string }) => void; use_fedcm_for_button?: boolean; ux_mode?: 'popup' | 'redirect'; login_uri?: string }): void
   renderButton(parent: HTMLElement, options: Record<string, string | number>): void
 }
 declare global {

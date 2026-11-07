@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react'
 import { MenuItem, MenuShell } from './Menu'
 import {
   deleteFromAccount,
-  finishSignIn,
   listShows,
   loadGoogle,
   openFromAccount,
@@ -279,11 +278,9 @@ export function SignIn() {
   const clientId = useAccount((s) => s.googleClientId)
   const slot = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
   useEffect(() => {
     if (!open) return
     setError(null)
-    setBusy(false)
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
     window.addEventListener('keydown', onKey)
     let cancelled = false
@@ -293,15 +290,11 @@ export function SignIn() {
           if (cancelled) return
           id.initialize({
             client_id: clientId,
-            // Google's own pop-up: works in every browser (the newer FedCM prompt doesn't everywhere yet).
-            use_fedcm_for_button: false,
-            callback: ({ credential }) => {
-              setBusy(true)
-              finishSignIn(credential).catch((e: Error) => {
-                setBusy(false)
-                setError(e.message)
-              })
-            }
+            // Google's full page, then back here (src/worker: /auth/google/redirect). No pop-up,
+            // so it works in every browser, the Claude app's included.
+            ux_mode: 'redirect',
+            login_uri: `${window.location.origin}/auth/google/redirect`,
+            use_fedcm_for_button: false
           })
           // One button, even when the window opens twice in a row (React's strict mode does).
           if (slot.current) slot.current.replaceChildren()
@@ -324,7 +317,6 @@ export function SignIn() {
         {clientId ? (
           <div className="sign-in-google">
             <div ref={slot} />
-            {busy && <span className="soft">Signing you in…</span>}
           </div>
         ) : (
           <p className="my-shows-error">Google sign-in isn't set up on this site yet.</p>
