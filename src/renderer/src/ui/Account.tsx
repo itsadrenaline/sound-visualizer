@@ -291,7 +291,8 @@ export function SignIn() {
         .then((id) => {
           id.initialize({
             client_id: clientId,
-            use_fedcm_for_button: true,
+            // Google's own pop-up: works in every browser (the newer FedCM prompt doesn't everywhere yet).
+            use_fedcm_for_button: false,
             callback: ({ credential }) => {
               setBusy(true)
               finishSignIn(credential).catch((e: Error) => {

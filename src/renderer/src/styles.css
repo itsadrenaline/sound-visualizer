@@ -787,4 +787,5 @@ input.length-input { font-variant-numeric: tabular-nums; }
 .my-shows-rename { display: flex; gap: 8px; flex: 1; }
 .my-shows-rename input { flex: 1; }
 .my-shows .wizard-foot .soft { font-size: 12px; }
+.sign-in-google iframe { color-scheme: normal; }
 .sign-in-google { display: flex; align-items: center; gap: 12px; min-height: 48px; margin: 6px 0 12px; }
