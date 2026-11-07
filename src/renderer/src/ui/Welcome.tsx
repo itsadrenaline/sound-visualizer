@@ -42,7 +42,11 @@ export function Welcome() {
       body: (
         <>
           <p>See your lighting rig in 3D, and watch it play your SoundSwitch shows live: beams, colours, gobos and moving heads, exactly as the DMX says.</p>
-          <p className="soft">Everything stays on this Mac. Nothing to install: SoundSwitch is all you need, and even that's optional for trying it out.</p>
+          <p className="soft">
+            {window.api?.platform === 'web'
+              ? 'It runs right in your browser, with nothing to install. SoundSwitch is all you need, and even that’s optional for trying it out.'
+              : 'Everything stays on this Mac. Nothing to install: SoundSwitch is all you need, and even that’s optional for trying it out.'}
+          </p>
         </>
       )
     },
