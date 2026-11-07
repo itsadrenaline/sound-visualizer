@@ -286,9 +286,11 @@ export function SignIn() {
     setBusy(false)
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
     window.addEventListener('keydown', onKey)
+    let cancelled = false
     if (clientId) {
       loadGoogle()
         .then((id) => {
+          if (cancelled) return
           id.initialize({
             client_id: clientId,
             // Google's own pop-up: works in every browser (the newer FedCM prompt doesn't everywhere yet).
@@ -307,7 +309,10 @@ export function SignIn() {
         })
         .catch((e: Error) => setError(e.message))
     }
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      cancelled = true
+      window.removeEventListener('keydown', onKey)
+    }
   }, [open, clientId])
   if (!open) return null
   return (
