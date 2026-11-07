@@ -230,13 +230,16 @@ function demoUsed(): number {
 function startDemo(): void {
   let used = demoUsed()
   let last = performance.now()
+  let lastUse = last
+  for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel'])
+    window.addEventListener(type, () => (lastUse = performance.now()), { passive: true, capture: true })
   const tick = () => {
     const now = performance.now()
     const step = Math.min(now - last, 5000)
     last = now
     const w = useWizards.getState()
-    // Some embedded browsers say "hidden" while on screen: focus counts as in front too.
-    const inFront = document.visibilityState === 'visible' || document.hasFocus()
+    // Some embedded browsers say "hidden" while on screen: focus or recent use counts too.
+    const inFront = document.visibilityState === 'visible' || document.hasFocus() || now - lastUse < 60_000
     const paused = !inFront || w.welcome || w.newShow
     if (!paused) used += step
     const left = Math.max(0, DEMO_MS - used)
