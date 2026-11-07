@@ -301,6 +301,8 @@ export function SignIn() {
               })
             }
           })
+          // One button, even when the window opens twice in a row (React's strict mode does).
+          if (slot.current) slot.current.replaceChildren()
           if (slot.current) id.renderButton(slot.current, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with', width: 280 })
         })
         .catch((e: Error) => setError(e.message))
