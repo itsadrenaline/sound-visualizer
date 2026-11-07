@@ -563,7 +563,7 @@ select.where { width: 100%; }
   50% { box-shadow: 0 0 0 10px rgba(255, 190, 80, 0), 0 0 22px 6px rgba(255, 180, 60, 0.45); background: #ffc35e; }
 }
 /* While it pulses, a small note under it says why it matters. */
-.status.pill.cta .cta-note { position: fixed; z-index: 60; white-space: nowrap; padding: 6px 10px; border-radius: 8px; background: #2a2416; border: 1px solid #f0b44c; color: #ffe2a8; font-size: 12px; font-weight: 500; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
+.status.pill.cta .cta-note { position: fixed; z-index: 19; white-space: nowrap; padding: 6px 10px; border-radius: 8px; background: #2a2416; border: 1px solid #f0b44c; color: #ffe2a8; font-size: 12px; font-weight: 500; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
 .status.pill.cta .cta-note::before { content: ''; position: absolute; top: -6px; right: 22px; width: 10px; height: 10px; background: #2a2416; border-left: 1px solid #f0b44c; border-top: 1px solid #f0b44c; transform: rotate(45deg); }
 @media (prefers-reduced-motion: reduce) { .status.pill.cta.pulsing { animation: none; box-shadow: 0 0 14px 3px rgba(255, 180, 60, 0.45); } }
 

@@ -116,6 +116,9 @@ export async function startAccount(): Promise<void> {
       return
     }
     useAccount.setState({ status: 'signed-in', user })
+    // The show that was open last time is still the account's: keep it linked.
+    const link = loadLink()
+    if (link && link.user === user.id && link.path === useDocument.getState().path) useAccount.setState({ linkedId: link.id })
     if (prefs) applyPrefs(prefs)
     followPrefs()
     followDocument()
@@ -172,6 +175,28 @@ export async function signOut(): Promise<void> {
     // Signed out on this side either way.
   }
   window.location.reload()
+}
+
+// --- Which show is linked, kept across reloads (this browser only) ---------------------------
+
+const LINK_KEY = 'sv.account.linked'
+
+function loadLink(): { id: string; path: string; user: string } | null {
+  try {
+    return JSON.parse(localStorage.getItem(LINK_KEY) ?? 'null')
+  } catch {
+    return null
+  }
+}
+
+function saveLink(): void {
+  const { linkedId, user } = useAccount.getState()
+  try {
+    if (linkedId && user) localStorage.setItem(LINK_KEY, JSON.stringify({ id: linkedId, path: useDocument.getState().path, user: user.id }))
+    else localStorage.removeItem(LINK_KEY)
+  } catch {
+    // A convenience only.
+  }
 }
 
 // --- Settings -----------------------------------------------------------------------------
@@ -236,6 +261,7 @@ export async function saveToAccount(asNew = false): Promise<boolean> {
     }
     useDocument.getState().setSaved(linkedPath(project.name), project)
     useAccount.setState({ linkedId: id, savedAt, saving: false })
+    saveLink()
     return true
   } catch (error) {
     useAccount.setState({ saving: false })
@@ -289,6 +315,9 @@ async function flushAutosave(): Promise<void> {
 function followDocument(): void {
   accountSave.linked = isLinked
   accountSave.save = () => saveToAccount()
+  useAccount.subscribe((s, prev) => {
+    if (s.linkedId !== prev.linkedId) saveLink()
+  })
   // Another show (a file, a template, New show): this one isn't the account's any more.
   useDocument.subscribe((s) => {
     const { linkedId } = useAccount.getState()
