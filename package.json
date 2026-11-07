@@ -12,8 +12,10 @@
     "dev:web": "vite --config vite.web.config.ts",
     "build": "electron-vite build",
     "build:web": "vite build --config vite.web.config.ts",
+    "dev:cloudflare": "npm run build:web && wrangler dev",
+    "deploy:cloudflare": "npm run build:web && wrangler deploy",
     "start": "electron-vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/worker",
     "test": "vitest run",
     "artnet:test": "node scripts/artnet-test.mjs",
     "library": "node scripts/build-library.mjs",
@@ -24,6 +26,7 @@
     "bridge": "esbuild src/bridge/index.ts --bundle --platform=node --format=esm --outfile=out/bridge/bridge.mjs --log-level=warning && node out/bridge/bridge.mjs"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261107.1",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -39,6 +42,7 @@
     "typescript": "7.0.2",
     "vite": "8.3.6",
     "vitest": "5.1.0",
+    "wrangler": "4.158.0",
     "zustand": "5.1.0"
   },
   "author": "Sound Visualizer contributors",

@@ -76,3 +76,26 @@ Source: GitHub Actions. The site is about 20 MB, most of it the fixture librarie
    and `.ssvis` files open in it.
 4. **Big shows**: the QLC+ list (14 MB) loads on first visit; load it only when the
    Library is opened.
+
+## On Cloudflare, with accounts
+
+On Cloudflare the same page gets accounts: **Sign in** (Google only, so there are no
+passwords to keep) and each person's settings and shows are kept online, in a D1 database.
+The page's files are served as they are; a small Worker (`src/worker`) does sign-in and
+the API. On any other host there's no account API, and the Sign in button doesn't show.
+
+- `wrangler.jsonc`: the Worker, the database and two settings:
+  - `GOOGLE_CLIENT_ID`: from Google Cloud ▸ Google Auth Platform ▸ Clients (type *Web
+    application*, the site's address under *Authorized JavaScript origins*). It's public: the
+    page shows Google's own button, Google signs the result, and the Worker checks Google's
+    signature (`src/worker/googleToken.ts`). No client secret.
+  - `ALLOWED_EMAILS`: comma-separated, to let only some people in while testing. Empty: anyone.
+- Tables are made the first time the Worker runs; there's nothing to set up in the database.
+- Shows are kept compressed; one can be up to about 1.9 MB compressed. Videos on screens
+  stay in the browser.
+- Deploys: Cloudflare builds the `web` branch on every push (Workers ▸ the Worker ▸ Settings ▸
+  Build: build command `npm ci --legacy-peer-deps && npm run build:web`, deploy command
+  `npx wrangler deploy`). By hand: `npm run deploy:cloudflare`.
+- Locally: `npm run dev:cloudflare` (http://localhost:8787). With `DEV_LOGIN=1` in a
+  `.dev.vars` file, `http://localhost:8787/auth/dev?email=you@example.com` signs in without
+  Google (only on localhost).

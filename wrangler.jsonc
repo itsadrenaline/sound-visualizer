@@ -1,0 +1,29 @@
+// The web version on Cloudflare: the page (out/web) plus the account API (src/worker).
+// Build with `npm run build:web`, then `npx wrangler deploy`. See WEB.md, "On Cloudflare".
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sound-visualizer",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./out/web",
+    "binding": "ASSETS",
+    // Sign-in and the API go to the Worker; everything else is the page's files.
+    "run_worker_first": ["/auth/*", "/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sound-visualizer",
+      "database_id": "2eedc5ff-9b18-4fac-bbed-5a18712d712e"
+    }
+  ],
+  "vars": {
+    // From Google Cloud ▸ Google Auth Platform ▸ Clients (type "Web application", with this
+    // site under "Authorized JavaScript origins"). Public: no client secret is used.
+    "GOOGLE_CLIENT_ID": "",
+    // Comma-separated emails allowed to sign in while testing; empty lets any Google account in.
+    "ALLOWED_EMAILS": ""
+  }
+}

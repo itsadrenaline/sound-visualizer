@@ -13,6 +13,8 @@ import { TEMPLATES } from '../state/shows'
 import { saveDocument, useDocument } from '../state/document'
 import type { ArtNetStatus } from '../../../shared/ipc'
 import { useSoundSwitch } from '../state/soundswitchLink'
+import { AccountButton } from './Account'
+import { isLinked } from '../state/account'
 
 export function Toolbar({ artNet }: { artNet: ArtNetStatus | null }) {
   const past = useStore((s) => s.past)
@@ -75,6 +77,7 @@ export function Toolbar({ artNet }: { artNet: ArtNetStatus | null }) {
       <ArtNetIndicator status={artNet} />
       <LearnMenu />
       <SaveButton />
+      <AccountButton />
     </header>
   )
 }
@@ -145,7 +148,7 @@ function SaveButton() {
   if (!window.api) return null
   const edited = saved !== project
   return (
-    <button data-tour="save" onClick={() => void saveDocument(false)} title={path ? `Save (⌘S): ${path}${edited ? '\nUnsaved changes' : '\nAll changes saved'}` : 'Save the show to a file (⌘S): the show, its objects and fixture types in one file'}>
+    <button data-tour="save" onClick={() => void saveDocument(false)} title={isLinked() ? `Save to your account (⌘S)${edited ? '\nUnsaved changes (they save by themselves in a few seconds)' : '\nAll changes saved'}` : path ? `Save (⌘S): ${path}${edited ? '\nUnsaved changes' : '\nAll changes saved'}` : 'Save the show to a file (⌘S): the show, its objects and fixture types in one file'}>
       {edited ? '● ' : ''}Save
     </button>
   )

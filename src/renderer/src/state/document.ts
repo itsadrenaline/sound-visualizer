@@ -56,7 +56,11 @@ function updateTitle(): void {
   if (typeof window !== 'undefined') window.api?.setTitle(project.name, path, saved !== project)
 }
 
+/** The web version's account (state/account.ts): a show linked to it saves there. */
+export const accountSave: { linked?: () => boolean; save?: () => Promise<boolean> } = {}
+
 export async function saveDocument(saveAs = false): Promise<boolean> {
+  if (!saveAs && accountSave.linked?.() && accountSave.save) return accountSave.save()
   if (!window.api) return false
   const project = useStore.getState().project
   try {

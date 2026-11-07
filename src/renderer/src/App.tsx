@@ -12,6 +12,7 @@ import { ObjectsPanel } from './ui/ObjectsPanel'
 import { NewShow } from './ui/NewShow'
 import { Welcome } from './ui/Welcome'
 import { FreshStartConfirm, useFirstLaunch, WelcomeBack } from './ui/FreshStart'
+import { MyShows, SignIn } from './ui/Account'
 import { SwitchProjectDialog } from './ui/SwitchProject'
 import { AboutDialog } from './ui/About'
 import { BridgeHelp } from './ui/BridgeHelp'
@@ -136,6 +137,8 @@ export function App() {
       <Welcome />
       <WelcomeBack />
       <FreshStartConfirm />
+      <MyShows />
+      <SignIn />
       <SwitchProjectDialog />
       <AboutDialog />
       {window.api?.platform === 'web' && <BridgeHelp />}

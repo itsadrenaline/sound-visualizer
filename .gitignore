@@ -13,3 +13,7 @@ _to_delete/
 electron.vite.config.*.mjs
 tests/zz.test.ts
 *.ssproj
+
+# Cloudflare local files (secrets and the local database)
+.dev.vars
+.wrangler/
