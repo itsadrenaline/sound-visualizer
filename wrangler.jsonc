@@ -22,7 +22,7 @@
   "vars": {
     // From Google Cloud ▸ Google Auth Platform ▸ Clients (type "Web application", with this
     // site under "Authorized JavaScript origins"). Public: no client secret is used.
-    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_CLIENT_ID": "202399500719-3bvve8pm5t1deau6cjq8jv5bopp3kksl.apps.googleusercontent.com",
     // Comma-separated emails allowed to sign in while testing; empty lets any Google account in.
     "ALLOWED_EMAILS": ""
   }
