@@ -14,7 +14,7 @@ import { saveDocument, useDocument } from '../state/document'
 import type { ArtNetStatus } from '../../../shared/ipc'
 import { useSoundSwitch } from '../state/soundswitchLink'
 import { AccountButton } from './Account'
-import { isLinked } from '../state/account'
+import { isLinked, useAccount } from '../state/account'
 
 export function Toolbar({ artNet }: { artNet: ArtNetStatus | null }) {
   const past = useStore((s) => s.past)
@@ -145,6 +145,8 @@ function SaveButton() {
   const path = useDocument((s) => s.path)
   const saved = useDocument((s) => s.saved)
   const project = useStore((s) => s.project)
+  // Re-render when the show becomes (or stops being) the account's.
+  useAccount((s) => s.linkedId)
   if (!window.api) return null
   const edited = saved !== project
   return (
