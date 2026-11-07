@@ -235,7 +235,9 @@ function startDemo(): void {
     const step = Math.min(now - last, 5000)
     last = now
     const w = useWizards.getState()
-    const paused = document.visibilityState !== 'visible' || w.welcome || w.newShow
+    // Some embedded browsers say "hidden" while on screen: focus counts as in front too.
+    const inFront = document.visibilityState === 'visible' || document.hasFocus()
+    const paused = !inFront || w.welcome || w.newShow
     if (!paused) used += step
     const left = Math.max(0, DEMO_MS - used)
     try {
